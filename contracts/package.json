@@ -1,0 +1,25 @@
+{
+  "name": "streetsync-contracts",
+  "version": "1.0.0",
+  "description": "StreetSync smart contract suite – Hardhat / Solidity 0.8.24",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
+    "deploy:arc": "hardhat run scripts/deploy.ts --network arcTestnet",
+    "clean": "hardhat clean",
+    "coverage": "hardhat coverage"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.0"
+  }
+}
+
