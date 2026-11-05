@@ -1,0 +1,30 @@
+{
+  "name": "@streetsync/evidence",
+  "version": "1.0.0",
+  "description": "StreetSync evidence bundle: WebP + CBOR + Zstd compression pipeline",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bokuweb/zstd-wasm": "^0.0.25",
+    "cbor-x": "^1.6.0",
+    "fzstd": "^0.1.1",
+    "sharp": "^0.33.5",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}
