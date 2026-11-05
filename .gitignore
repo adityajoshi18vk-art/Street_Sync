@@ -59,6 +59,14 @@ out
 dist
 .output
 
+# SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+backend/data/
+data/
+
 # OS files
 .DS_Store
 Thumbs.db

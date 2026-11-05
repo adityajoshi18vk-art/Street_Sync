@@ -1,0 +1,25 @@
+{
+  "name": "streetsync-backend",
+  "version": "1.0.0",
+  "description": "StreetSync backend – World ID v4 attestation signer, EIP-712 signer, Arc event indexer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "tsx --test test/backend.test.ts",
+    "db:reset": "rm -f data/streetsync.db && tsx src/server.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/cors": "^11.0.0",
+    "viem": "^2.21.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
