@@ -24,3 +24,9 @@ input[type="number"]::-webkit-inner-spin-button {
 .safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
+
+/* Leaflet styles every popup link blue; keep button-style links readable. */
+.leaflet-container a.popup-cta,
+.leaflet-container a.popup-cta:hover {
+  color: #fff;
+}
