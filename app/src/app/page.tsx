@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAccount, useChainId, useConfig, useWriteContract } from "wagmi";
-import { decodeEventLog, keccak256, toHex } from "viem";
-import { waitForTransactionReceipt } from "wagmi/actions";
+import { useAccount, useChainId, useConfig, useReadContract, useWriteContract } from "wagmi";
+import { decodeEventLog } from "viem";
+import { REPORT_MAX_DESCRIPTION, REPORT_MIN_DESCRIPTION, normalizeDescription, packReport } from "@streetsync/evidence";
 import {
   ESCROW_ABI,
   ESCROW_ADDRESS,
@@ -17,12 +17,19 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { listBounties } from "@/lib/api";
+import { listBounties, uploadBountyReport } from "@/lib/api";
+import { friendlyError } from "@/lib/errors";
+import { availableExpiryChoices, canPledge, formatDuration } from "@/lib/lifecycle";
+import { bountyDisplayStatus } from "@/lib/map-utils";
+import { encodeReportPhoto } from "@/lib/photo";
+import { MAX_PHOTO_INPUT_BYTES, browserStorage, deletePendingReport, savePendingReport } from "@/lib/report";
+import { useNowSeconds } from "@/lib/useNow";
 import {
+  formatBytes,
   normalizeBounty,
   STATUS_COLORS,
   STATUS_NAMES,
-  statusName,
+  STATUS_LABELS,
   shortAddress,
   formatUsdcDisplaySafe,
   type BountyMapItem
@@ -34,13 +41,6 @@ const MapView = dynamic<MapViewProps>(
   { ssr: false, loading: () => <div className="h-[420px] w-full animate-pulse rounded-xl bg-gray-200" /> }
 );
 
-const EXPIRY_OPTIONS = [
-  { label: "1 day", seconds: 86_400 },
-  { label: "3 days", seconds: 3 * 86_400 },
-  { label: "7 days", seconds: 7 * 86_400 },
-  { label: "30 days", seconds: 30 * 86_400 }
-];
-
 export default function HomePage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
@@ -48,6 +48,19 @@ export default function HomePage() {
   const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id;
   const config = useConfig();
   const { writeContractAsync, isPending: writing } = useWriteContract();
+  const now = useNowSeconds();
+
+  const validationWindowQuery = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: ESCROW_ADDRESS ?? undefined,
+    abi: ESCROW_ABI,
+    functionName: "validationWindow",
+    query: { enabled: !!ESCROW_ADDRESS && contractsDeployed }
+  });
+  const validationWindow =
+    typeof validationWindowQuery.data === "bigint" ? Number(validationWindowQuery.data) : null;
+  const windowReady = validationWindowQuery.isSuccess || validationWindowQuery.isError;
+  const expiryChoices = useMemo(() => availableExpiryChoices(validationWindow), [validationWindow]);
 
   const [bounties, setBounties] = useState<BountyMapItem[]>([]);
   const [listError, setListError] = useState<string | null>(null);
@@ -60,9 +73,18 @@ export default function HomePage() {
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [expiryIdx, setExpiryIdx] = useState(2);
+  const [expirySeconds, setExpirySeconds] = useState(7 * 86_400);
   const [txStatus, setTxStatus] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
+  const [txNotice, setTxNotice] = useState<string | null>(null);
+
+  const [photo, setPhoto] = useState<{
+    bytes: Uint8Array;
+    previewUrl: string;
+    capturedAtMs: number;
+  } | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const [pledgeAmount, setPledgeAmount] = useState("");
   const [pledgeStatus, setPledgeStatus] = useState<string | null>(null);
@@ -98,12 +120,51 @@ export default function HomePage() {
     [bounties, selectedId]
   );
 
+  const selectedExpiry = expiryChoices.find((c) => c.seconds === expirySeconds) ?? expiryChoices[0];
+  const normalizedDescription = normalizeDescription(description);
+  const descriptionLength = [...normalizedDescription].length;
+  const descriptionValid =
+    descriptionLength >= REPORT_MIN_DESCRIPTION && descriptionLength <= REPORT_MAX_DESCRIPTION;
+
+  const handlePhotoChange = async (file: File | undefined) => {
+    setPhotoError(null);
+    if (photo) URL.revokeObjectURL(photo.previewUrl);
+    setPhoto(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Choose an image file.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_INPUT_BYTES) {
+      setPhotoError("That photo is too large. Choose one under 25 MB.");
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const bytes = await encodeReportPhoto(new Uint8Array(await file.arrayBuffer()));
+      const capturedAtMs = file.lastModified > 0 && file.lastModified <= Date.now() ? file.lastModified : Date.now();
+      setPhoto({ bytes, previewUrl: URL.createObjectURL(file), capturedAtMs });
+    } catch (e) {
+      setPhotoError(friendlyError(e));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const handleCreateBounty = async () => {
     if (!canWrite || !draftPin || !address || !ESCROW_ADDRESS) return;
     setTxError(null);
-    const trimmed = description.trim();
-    if (trimmed.length < 8) {
-      setTxError("Description must be at least 8 characters.");
+    setTxNotice(null);
+    if (!photo) {
+      setTxError("Add a photo of the problem first.");
+      return;
+    }
+    if (!descriptionValid) {
+      setTxError(`Describe the problem in ${REPORT_MIN_DESCRIPTION}–${REPORT_MAX_DESCRIPTION} characters.`);
+      return;
+    }
+    if (!selectedExpiry) {
+      setTxError("The neighbour-validation window is too long for any expiry option. Ask the operator to shorten it.");
       return;
     }
     let amountUsdc: string;
@@ -115,11 +176,29 @@ export default function HomePage() {
       return;
     }
 
+    let newId: string | null = null;
+    let bundle: Uint8Array;
+    let reportHash: `0x${string}`;
     try {
       const { latE5, lngE5 } = latLngToE5(draftPin.lat, draftPin.lng);
       const regionCell = regionCellFromLatLng(draftPin.lat, draftPin.lng);
-      const descHash = keccak256(toHex(trimmed));
-      const claimDeadline = BigInt(Math.floor(Date.now() / 1000) + EXPIRY_OPTIONS[expiryIdx].seconds);
+      const packed = await packReport({
+        creator: address,
+        description: normalizedDescription,
+        latE5,
+        lngE5,
+        capturedAtMs: photo.capturedAtMs,
+        photo: photo.bytes
+      });
+      bundle = packed.bundle;
+      reportHash = packed.reportHash;
+
+      // Persist before any transaction so a failed upload can be retried from the bounty page.
+      const storage = browserStorage();
+      if (!storage) throw new Error("Your browser blocks local storage, which is needed to keep your photo safe until it uploads.");
+      savePendingReport(storage, reportHash, bundle);
+
+      const claimDeadline = BigInt(Math.floor(Date.now() / 1000) + selectedExpiry.seconds);
       const initialAmount = parseUsdc(amountUsdc);
 
       setTxStatus("Approving exactly " + amountUsdc + " USDC…");
@@ -136,23 +215,17 @@ export default function HomePage() {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "createBounty",
-        args: [descHash, latE5, lngE5, regionCell, initialAmount, claimDeadline],
+        args: [packed.descriptionHash, reportHash, latE5, lngE5, regionCell, initialAmount, claimDeadline],
         chain: ACTIVE_CHAIN,
         chainId: ACTIVE_CHAIN.id,
         account: address
       });
       setTxStatus("Waiting for confirmation…");
-      const receipt = await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
-      if (receipt.status !== "success") throw new Error("Transaction reverted. No bounty was created.");
+      const receipt = await waitTx(config, hash);
 
-      let newId: string | null = null;
       for (const log of receipt.logs) {
         try {
-          const decoded = decodeEventLog({
-            abi: ESCROW_ABI,
-            data: log.data,
-            topics: log.topics
-          });
+          const decoded = decodeEventLog({ abi: ESCROW_ABI, data: log.data, topics: log.topics });
           if (decoded.eventName === "BountyCreated") {
             newId = (decoded.args as unknown as { bountyId: bigint }).bountyId.toString();
             break;
@@ -161,17 +234,41 @@ export default function HomePage() {
           // not an escrow event
         }
       }
-
+    } catch (e) {
       setTxStatus(null);
+      setTxError(friendlyError(e));
+      return;
+    }
+
+    // The bounty exists on-chain from here on; only the photo upload can still fail.
+    let uploaded = false;
+    if (newId) {
+      try {
+        setTxStatus("Uploading your photo…");
+        await uploadBountyReport(newId, bundle);
+        deletePendingReport(browserStorage()!, reportHash);
+        uploaded = true;
+      } catch (e) {
+        setTxNotice(
+          `Your bounty is created, but the photo upload failed (${friendlyError(e)}). Open the bounty page to retry the upload.`
+        );
+      }
+    } else {
+      setTxNotice(
+        "Your bounty is created, but its id couldn't be read from the receipt. Find it on the map; your photo is saved on this device and can be uploaded from the bounty page."
+      );
+    }
+
+    setTxStatus(null);
+    if (uploaded || newId) {
+      if (photo) URL.revokeObjectURL(photo.previewUrl);
+      setPhoto(null);
       setDescription("");
       setAmount("");
       setDraftPin(null);
-      void loadBounties();
-      if (newId) router.push(`/bounty/${newId}`);
-    } catch (e) {
-      setTxStatus(null);
-      setTxError(e instanceof Error ? e.message : String(e));
     }
+    void loadBounties();
+    if (newId) router.push(`/bounty/${newId}`);
   };
 
   const handlePledge = async () => {
@@ -206,7 +303,7 @@ export default function HomePage() {
       void loadBounties();
     } catch (e) {
       setPledgeStatus(null);
-      setTxError(e instanceof Error ? e.message : String(e));
+      setTxError(friendlyError(e));
     }
   };
 
