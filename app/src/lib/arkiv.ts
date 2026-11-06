@@ -1,5 +1,6 @@
 "use client";
 
+import { isLocalNetwork } from "../config/contracts";
 import type { IArkivClient } from "@streetsync/arkiv-client";
 
 /**
