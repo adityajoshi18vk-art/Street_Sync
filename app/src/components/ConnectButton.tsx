@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAccount, useConnect, useSwitchChain, useChainId } from "wagmi";
+import { ChevronDown, TriangleAlert, Wallet } from "lucide-react";
 import { ACTIVE_CHAIN, contractsDeployed } from "@/config/contracts";
 import { shortAddress } from "@/lib/types";
 
@@ -26,11 +27,14 @@ export function ConnectButton() {
       >
         {isPending ? (
           <>
-            <span className="spinner spinner-sm border-white/40 border-t-white" />
+            <span className="spinner spinner-sm spinner-inherit" />
             Connecting…
           </>
         ) : (
-          "Connect Wallet"
+          <>
+            <Wallet className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+            Connect Wallet
+          </>
         )}
       </button>
     );
@@ -44,13 +48,14 @@ export function ConnectButton() {
           disabled={switching}
           className="btn btn-sm border border-red-400/30 bg-red-400/10 text-red-300 hover:bg-red-400/20"
         >
+          <TriangleAlert className="h-4 w-4" aria-hidden />
           {switching ? "Switching…" : `Switch to ${ACTIVE_CHAIN.name}`}
         </button>
       )}
       <div className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex min-h-[2rem] items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-white/30 hover:bg-white/10"
+          className="flex min-h-[2rem] items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-1.5 text-sm font-semibold text-zinc-200 transition hover:border-white/30 hover:bg-white/10"
         >
           <span
             className={`h-2 w-2 rounded-full ${
@@ -58,13 +63,14 @@ export function ConnectButton() {
             }`}
           />
           <span className="font-mono text-xs">{shortAddress(address)}</span>
+          <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition ${open ? "rotate-180" : ""}`} aria-hidden />
         </button>
         {open && (
           <div className="card absolute right-0 z-50 mt-2 w-60 p-4 text-xs animate-rise">
             <p className="label-micro">Network</p>
-            <p className="mb-3 mt-0.5 font-semibold text-slate-100">{ACTIVE_CHAIN.name}</p>
+            <p className="mb-3 mt-0.5 font-semibold text-zinc-100">{ACTIVE_CHAIN.name}</p>
             <p className="label-micro">Wallet</p>
-            <p className="mt-0.5 break-all font-mono text-[11px] text-slate-300">{address}</p>
+            <p className="mt-0.5 break-all font-mono text-[11px] text-zinc-300">{address}</p>
             {!contractsDeployed && (
               <p className="alert-warn mt-3 p-2.5 text-[11px]">
                 Escrow contracts not configured on this network.

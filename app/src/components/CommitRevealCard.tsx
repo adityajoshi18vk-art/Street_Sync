@@ -165,7 +165,7 @@ export default function CommitRevealCard({
     <div className="card p-5">
       <div className="flex items-center justify-between">
         <p className="heading text-sm">
-          Commit-Reveal Vote <span className="text-slate-500">· round {reviewRound}</span>
+          Commit-Reveal Vote <span className="text-zinc-500">· round {reviewRound}</span>
         </p>
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ${
@@ -180,21 +180,21 @@ export default function CommitRevealCard({
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-zinc-400">
         Pool: {formatUsdcDisplay(totalPledged)} USDC · 90% to worker on approval, 10% + slashed
         stakes to majority reviewers.
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
         <div className="card-inset p-2.5">
-          <p className="text-slate-500">Commit ends</p>
-          <p className="font-mono text-sm font-semibold text-slate-200">
+          <p className="text-zinc-500">Commit ends</p>
+          <p className="font-mono text-sm font-semibold text-zinc-200">
             {phase === "commit" ? countdown(commitSecondsLeft) : formatUtc(commitDeadline)}
           </p>
         </div>
         <div className="card-inset p-2.5">
-          <p className="text-slate-500">Reveal ends</p>
-          <p className="font-mono text-sm font-semibold text-slate-200">
+          <p className="text-zinc-500">Reveal ends</p>
+          <p className="font-mono text-sm font-semibold text-zinc-200">
             {phase !== "commit" ? countdown(revealSecondsLeft) : formatUtc(revealDeadline)}
           </p>
         </div>
@@ -222,7 +222,7 @@ export default function CommitRevealCard({
               className={`rounded-xl py-2.5 text-sm font-semibold ring-1 transition ${
                 approve
                   ? "bg-emerald-500 text-white ring-emerald-400/50 shadow-lg shadow-emerald-500/20"
-                  : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
+                  : "bg-white/5 text-zinc-300 ring-white/10 hover:bg-white/10"
               }`}
             >
               Approve work
@@ -232,7 +232,7 @@ export default function CommitRevealCard({
               className={`rounded-xl py-2.5 text-sm font-semibold ring-1 transition ${
                 !approve
                   ? "bg-red-500 text-white ring-red-400/50 shadow-lg shadow-red-500/20"
-                  : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
+                  : "bg-white/5 text-zinc-300 ring-white/10 hover:bg-white/10"
               }`}
             >
               Reject work
@@ -245,7 +245,7 @@ export default function CommitRevealCard({
           >
             {busy === "commit" ? (
               <>
-                <span className="spinner spinner-sm border-white/40 border-t-white" />
+                <span className="spinner spinner-sm spinner-inherit" />
                 Committing…
               </>
             ) : storedVote ? (
@@ -254,7 +254,7 @@ export default function CommitRevealCard({
               "1-click Commit Vote"
             )}
           </button>
-          <p className="mt-1.5 text-[11px] text-slate-500">
+          <p className="mt-1.5 text-[11px] text-zinc-500">
             A random 32-byte salt is generated in your browser and saved locally — only the
             keccak256 hash goes on-chain.
           </p>
@@ -269,7 +269,7 @@ export default function CommitRevealCard({
         >
           {busy === "reveal" ? (
             <>
-              <span className="spinner spinner-sm border-white/40 border-t-white" />
+              <span className="spinner spinner-sm spinner-inherit" />
               Revealing…
             </>
           ) : (

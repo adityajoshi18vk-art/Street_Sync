@@ -367,13 +367,13 @@ export default function CameraCapture({
   return (
     <div className="card overflow-hidden bg-ink-900/80">
       <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="label-micro !text-slate-300">
+        <span className="label-micro !text-zinc-300">
           {slot} photo
         </span>
-        <span className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
+        <span className="flex items-center gap-2 text-[11px] font-medium text-zinc-400">
           <span
             className={`h-1.5 w-1.5 rounded-full ${
-              cameraState === "live" ? "animate-pulse bg-red-500 shadow-[0_0_8px_rgb(239_68_68)]" : "bg-slate-600"
+              cameraState === "live" ? "animate-pulse bg-red-500 shadow-[0_0_8px_rgb(239_68_68)]" : "bg-zinc-600"
             }`}
           />
           {cameraState === "live" ? "REC" : "standby"}
@@ -392,7 +392,7 @@ export default function CameraCapture({
             </span>
           ))
         ) : (
-          <span className="text-xs text-slate-500">Challenge code appears here after claim</span>
+          <span className="text-xs text-zinc-500">Challenge code appears here after claim</span>
         )}
       </div>
 
@@ -408,14 +408,14 @@ export default function CameraCapture({
             {cameraState === "denied" ? (
               <>
                 <p className="text-sm text-red-400">Camera access denied.</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-zinc-400">
                   Use the system camera button below — gallery uploads are rejected by the flow.
                 </p>
               </>
             ) : cameraState === "starting" ? (
-              <p className="text-sm text-slate-300">Starting camera…</p>
+              <p className="text-sm text-zinc-300">Starting camera…</p>
             ) : (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-zinc-400">
                 Camera preview will appear here (rear camera enforced).
               </p>
             )}
@@ -441,7 +441,7 @@ export default function CameraCapture({
         <div className="mx-4 mt-3 flex items-center justify-between rounded-xl bg-amber-400/10 px-3 py-2 text-xs ring-1 ring-amber-400/30">
           <div className="flex items-center gap-2">
             <span className="font-bold text-amber-400">Swarm Video:</span>
-            <span className="font-mono text-slate-300">{videoWalkthrough.swarmReference.slice(0, 14)}…</span>
+            <span className="font-mono text-zinc-300">{videoWalkthrough.swarmReference.slice(0, 14)}…</span>
           </div>
           <span className="text-[10px] font-semibold text-emerald-400">✓ Sealed for Arkiv</span>
         </div>
@@ -464,7 +464,7 @@ export default function CameraCapture({
               >
                 {capturing ? (
                   <>
-                    <span className="spinner spinner-sm border-white/40 border-t-white" />
+                    <span className="spinner spinner-sm spinner-inherit" />
                     Capturing…
                   </>
                 ) : (
@@ -493,7 +493,7 @@ export default function CameraCapture({
             >
               {videoUploading ? (
                 <>
-                  <span className="spinner spinner-sm border-white/40 border-t-white" />
+                  <span className="spinner spinner-sm spinner-inherit" />
                   Uploading Walkthrough to Swarm…
                 </>
               ) : recordingVideo

@@ -5,11 +5,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env.arc src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node --env-file-if-exists=.env.arc dist/server.js",
     "test": "tsx --test test/backend.test.ts",
-    "db:reset": "rm -f data/streetsync.db && tsx src/server.ts"
+    "db:reset": "rm -f data/streetsync.db && tsx src/server.ts",
+    "dev:arc": "tsx watch --env-file=.env.arc src/server.ts",
+    "start:arc": "node --env-file=.env.arc dist/server.js"
   },
   "dependencies": {
     "@streetsync/arkiv-client": "^1.0.0",

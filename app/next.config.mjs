@@ -1,6 +1,19 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+
+const require = createRequire(import.meta.url);
+// @aliimam/* declare "main": "dist/index.cjs", which they don't ship; point at their ESM build.
+const esmEntry = (pkg) => join(dirname(require.resolve(`${pkg}/package.json`)), "dist/index.mjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Same-origin proxy to the backend, so the app works behind a tunnel or preview URL
+  // where the browser can't reach localhost:3001. Use with NEXT_PUBLIC_API_URL=/backend.
+  async rewrites() {
+    const target = process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
+    return [{ source: "/backend/:path*", destination: `${target}/:path*` }];
+  },
   webpack: (config, { isServer }) => {
     config.experiments = {
       ...config.experiments,
@@ -12,6 +25,8 @@ const nextConfig = {
     // Our app never touches x402 payments, so stub every referenced subpath.
     config.resolve.alias = {
       ...config.resolve.alias,
+      "@aliimam/icons$": esmEntry("@aliimam/icons"),
+      "@aliimam/logos$": esmEntry("@aliimam/logos"),
       "@x402/core/client": false,
       "@x402/core/schemas": false,
       "@x402/core/server": false,

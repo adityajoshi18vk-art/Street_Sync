@@ -10,30 +10,43 @@ const config: Config = {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       colors: {
-        ink: {
-          950: "#000000",
-          900: "#0a0a0a",
-          800: "#16181c",
-          700: "#1d1f23",
-          600: "#2f3336"
+        // shadcn/ui semantic tokens, mapped to the StreetSync palette in globals.css
+        background: "hsl(var(--background) / <alpha-value>)",
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        primary: {
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          foreground: "hsl(var(--primary-foreground) / <alpha-value>)"
         },
+        muted: {
+          DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+          foreground: "hsl(var(--muted-foreground) / <alpha-value>)"
+        },
+        border: "hsl(var(--border) / <alpha-value>)",
+        ink: {
+          950: "#050506",
+          900: "#0b0b0e",
+          800: "#131318",
+          700: "#1b1b22",
+          600: "#2a2a33"
+        },
+        // "Signal" lime: high-visibility street-marking green; pair with dark text on fills
         brand: {
-          50: "#eaf6fe",
-          100: "#d3ecfc",
-          200: "#c3e3fa",
-          300: "#8ecdf8",
-          400: "#4db1f3",
-          500: "#1d9bf0",
-          600: "#1a8cd8",
-          700: "#177cc0",
-          800: "#136297",
-          900: "#104f7a",
-          950: "#0c3a59"
+          50: "#fbfff0",
+          100: "#f7fee7",
+          200: "#ecfccb",
+          300: "#d9f99d",
+          400: "#bef264",
+          500: "#a3e635",
+          600: "#84cc16",
+          700: "#65a30d",
+          800: "#4d7c0f",
+          900: "#3f6212",
+          950: "#1a2e05"
         },
         accent: {
-          300: "#67e8f9",
-          400: "#22d3ee",
-          500: "#06b6d4"
+          300: "#c4b5fd",
+          400: "#a78bfa",
+          500: "#8b5cf6"
         },
         status: {
           open: "#34d399",
@@ -47,8 +60,8 @@ const config: Config = {
       },
       boxShadow: {
         card: "0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 8px 30px -12px rgb(0 0 0 / 0.6)",
-        glow: "0 0 0 1px rgb(29 155 240 / 0.3), 0 8px 32px -8px rgb(29 155 240 / 0.45)",
-        "glow-sm": "0 4px 20px -6px rgb(29 155 240 / 0.45)"
+        glow: "0 0 0 1px rgb(190 242 100 / 0.35), 0 10px 36px -10px rgb(163 230 53 / 0.55)",
+        "glow-sm": "0 4px 22px -8px rgb(163 230 53 / 0.5)"
       },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
