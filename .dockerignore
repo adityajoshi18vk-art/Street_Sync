@@ -1,0 +1,15 @@
+.git
+.hoplite
+**/node_modules
+**/.next
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+backend/data
+data
+contracts/artifacts
+contracts/cache
+contracts/typechain-types
+coverage
+*.log
