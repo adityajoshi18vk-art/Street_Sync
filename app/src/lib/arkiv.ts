@@ -1,6 +1,6 @@
 "use client";
 
-import { isLocalNetwork } from "../config/contracts";
+import { BACKEND_API_URL, isLocalNetwork } from "../config/contracts";
 import type { IArkivClient } from "@streetsync/arkiv-client";
 
 /**
@@ -15,10 +15,8 @@ import type { IArkivClient } from "@streetsync/arkiv-client";
  */
 
 const ARKIV_MODE = (process.env.NEXT_PUBLIC_ARKIV_MODE ?? "http").toLowerCase();
-const ARKIV_URL =
-  process.env.NEXT_PUBLIC_ARKIV_URL ??
-  process.env.NEXT_PUBLIC_ARKIV_RPC_URL ??
-  "https://arp.testnet.arkiv.golem.network";
+// Writes go through the backend relay, which holds the Arkiv access key and gas wallet.
+const ARKIV_URL = process.env.NEXT_PUBLIC_ARKIV_URL ?? `${BACKEND_API_URL}/api/arkiv`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -214,5 +212,5 @@ export function getArkivClient(): IArkivClient {
     return new LocalArkivClient();
   }
   if (ARKIV_MODE !== "http") throw new Error("Unsupported Arkiv storage mode.");
-  return new HttpArkivClient(ARKIV_URL, process.env.NEXT_PUBLIC_ARKIV_API_KEY);
+  return new HttpArkivClient(ARKIV_URL);
 }
