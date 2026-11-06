@@ -10,7 +10,7 @@ import {
 import { recoverWorkerAddress, unpackBundle } from "@streetsync/evidence";
 import { readContract } from "wagmi/actions";
 import { useConfig } from "wagmi";
-import { ESCROW_ABI, ESCROW_ADDRESS, ACTIVE_CHAIN, formatUsdcDisplay } from "@/config/contracts";
+import { ESCROW_ABI, ESCROW_ADDRESS, ACTIVE_CHAIN, assertContractsConfigured, formatUsdcDisplay } from "@/config/contracts";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
 import type { EvidenceMetadata } from "@streetsync/evidence";
 import type { OnChainBounty } from "@/lib/types";
@@ -54,8 +54,10 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       setLoadError(null);
       try {
         // 1. On-chain bounty (public RPC — wallet NOT required)
+        assertContractsConfigured();
         const raw = (await readContract(config, {
           address: ESCROW_ADDRESS!,
+          chainId: ACTIVE_CHAIN.id,
           abi: ESCROW_ABI,
           functionName: "getBounty",
           args: [BigInt(bountyId)]
