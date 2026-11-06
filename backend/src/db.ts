@@ -182,6 +182,10 @@ const findNullifierByWallet = db.prepare(`
   SELECT * FROM nullifiers WHERE nullifier_hash = ? AND action = ? AND wallet != ?
 `);
 
+const findVerifiedWallet = db.prepare(`
+  SELECT * FROM nullifiers WHERE action = ? AND wallet = ? LIMIT 1
+`);
+
 // ─── Nonces ──────────────────────────────────────────────────────────────────
 
 const insertNonce = db.prepare(`
@@ -349,6 +353,12 @@ export const dbAccess = {
   // ─── Nullifiers ───
   checkNullifier(nullifierHash: string, action: string) {
     return findNullifier.get(nullifierHash, action) as
+      | { nullifier_hash: string; action: string; wallet: string }
+      | undefined;
+  },
+  /** A wallet that already proved uniqueness for this action (World ID 4.0 nullifiers are per human + action). */
+  findVerifiedWallet(action: string, wallet: string) {
+    return findVerifiedWallet.get(action, wallet.toLowerCase()) as
       | { nullifier_hash: string; action: string; wallet: string }
       | undefined;
   },
