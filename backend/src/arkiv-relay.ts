@@ -105,7 +105,7 @@ export function isArkivRelayConfigured(): boolean {
   return Boolean(key && isHex(key) && key.length === 66 && process.env.ARKIV_ACCESS_KEY);
 }
 
-function arkivChain() {
+export function arkivChain() {
   return rabdi({ accessKey: process.env.ARKIV_ACCESS_KEY ?? "" });
 }
 
