@@ -1,7 +1,7 @@
 /**
  * @streetsync/arkiv-client
  *
- * Arkiv SDK integration, bytes32 conversion, bundle chunking fallback,
+ * Arkiv SDK integration, bytes32 conversion,
  * entity reader, and cryptographic audit verifier for StreetSync.
  */
 
@@ -22,10 +22,7 @@ export interface ArkivEntityAttributes {
   entity_type: "evidence";
   bounty_id: string;
   worker: string;
-  sha256_prefix: string; // 18-char hex prefix: evidenceHash.slice(0, 18)
-  kind: "bundle" | "chunk";
-  chunk_index?: string;
-  total_chunks?: string;
+  sha256_prefix: string;
 }
 
 export interface ArkivWriteResult {
@@ -75,9 +72,7 @@ export interface IArkivClient {
 // B. Constants
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const MAX_SAFE_BUNDLE_BYTES = 120_000; // 120 KiB fallback threshold
-export const MAX_CHUNK_PAYLOAD = 115_000;
-export const CHUNK_HEADER_SIZE = 4;
+export const MAX_SAFE_BUNDLE_BYTES = 120_000;
 export const ENTITY_TTL_SECONDS = 604_800; // 7 days
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -136,7 +131,7 @@ export function registerKeyMapping(bytes32Key: string, originalKey: string): voi
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// D. Arkiv Entity Writer & Chunking
+// D. Arkiv Entity Writer
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -148,8 +143,7 @@ export async function computeEvidenceHash(bundle: Uint8Array): Promise<`0x${stri
 
 /**
  * Writes an evidence bundle to Arkiv.
- * If bundle exceeds 120,000 bytes, automatically chunks the payload across
- * multiple entities and writes a manifest entity as the primary key.
+ * Evidence is stored atomically as one entity; oversized bundles are rejected.
  */
 export async function writeEvidenceBundle(
   client: IArkivClient,
@@ -161,6 +155,9 @@ export async function writeEvidenceBundle(
   if (bundle.length === 0) {
     throw new RangeError("Cannot write empty evidence bundle");
   }
+  if (bundle.length > MAX_SAFE_BUNDLE_BYTES) {
+    throw new RangeError(`Evidence bundle is ${bundle.length} bytes; exceeds the ${MAX_SAFE_BUNDLE_BYTES}-byte Arkiv safe budget`);
+  }
 
   const computedHash = await computeEvidenceHash(bundle);
   if (expectedEvidenceHash && computedHash.toLowerCase() !== expectedEvidenceHash.toLowerCase()) {
@@ -169,106 +166,29 @@ export async function writeEvidenceBundle(
     );
   }
 
-  // Exact attribute formatting from specification:
-  // sha256_prefix: evidenceHash.slice(0, 18)
-  const sha256Prefix = computedHash.slice(0, 18);
+  const sha256Prefix = computedHash.slice(0, 32);
   const baseAttributes: Record<string, string> = {
     project: "streetsync",
     entity_type: "evidence",
     bounty_id: String(bountyId),
     worker: workerAddress.toLowerCase(),
     sha256_prefix: sha256Prefix,
-    kind: "bundle",
   };
-
-  // Single-entity write if within 120,000 bytes
-  if (bundle.length <= MAX_SAFE_BUNDLE_BYTES) {
-    const writeResponse = await client.writeEntity(bundle, baseAttributes, {
-      ttl: ENTITY_TTL_SECONDS,
-    });
-    const entityKeyBytes32 = await entityKeyToBytes32(writeResponse.key);
-
-    return {
-      entityKey: writeResponse.key,
-      entityKeyBytes32,
-      evidenceHash: computedHash,
-      chunked: false,
-    };
+  const oversizedAttribute = Object.entries(baseAttributes).find(([, value]) => value.length > 128);
+  if (oversizedAttribute) {
+    throw new RangeError(`Arkiv attribute ${oversizedAttribute[0]} exceeds 128 bytes`);
   }
 
-  // Automatic chunking fallback
-  return chunkAndWriteBundle(client, bundle, baseAttributes, computedHash);
-}
-
-/**
- * Handles automatic chunking for bundles exceeding 120,000 bytes.
- */
-async function chunkAndWriteBundle(
-  client: IArkivClient,
-  bundle: Uint8Array,
-  baseAttributes: Record<string, string>,
-  evidenceHash: `0x${string}`
-): Promise<ArkivWriteResult> {
-  const totalChunks = Math.ceil(bundle.length / MAX_CHUNK_PAYLOAD);
-  if (totalChunks > 255) {
-    throw new RangeError(`Bundle too large to chunk: requires ${totalChunks} chunks (max 255)`);
-  }
-
-  const chunkKeys: string[] = [];
-
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * MAX_CHUNK_PAYLOAD;
-    const end = Math.min(start + MAX_CHUNK_PAYLOAD, bundle.length);
-    const slice = bundle.subarray(start, end);
-
-    // Prepend 4-byte chunk header: [0x53, 0x43 ("SC"), chunkIndex, totalChunks]
-    const chunkPayload = new Uint8Array(CHUNK_HEADER_SIZE + slice.length);
-    chunkPayload[0] = 0x53; // 'S'
-    chunkPayload[1] = 0x43; // 'C'
-    chunkPayload[2] = i;
-    chunkPayload[3] = totalChunks;
-    chunkPayload.set(slice, CHUNK_HEADER_SIZE);
-
-    const chunkAttributes: Record<string, string> = {
-      ...baseAttributes,
-      kind: "chunk",
-      chunk_index: String(i),
-      total_chunks: String(totalChunks),
-    };
-
-    const res = await client.writeEntity(chunkPayload, chunkAttributes, {
-      ttl: ENTITY_TTL_SECONDS,
-    });
-    chunkKeys.push(res.key);
-  }
-
-  // Write manifest entity pointing to all chunk keys
-  const manifestData = JSON.stringify({
-    manifestVersion: 1,
-    evidenceHash,
-    totalChunks,
-    chunkKeys,
-    totalBytes: bundle.length,
-  });
-  const manifestPayload = new TextEncoder().encode(manifestData);
-
-  const manifestAttributes: Record<string, string> = {
-    ...baseAttributes,
-    kind: "bundle",
-  };
-
-  const manifestRes = await client.writeEntity(manifestPayload, manifestAttributes, {
+  const writeResponse = await client.writeEntity(bundle, baseAttributes, {
     ttl: ENTITY_TTL_SECONDS,
   });
-
-  const entityKeyBytes32 = await entityKeyToBytes32(manifestRes.key);
+  const entityKeyBytes32 = await entityKeyToBytes32(writeResponse.key);
 
   return {
-    entityKey: manifestRes.key,
+    entityKey: writeResponse.key,
     entityKeyBytes32,
-    evidenceHash,
-    chunked: true,
-    chunkKeys,
+    evidenceHash: computedHash,
+    chunked: false,
   };
 }
 
@@ -303,6 +223,7 @@ export async function readEvidenceBundle(
         const chunkEntity = await client.readEntity(chunkKey);
         const payload = chunkEntity.payload;
 
+        const CHUNK_HEADER_SIZE = 4;
         if (payload.length < CHUNK_HEADER_SIZE || payload[0] !== 0x53 || payload[1] !== 0x43) {
           throw new Error(`Invalid chunk header on chunk ${i} (${chunkKey})`);
         }
