@@ -6,6 +6,8 @@ import "./src/env/public";
 assertNoPublicSecrets();
 
 const nextConfig: NextConfig = {
+  // Lets the e2e suite build against its own chain without clobbering the dev build.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

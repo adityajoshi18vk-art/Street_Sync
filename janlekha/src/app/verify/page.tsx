@@ -3,7 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ErrorPanel, LoadingPanel, NotFoundPanel, OnChain } from "@/components/ui";
-import { catalogDocument, catalogProject, formatTimestamp } from "@/lib/janlekha/format";
+import { findOffChainCopy } from "@/lib/documents/storage";
+import { catalogProject, formatTimestamp } from "@/lib/janlekha/format";
 import { getProject, listProjects, verifiableDocuments } from "@/lib/janlekha/reads";
 import { VerifyForm, type VerifyOption } from "./VerifyForm";
 
@@ -44,13 +45,15 @@ async function VerifyContent({ searchParams }: { searchParams: PageProps<"/verif
   if (result.status === "error") return <ErrorPanel failure={result.failure} />;
 
   const p = result.project;
-  const options: VerifyOption[] = verifiableDocuments(p).map((d) => ({
-    key: d.key,
-    label: d.label,
-    hash: d.hash,
-    recordedAt: formatTimestamp(d.recordedAt),
-    offChainFile: catalogDocument(d.hash)?.file,
-  }));
+  const options: VerifyOption[] = await Promise.all(
+    verifiableDocuments(p).map(async (d) => ({
+      key: d.key,
+      label: d.label,
+      hash: d.hash,
+      recordedAt: formatTimestamp(d.recordedAt),
+      offChainFile: (await findOffChainCopy(d.hash))?.url,
+    })),
+  );
 
   return (
     <div className="space-y-4">

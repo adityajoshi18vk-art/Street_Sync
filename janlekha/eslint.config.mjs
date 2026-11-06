@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "artifacts/**",
     "cache/**",
     "deployments/**",
+    ".next-e2e/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 

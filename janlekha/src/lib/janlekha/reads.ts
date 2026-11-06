@@ -4,8 +4,10 @@ import { janLekhaAbi } from "./abi";
 import { chainConfig, publicClient, ReadError, revertErrorName, toReadFailure, type ChainConfig, type ReadFailure } from "./chain";
 import { getProjectTimeline, type TimelineEvent } from "./events";
 
-export const MilestoneStatus = ["None", "Defined", "EvidenceSubmitted", "Approved", "Paid"] as const;
-export type MilestoneStatusName = (typeof MilestoneStatus)[number];
+import type { ActionState, MilestoneStatusName } from "./action-state";
+
+export const MilestoneStatus = ["None", "Defined", "EvidenceSubmitted", "Approved", "Paid"] as const satisfies readonly MilestoneStatusName[];
+export type { MilestoneStatusName };
 
 export type Stage =
   | "Tender not published"
@@ -42,6 +44,7 @@ export interface AwardView {
 
 export interface BidView {
   vendor: Address;
+  commitment: Hex;
   committedAt: bigint;
   revealed: boolean;
   revealedAt: bigint;
@@ -276,4 +279,29 @@ export function verifiableDocuments(p: ProjectDetail): VerifiableDocument[] {
     if (m.paidAt > 0n) docs.push({ key: `m${m.id}-payment`, label: `Milestone ${m.id} mock PFMS payment advice`, hash: m.paymentReferenceHash, recordedAt: m.paidAt });
   }
   return docs;
+}
+
+export function toActionState(p: ProjectDetail, ctx: ChainContext): ActionState {
+  return {
+    projectId: p.id.toString(),
+    department: p.department,
+    allocationPaise: p.budget.allocationPaise.toString(),
+    reservedPaise: p.budget.reservedPaise.toString(),
+    paidPaise: p.budget.paidPaise.toString(),
+    chainTime: ctx.chainTime.toString(),
+    tender: p.tender && {
+      bidDeadline: p.tender.bidDeadline.toString(),
+      revealDeadline: p.tender.revealDeadline.toString(),
+      commitCount: p.tender.commitCount,
+      revealCount: p.tender.revealCount,
+    },
+    bids: p.bids.map((b) => ({ vendor: b.vendor, commitment: b.commitment, revealed: b.revealed, amountPaise: b.amountPaise.toString() })),
+    award: p.award && {
+      vendor: p.award.vendor,
+      amountPaise: p.award.amountPaise.toString(),
+      milestoneTotalPaise: p.award.milestoneTotalPaise.toString(),
+      milestoneCount: p.award.milestoneCount,
+    },
+    milestones: p.milestones.map((m) => ({ id: m.id, amountPaise: m.amountPaise.toString(), status: m.status, inspector: m.inspector })),
+  };
 }

@@ -47,3 +47,9 @@ export function txUrl(explorerUrl: string | null, hash: Hex): string | null {
 export function addressUrl(explorerUrl: string | null, address: Address): string | null {
   return explorerUrl ? `${explorerUrl}/account/${address}` : null;
 }
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

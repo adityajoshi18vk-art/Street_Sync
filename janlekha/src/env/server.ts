@@ -13,9 +13,14 @@ const schema = z.object({
       .regex(/^postgres(ql)?:\/\//, "must be a postgresql:// connection string")
       .optional(),
   ),
+  // Off-chain, content-addressed store for synthetic/public demo documents.
+  DOCUMENT_STORAGE_DIR: z.preprocess((v) => (v === "" ? undefined : v), z.string().default(".data/documents")),
 });
 
-const parsed = schema.safeParse({ DATABASE_URL: process.env.DATABASE_URL });
+const parsed = schema.safeParse({
+  DATABASE_URL: process.env.DATABASE_URL,
+  DOCUMENT_STORAGE_DIR: process.env.DOCUMENT_STORAGE_DIR,
+});
 
 if (!parsed.success) {
   throw new Error(`Invalid server environment variables:\n${z.prettifyError(parsed.error)}`);

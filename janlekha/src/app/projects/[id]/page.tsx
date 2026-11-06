@@ -18,13 +18,15 @@ import {
   TxLink,
 } from "@/components/ui";
 import type { TimelineEvent } from "@/lib/janlekha/events";
-import { catalogDocument, catalogProject, formatPaise, formatTimestamp, shortHex } from "@/lib/janlekha/format";
-import { getProject, type MilestoneView, type ProjectDetail } from "@/lib/janlekha/reads";
+import { findOffChainCopy } from "@/lib/documents/storage";
+import { catalogProject, formatPaise, formatTimestamp, shortHex } from "@/lib/janlekha/format";
+import { getProject, toActionState, type MilestoneView, type ProjectDetail } from "@/lib/janlekha/reads";
+import { ProjectActions } from "./ProjectActions";
 
 export const metadata: Metadata = { title: "Project" };
 
-function DocumentHash({ projectId, docKey, label, hash }: { projectId: bigint; docKey: string; label: string; hash: Hex }) {
-  const offChain = catalogDocument(hash);
+async function DocumentHash({ projectId, docKey, label, hash }: { projectId: bigint; docKey: string; label: string; hash: Hex }) {
+  const offChain = await findOffChainCopy(hash);
   return (
     <div className="rounded-lg border border-neutral-200 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -40,9 +42,10 @@ function DocumentHash({ projectId, docKey, label, hash }: { projectId: bigint; d
       {offChain && (
         <p className="mt-1 text-xs text-neutral-500">
           Off-chain copy:{" "}
-          <a href={offChain.file} className="underline underline-offset-2" download>
+          <a href={offChain.url} className="underline underline-offset-2" download>
             {offChain.title}
-          </a>
+          </a>{" "}
+          (unverified until checked)
         </p>
       )}
     </div>
@@ -313,6 +316,8 @@ async function ProjectContent({ id }: { id: string }) {
           )}
         </Section>
       )}
+
+      <ProjectActions state={toActionState(p, ctx)} />
 
       <Section title="Event timeline" badge={<OnChain />}>
         <Timeline project={p} explorerUrl={explorerUrl} isHedera={isHedera} />

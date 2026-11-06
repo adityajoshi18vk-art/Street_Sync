@@ -22,21 +22,25 @@
     "contracts:roles:local": "hardhat run scripts/grant-roles.ts --network localhost",
     "contracts:smoke:local": "hardhat run scripts/smoke-test.ts --network localhost",
     "contracts:seed:local": "hardhat run scripts/seed-demo.ts --network localhost",
-    "demo:documents": "hardhat run scripts/demo-documents.ts"
+    "demo:documents": "hardhat run scripts/demo-documents.ts",
+    "test:e2e": "hardhat build --quiet && playwright test"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@tanstack/react-query": "^5.106.1",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
     "viem": "^2.57.16",
+    "wagmi": "^3.7.11",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

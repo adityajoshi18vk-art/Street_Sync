@@ -63,3 +63,26 @@ npm run build && npm start
 
 `npm run demo:documents` regenerates the deterministic synthetic PDFs in `public/demo-documents/`
 and the off-chain catalog (titles and download links keyed by on-chain hash).
+
+## Wallet writes (department, vendor, inspector, PAO)
+
+`/projects` (create project) and `/projects/[id]` (all other actions) show the actions for the project's
+current stage. Writes go only to the configured chain (`NEXT_PUBLIC_HEDERA_CHAIN_ID`, Hedera Testnet by default)
+through an injected EVM wallet. Roles are read from the contract, and every disabled action shows why.
+Each transaction is checked against current state, signed, then confirmed by receipt before the page refreshes.
+
+- Vendor bids: the salt comes from `crypto.getRandomValues`. Committing is enabled only after the vendor downloads
+  the bid backup (JSON), which is needed to reveal. Quotation PDFs are hashed in the browser and never uploaded.
+- Documents: PDF only, ≤ 2 MB, SHA-256 computed in the browser and re-checked by the server, stored under their
+  hash in `DOCUMENT_STORAGE_DIR`. Synthetic/public demo documents only. A stored file is not official until an
+  authorised role references its hash on-chain.
+
+### End-to-end tests
+
+```bash
+npm run test:e2e   # Playwright: fresh Hardhat node on :8546, dedicated .next-e2e build on :3400
+```
+
+The suite injects an EIP-1193 test wallet that forwards to the node's unlocked dev accounts (no private keys).
+It covers the full happy path (create → tender → sealed bids → reveal → award → milestone → evidence →
+inspection → mock PFMS attestation), wrong-network blocking, and a failed reveal using a tampered bid backup.

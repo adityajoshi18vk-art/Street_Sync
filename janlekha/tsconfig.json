@@ -34,7 +34,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-e2e/types/**/*.ts",
+    ".next-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
@@ -42,6 +44,9 @@
     "test",
     "scripts",
     "artifacts",
-    "cache"
+    "cache",
+    "e2e",
+    "playwright.config.ts",
+    ".next-e2e"
   ]
 }

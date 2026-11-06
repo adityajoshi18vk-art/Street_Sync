@@ -50,3 +50,9 @@ next-env.d.ts
 
 # local rehearsal deployments (chain resets on restart)
 /deployments/localhost.json
+
+# off-chain document storage, e2e build and reports
+/.data
+/.next-e2e
+/test-results
+/playwright-report

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Badge, ErrorPanel, LoadingPanel, OffChain, OnChain } from "@/components/ui";
 import { catalogProject, formatPaise, formatTimestamp, shortHex } from "@/lib/janlekha/format";
 import { listProjects, type Stage } from "@/lib/janlekha/reads";
+import { CreateProjectPanel } from "./CreateProjectPanel";
 
 export const metadata: Metadata = { title: "Projects" };
 
@@ -89,6 +90,7 @@ export default function ProjectsPage() {
           <span className="text-xs text-neutral-500">Titles and department names are off-chain demo metadata.</span>
         </div>
       </div>
+      <CreateProjectPanel />
       <Suspense fallback={<LoadingPanel label="Reading projects from the contract…" />}>
         <ProjectList />
       </Suspense>
