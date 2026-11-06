@@ -222,11 +222,11 @@ Arc bounty.
 
 | Item | Value |
 | :--- | :--- |
-| StreetSyncEscrow | [`0x3Fd53ce0728BfBDbc5559C4a573f54294FfEa356`](https://testnet.arcscan.app/address/0x3Fd53ce0728BfBDbc5559C4a573f54294FfEa356) |
+| StreetSyncEscrow | [`0x57Dd350aCb93B5A6499b3D18fc9c785446A8654F`](https://testnet.arcscan.app/address/0x57Dd350aCb93B5A6499b3D18fc9c785446A8654F) |
 | USDC (ERC-20, 6 decimals) | `0x3600000000000000000000000000000000000000` |
 | Owner | `0xAf1f2f642a44095Fb29eFF70760D0a5df3d8e354` |
 | Attester (backend signer) | `0xa445eD835991A70015CC12e000182E8Ff727e5CD` |
-| Deploy block | `70957147` |
+| Deploy block | `70967045` |
 
 The owner can rotate the attester with `setAttester(address)`.
 
@@ -256,3 +256,22 @@ The app uses IDKit 4 with backend-signed requests:
 
 Backend variables: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`,
 `WORLD_ID_ENVIRONMENT` (`production` for World App, `staging` for the simulator).
+
+## Lifecycle (contract v2)
+
+1. **Report.** The reporter adds a photo, a description and a map pin, and funds the escrow in USDC.
+   The photo and description go to Arkiv as one bundle. The contract stores `reportHash`
+   (SHA-256 of that bundle) and `descriptionHash`, and the bounty starts **Awaiting neighbours**.
+2. **Neighbour validation.** World-ID-verified neighbours within `NEIGHBOUR_RADIUS_KM` (default 10 km)
+   vote real or not real (action `vote-problem`). Two matching votes decide the outcome (`validationQuorum`).
+   Real opens the bounty; not real, or no decision within 24 h, refunds every pledge.
+3. **Work.** A verified worker claims the bounty, gets a 4-digit code and has `claimDuration` to submit
+   before/after photos. The creator, pledgers and neighbours who voted cannot claim.
+4. **Review.** Three staked reviewers compare the reporter's photo with the worker's before/after photos,
+   then commit and reveal their votes. Approval pays the worker 90% and the majority reviewers 10%,
+   plus any slashed stakes.
+5. **Recovery.** A rejected worker may rework once within the window. Stalled claims or rework windows
+   can be reopened by anyone, and that worker is blocked from re-claiming. Refunded or expired bounties
+   let every pledger withdraw. Reviewers withdraw their rewards, and re-stake after each settled review.
+
+Operator settings: `setValidationQuorum(0..10)` (0 disables neighbour validation) and `setValidationWindow`.
