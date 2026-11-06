@@ -14,17 +14,16 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import dbAccess from "./db.js";
-import { signAttestation, getAttesterAddress, getVerifyingContract, isAttestationSignerReady, RoleEnum, setVerifyingContract } from "./signer.js";
+import { getAttesterAddress, getVerifyingContract, isAttestationSignerReady, setVerifyingContract } from "./signer.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
 import { isAddress, type Address } from "viem";
 import { isArkivRelayConfigured, registerArkivRoutes } from "./arkiv-relay.js";
-import { isAllowedWorldIdAction, isLocalWorldIdBypassEnabled, recordWorldIdNullifier } from "./worldid.js";
+import { isWorldIdConfigured, registerWorldIdRoutes, worldIdConfig } from "./worldid-v4.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
 const BACKEND_PORT = Number(process.env.BACKEND_PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
-const WORLD_APP_ID = process.env.WORLD_APP_ID ?? "";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 
 // ─── Fastify Setup ───────────────────────────────────────────────────────────
@@ -46,153 +45,7 @@ await app.register(cors, {
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  POST /api/worldid/verify
-//  World ID v4 proof verification + EIP-712 attestation issuance
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface WorldIdVerifyBody {
-  proof: string;
-  merkle_root: string;
-  nullifier_hash: string;
-  verification_level: string;
-  action: string;
-  wallet: string;
-  role: "worker" | "reviewer";
-  bountyId: string;
-  dev_bypass?: boolean;
-}
-
-// Dev bypass is only honored when the server is explicitly configured for it
-// AND the request carries an explicit dev_bypass flag. Never enabled by default.
-const DEV_BYPASS_ENABLED = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
-
-app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, reply) => {
-  if (!request.body || typeof request.body !== "object") {
-    return reply.status(400).send({ error: "Invalid request body" });
-  }
-  const {
-    proof,
-    merkle_root,
-    nullifier_hash,
-    verification_level,
-    action,
-    wallet,
-    role,
-    bountyId,
-  } = request.body;
-
-  // Validate required fields
-  if (
-    typeof proof !== "string" || !proof.trim() ||
-    typeof merkle_root !== "string" || !merkle_root.trim() ||
-    typeof nullifier_hash !== "string" || !nullifier_hash.trim() ||
-    typeof verification_level !== "string" || !verification_level.trim() ||
-    typeof action !== "string" || !action.trim() ||
-    typeof wallet !== "string" || !isAddress(wallet) ||
-    (role !== "worker" && role !== "reviewer") ||
-    typeof bountyId !== "string" || !/^\d+$/.test(bountyId) ||
-    (role === "reviewer" && bountyId !== "0")
-  ) {
-    return reply.status(400).send({
-      error: "Invalid request: expected a World ID proof, action, wallet, role, and decimal bountyId",
-    });
-  }
-
-  const useLocalBypass = isLocalWorldIdBypassEnabled(CHAIN_ID, DEV_BYPASS_ENABLED, request.body.dev_bypass);
-  if (!isAllowedWorldIdAction(role, action)) {
-    return reply.status(400).send({ error: "Action is not configured for the requested World ID role" });
-  }
-  if ((!WORLD_APP_ID || WORLD_APP_ID.includes("YOUR_")) && !useLocalBypass) {
-    return reply.status(503).send({ error: "World ID application is not configured" });
-  }
-  if (!isAttestationSignerReady()) {
-    return reply.status(503).send({ error: "Attestation signing is unavailable until StreetSyncEscrow is deployed and configured" });
-  }
-
-  // Derive the action ID for sybil tracking
-  // Actions: "register-worker", "register-reviewer", "review-bounty-<id>"
-  const actionId = action;
-
-  // ── Step 1: Check nullifier hasn't been used by a DIFFERENT wallet for this action ──
-  const existingNullifier = dbAccess.checkNullifierOtherWallet(
-    nullifier_hash, actionId, wallet.toLowerCase(),
-  );
-  if (existingNullifier) {
-    return reply.status(409).send({
-      error: "Sybil detected: this World ID identity already used a different wallet for this action",
-      action: actionId,
-    });
-  }
-
-  // Re-attestation for the same wallet is allowed; another wallet is not.
-
-  // ── Step 2: Verify proof against World ID v4 API ────────────────────────────
-  if (!useLocalBypass) try {
-    const verifyResponse = await fetch(
-      `https://developer.worldcoin.org/api/v2/verify/${WORLD_APP_ID}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merkle_root,
-          nullifier_hash,
-          proof,
-          verification_level,
-          action: actionId,
-          signal: wallet,
-        }),
-      },
-    );
-
-    if (!verifyResponse.ok) {
-      const errBody = await verifyResponse.text();
-      request.log.error(`World ID verification failed: ${verifyResponse.status} ${errBody}`);
-      return reply.status(401).send({
-        error: "World ID verification failed",
-        detail: errBody,
-      });
-    }
-
-    const verifyData = await verifyResponse.json() as { success: boolean };
-    if (!verifyData.success) {
-      return reply.status(401).send({
-        error: "World ID proof is invalid",
-      });
-    }
-  } catch (e) {
-    request.log.error(`World ID API error: ${(e as Error).message}`);
-    // Hard failure unless the operator explicitly enabled the dev bypass
-    // (ALLOW_DEV_WORLD_ID_BYPASS=true) AND the client opted in per-request.
-    if (!useLocalBypass) {
-      return reply.status(502).send({
-        error: "Cannot reach World ID verification API",
-      });
-    }
-    request.log.warn("World ID API unreachable – proceeding via ALLOW_DEV_WORLD_ID_BYPASS");
-  }
-
-  // ── Step 3: Record nullifier in DB ──────────────────────────────────────────
-  const nullifierResult = recordWorldIdNullifier(nullifier_hash, actionId, wallet);
-  if (nullifierResult === "conflict") {
-    return reply.status(409).send({ error: "Sybil detected: this World ID identity is already used by another wallet", action: actionId });
-  }
-
-  // ── Step 4: Sign EIP-712 attestation ────────────────────────────────────────
-  const roleValue = role === "worker" ? RoleEnum.Worker : RoleEnum.Reviewer;
-  const bountyIdBigInt = BigInt(bountyId ?? "0");
-
-  const attestation = await signAttestation(
-    wallet as Address,
-    roleValue,
-    bountyIdBigInt,
-  );
-
-  return reply.status(200).send({
-    success: true,
-    attestation,
-  });
-});
+registerWorldIdRoutes(app);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/bounties
@@ -341,7 +194,7 @@ app.get("/api/health", async (_request, reply) => {
   } catch {
     escrowConfigured = false;
   }
-  const worldIdConfigured = Boolean(WORLD_APP_ID && !WORLD_APP_ID.includes("YOUR_"));
+  const worldIdConfigured = isWorldIdConfigured();
   const signerConfigured = isAttestationSignerReady();
   return reply.send({
     status: "ok",
@@ -349,7 +202,9 @@ app.get("/api/health", async (_request, reply) => {
     readiness: { worldId: worldIdConfigured, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
     chainId: CHAIN_ID,
     attester: getAttesterAddress() ?? "",
-    worldAppId: WORLD_APP_ID,
+    worldAppId: worldIdConfig().appId,
+    worldRpId: worldIdConfig().rpId,
+    worldIdEnvironment: worldIdConfig().environment,
     timestamp: new Date().toISOString(),
   });
 });
@@ -364,7 +219,7 @@ async function main() {
   console.log("╚══════════════════════════════════════════════╝");
   console.log(`Attester address: ${getAttesterAddress() ?? "not configured"}`);
   console.log(`Chain ID:         ${CHAIN_ID}`);
-  console.log(`World App ID:     ${WORLD_APP_ID}`);
+  console.log(`World App ID:     ${worldIdConfig().appId || "not configured"}`);
 
   // Set verifying contract from env if available (indexer may override later)
   if (process.env.ESCROW_CONTRACT_ADDRESS) {
@@ -380,8 +235,8 @@ async function main() {
   } catch {
     console.warn("Attestation signing is disabled until StreetSyncEscrow is deployed and configured.");
   }
-  if (!WORLD_APP_ID || WORLD_APP_ID.includes("YOUR_")) {
-    console.warn("World ID verification is disabled until WORLD_APP_ID is configured.");
+  if (!isWorldIdConfigured()) {
+    console.warn("World ID verification is disabled until WORLD_APP_ID, WORLD_RP_ID and WORLD_RP_SIGNING_KEY are configured.");
   }
 
   // Start event indexer in background
