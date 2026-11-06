@@ -21,7 +21,7 @@ import { approveUsdcExact } from "@/lib/tx";
 import { TestUsdcFaucet } from "@/components/TestUsdcFaucet";
 import { HomeHero, type HeroGlyphs } from "@/components/home/HomeHero";
 import { HowItWorks } from "@/components/home/HowItWorks";
-import { MapPinPlus, ListFilter, RefreshCw } from "lucide-react";
+import { MapPinPlus, ListFilter, RefreshCw, Hammer } from "lucide-react";
 import { listBounties } from "@/lib/api";
 import { reverseGeocode } from "@/lib/geocode";
 import {
@@ -56,7 +56,7 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
   const [bounties, setBounties] = useState<BountyMapItem[]>([]);
   const [listError, setListError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<number | "mine" | null>(null);
 
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [draftPin, setDraftPin] = useState<{ lat: number; lng: number } | null>(null);
@@ -77,14 +77,18 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
     setLoading(true);
     setListError(null);
     try {
-      const raw = await listBounties({ limit: 200, status: statusFilter ?? undefined });
+      const raw = await listBounties({
+        limit: 200,
+        status: typeof statusFilter === "number" ? statusFilter : undefined,
+        worker: statusFilter === "mine" && address ? address : undefined
+      });
       setBounties(raw.map(normalizeBounty).filter((b) => b.lat !== 0 || b.lng !== 0));
     } catch (e) {
       setListError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, address]);
 
   useEffect(() => {
     void loadBounties();
@@ -291,12 +295,24 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
         >
           All ({bounties.length})
         </button>
+        {isConnected && address && (
+          <button
+            onClick={() => setStatusFilter(statusFilter === "mine" ? null : "mine")}
+            className={`chip font-semibold ${
+              statusFilter === "mine"
+                ? "chip-active !bg-primary/20 !text-primary !border-primary/40 ring-1 ring-primary/40"
+                : "border-primary/20 text-primary hover:border-primary/40"
+            }`}
+          >
+            🔨 My Jobs
+          </button>
+        )}
         {STATUS_NAMES.map((name, idx) => {
           const count = bounties.filter((b) => b.status === idx).length;
           return (
             <button
               key={name}
-              onClick={() => setStatusFilter(idx)}
+              onClick={() => setStatusFilter(statusFilter === idx ? null : idx)}
               className={`chip ${statusFilter === idx ? "chip-active" : ""}`}
             >
               <span
@@ -405,7 +421,7 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
         </section>
 
         {/* Bounty list */}
-        <section className="animate-rise stagger-5 space-y-3 lg:col-span-3">
+        <section id="bounties" className="animate-rise stagger-5 space-y-3 scroll-mt-24 lg:col-span-3">
           {selectedBounty && (
             <div className="card border-brand-400/40 p-5 shadow-glow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -420,12 +436,31 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
                     </strong>
                   </p>
                 </div>
-                <Link
-                  href={`/bounty/${selectedBounty.bountyId}`}
-                  className="btn-primary btn-sm"
-                >
-                  Details
-                </Link>
+                <div className="flex items-center gap-2">
+                  {selectedBounty.status === 0 ? (
+                    <Link
+                      href={`/bounty/${selectedBounty.bountyId}/work`}
+                      className="btn-success btn-sm flex items-center gap-1.5 font-bold"
+                    >
+                      <Hammer className="h-3.5 w-3.5" />
+                      Accept &amp; Work
+                    </Link>
+                  ) : address && selectedBounty.worker?.toLowerCase() === address.toLowerCase() ? (
+                    <Link
+                      href={`/bounty/${selectedBounty.bountyId}/work`}
+                      className="btn-primary btn-sm flex items-center gap-1.5 font-bold"
+                    >
+                      <Hammer className="h-3.5 w-3.5" />
+                      Workbench
+                    </Link>
+                  ) : null}
+                  <Link
+                    href={`/bounty/${selectedBounty.bountyId}`}
+                    className="btn-ghost btn-sm"
+                  >
+                    Details
+                  </Link>
+                </div>
               </div>
               {selectedBounty.status === 0 && (
                 <div className="mt-3 flex gap-2">
@@ -485,12 +520,22 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
                       </span>
                     )}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
+                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{ backgroundColor: STATUS_COLORS[statusName(b.status)], boxShadow: `0 0 5px ${STATUS_COLORS[statusName(b.status)]}` }}
                     />
                     {statusName(b.status)}
+                    {b.status === 0 && (
+                      <span className="rounded bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 ring-1 ring-emerald-400/30">
+                        Open to Claim
+                      </span>
+                    )}
+                    {address && b.worker?.toLowerCase() === address.toLowerCase() && (
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary ring-1 ring-primary/30">
+                        Your Job
+                      </span>
+                    )}
                     {b.worker && <span>· worker {shortAddress(b.worker)}</span>}
                     {b.creator && !b.worker && <span>· by {shortAddress(b.creator)}</span>}
                   </p>

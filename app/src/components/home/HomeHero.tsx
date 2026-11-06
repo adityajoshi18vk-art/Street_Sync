@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowRight, ArrowUpRight, MapPin, ShieldCheck } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, Hammer, MapPin, ShieldCheck } from "lucide-react";
 
 import { HeroSection03 } from "@/components/ui/hero-03";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -175,7 +175,11 @@ export function HomeHero({
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            <a href="#create" className="btn-primary">
+            <a href="#bounties" className="btn-primary">
+              <Hammer className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+              Work bounties ({open} open)
+            </a>
+            <a href="#create" className="btn-ghost">
               <MapPin className="h-4 w-4" strokeWidth={2.5} aria-hidden />
               Drop a bounty
             </a>
