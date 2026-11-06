@@ -57,26 +57,24 @@ const POLL_INTERVAL_MS = 3_000; // 3 seconds between polls
 
 function resolveContractAddress(): Address {
   // 1. Try env var first
-  if (process.env.ESCROW_CONTRACT_ADDRESS) {
+  if (process.env.ESCROW_CONTRACT_ADDRESS && process.env.ESCROW_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
     return process.env.ESCROW_CONTRACT_ADDRESS as Address;
   }
 
-  // 2. Try Hardhat deployment artifact
-  const deploymentsPath = process.env.DEPLOYMENTS_PATH ?? "../contracts/deployments/arcTestnet.json";
+  // 2. Try Hardhat deployment artifact (dynamic for chainId)
+  const networkName = CHAIN_ID === 31337 ? "localhost" : "arcTestnet";
+  const deploymentsPath = process.env.DEPLOYMENTS_PATH ?? `../contracts/deployments/${networkName}.json`;
   const absPath = path.resolve(deploymentsPath);
 
   if (fs.existsSync(absPath)) {
     try {
       const raw = fs.readFileSync(absPath, "utf-8");
       const deployment = JSON.parse(raw);
-      if (deployment.address) {
-        console.log(`[indexer] Loaded contract address from ${absPath}: ${deployment.address}`);
-        return deployment.address as Address;
-      }
-      // Check for nested structure (Hardhat-deploy format)
-      if (deployment.StreetSyncEscrow?.address) {
-        const addr = deployment.StreetSyncEscrow.address;
-        console.log(`[indexer] Loaded contract address from deployment: ${addr}`);
+      const addr = deployment.contracts?.StreetSyncEscrow?.address ??
+                   deployment.StreetSyncEscrow?.address ??
+                   deployment.address;
+      if (addr && addr !== "0x0000000000000000000000000000000000000000") {
+        console.log(`[indexer] Loaded contract address from ${absPath}: ${addr}`);
         return addr as Address;
       }
     } catch (e) {

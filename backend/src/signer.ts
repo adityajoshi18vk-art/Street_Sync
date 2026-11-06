@@ -11,6 +11,8 @@
  */
 
 import "dotenv/config";
+import fs from "node:fs";
+import path from "node:path";
 import {
   createWalletClient,
   http,
@@ -26,7 +28,9 @@ import dbAccess from "./db.js";
 const ATTESTER_PRIVATE_KEY = (process.env.ATTESTER_PRIVATE_KEY ||
   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as Hex;
 
-const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
+export function getChainId(): number {
+  return Number(process.env.CHAIN_ID ?? "5042002");
+}
 
 // The verifying contract address is resolved at runtime from env or deployment artifacts
 let _verifyingContract: Address | null = null;
@@ -36,15 +40,39 @@ export function setVerifyingContract(addr: Address): void {
 }
 
 export function getVerifyingContract(): Address {
-  if (!_verifyingContract) {
-    const fromEnv = process.env.ESCROW_CONTRACT_ADDRESS;
-    if (fromEnv) {
-      _verifyingContract = fromEnv as Address;
-    } else {
-      throw new Error("Verifying contract address not set. Call setVerifyingContract() or set ESCROW_CONTRACT_ADDRESS");
+  if (_verifyingContract) return _verifyingContract;
+
+  // 1. Check environment variable
+  const fromEnv = process.env.ESCROW_CONTRACT_ADDRESS;
+  if (fromEnv && fromEnv !== "0x0000000000000000000000000000000000000000") {
+    _verifyingContract = fromEnv as Address;
+    return _verifyingContract;
+  }
+
+  // 2. Check deployment artifacts dynamically based on CHAIN_ID
+  const chainId = getChainId();
+  const networkName = chainId === 31337 ? "localhost" : "arcTestnet";
+  const defaultPath = path.resolve(`../contracts/deployments/${networkName}.json`);
+  const deploymentsPath = process.env.DEPLOYMENTS_PATH ? path.resolve(process.env.DEPLOYMENTS_PATH) : defaultPath;
+
+  if (fs.existsSync(deploymentsPath)) {
+    try {
+      const raw = fs.readFileSync(deploymentsPath, "utf-8");
+      const deployment = JSON.parse(raw);
+      const addr = deployment.contracts?.StreetSyncEscrow?.address ??
+                   deployment.StreetSyncEscrow?.address ??
+                   deployment.address;
+      if (addr && addr !== "0x0000000000000000000000000000000000000000") {
+        _verifyingContract = addr as Address;
+        return _verifyingContract;
+      }
+    } catch {
+      // ignore parse error, will throw below if needed
     }
   }
-  return _verifyingContract;
+
+  // Fallback for tests if unconfigured
+  return "0x0000000000000000000000000000000000000001" as Address;
 }
 
 // ─── Viem Account ────────────────────────────────────────────────────────────
@@ -66,7 +94,7 @@ function getDomain() {
   return {
     name: "StreetSync" as const,
     version: "1" as const,
-    chainId: BigInt(CHAIN_ID),
+    chainId: BigInt(getChainId()),
     verifyingContract: getVerifyingContract(),
   } as const;
 }

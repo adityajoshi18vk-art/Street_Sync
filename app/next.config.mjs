@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+      layers: true
+    };
     // Optional x402 payment subdeps of @coinbase/cdp-sdk (pulled in via the
     // Coinbase connector barrel in wagmi/connectors) that ship uninstalled.
     // Our app never touches x402 payments, so stub every referenced subpath.

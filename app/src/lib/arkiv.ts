@@ -14,7 +14,10 @@ import type { IArkivClient } from "@streetsync/arkiv-client";
  */
 
 const ARKIV_MODE = (process.env.NEXT_PUBLIC_ARKIV_MODE ?? "http").toLowerCase();
-const ARKIV_URL = process.env.NEXT_PUBLIC_ARKIV_URL ?? "https://arp.testnet.arkiv.golem.network";
+const ARKIV_URL =
+  process.env.NEXT_PUBLIC_ARKIV_URL ??
+  process.env.NEXT_PUBLIC_ARKIV_RPC_URL ??
+  "https://arp.testnet.arkiv.golem.network";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
