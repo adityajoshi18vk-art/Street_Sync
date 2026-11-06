@@ -28,7 +28,10 @@ import {
 import { approveUsdcExact, waitTx } from "@/lib/tx";
 import { getReviewerAssignments, type Attestation } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
-import { shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
+import { shortAddress, statusName, type OnChainBounty, type ReviewerAssignment } from "@/lib/types";
+import { friendlyError } from "@/lib/errors";
+import { useBountyReport } from "@/lib/useBountyReport";
+import ReportCard from "@/components/ReportCard";
 import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import CommitRevealCard from "@/components/CommitRevealCard";
@@ -64,6 +67,10 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
     | { wallet: string; regionCell: number; stakedAmount: bigint; active: boolean; rewardBalance: bigint }
     | undefined;
   const registered = !!reviewer && reviewer.active;
+  const rewards = reviewer?.rewardBalance ?? 0n;
+  const previouslyRegistered = !!reviewer && reviewer.wallet !== "0x0000000000000000000000000000000000000000";
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState<string | null>(null);
   const stake = typeof stakeRaw === "bigint" ? stakeRaw : 2_000_000n;
 
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
@@ -106,13 +113,39 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         await waitTx(config, hash);
         onRegistered();
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(friendlyError(err));
       } finally {
         setBusy(false);
       }
     },
     [address, canWrite, config, gps, onRegistered, stake, writeContractAsync]
   );
+
+  const withdrawRewards = useCallback(async () => {
+    if (!canWrite || !address || !ESCROW_ADDRESS) return;
+    setWithdrawing(true);
+    setError(null);
+    setWithdrawMsg(null);
+    try {
+      const hash = await writeContractAsync({
+        address: ESCROW_ADDRESS as `0x${string}`,
+        abi: ESCROW_ABI,
+        functionName: "withdrawReward",
+        args: [],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
+      });
+      setTxHash(hash);
+      await waitTx(config, hash);
+      setWithdrawMsg("Rewards sent to your wallet.");
+      onRegistered();
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setWithdrawing(false);
+    }
+  }, [address, canWrite, config, onRegistered, writeContractAsync]);
 
   const requestGps = useCallback(() => {
     if (!navigator.geolocation) {
@@ -132,6 +165,22 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-gray-900">Reviewer registration</h2>
+      {rewards > 0n && (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 p-3 text-xs text-emerald-800 ring-1 ring-emerald-200">
+          <span>
+            Unclaimed rewards: <span className="font-semibold">{formatUsdcDisplay(rewards)} USDC</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void withdrawRewards()}
+            disabled={withdrawing || !canWrite}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700 disabled:bg-gray-300"
+          >
+            {withdrawing ? "Withdrawing…" : "Withdraw rewards"}
+          </button>
+        </div>
+      )}
+      {withdrawMsg && <p className="mt-2 text-xs text-emerald-700">{withdrawMsg}</p>}
       {registered ? (
         <div className="mt-3 space-y-1 text-sm text-gray-700">
           <p className="font-semibold text-emerald-700">Active reviewer ✓</p>
@@ -143,9 +192,17 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         </div>
       ) : (
         <>
+          {previouslyRegistered && (
+            <p className="mt-2 rounded-lg bg-blue-50 p-3 text-xs text-blue-800">
+              {reviewer && reviewer.stakedAmount === 0n && rewards >= 0n
+                ? "Your last review is settled and your stake was returned (or slashed if you missed a reveal). Stake again to keep reviewing; any unclaimed rewards stay yours."
+                : "Your reviewer registration is inactive. Stake again to keep reviewing."}
+            </p>
+          )}
           <p className="mt-1 text-xs text-gray-500">
             Verify with World ID, approve exactly {formatUsdcDisplay(stake)} USDC of stake, and
-            register. Stakes are slashed if you sit on a panel and fail to reveal.
+            register. Stakes are slashed if you sit on a panel and fail to reveal. After each review
+            you settle, your stake comes back and you re-stake to take the next one.
           </p>
           {!address ? (
             <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
@@ -202,6 +259,7 @@ interface EvidencePanelProps {
 }
 
 function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePanelProps) {
+  const { report } = useBountyReport(bountyId);
   const [verification, setVerification] = useState<ArkivVerificationResult | null>(null);
   const [bundleSize, setBundleSize] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -252,7 +310,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
       );
       setVerification(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
     } finally {
       setLoading(false);
     }
@@ -315,6 +373,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             </span>
           </div>
 
+          {report && <ReportCard report={report} compact title="Problem as reported" />}
           {beforeUrl && afterUrl ? (
             <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
           ) : (
@@ -424,14 +483,14 @@ function AssignmentCard({
     query: { enabled: contractsDeployed }
   });
 
-  const b = raw as unknown[] | undefined;
-  const status = b ? Number(b[16]) : (assignment.bountyStatus ?? -1);
-  const worker = b && typeof b[9] === "string" ? (b[9] as string) : assignment.worker;
-  const arkivKey = b && typeof b[11] === "string" ? (b[11] as string) : null;
-  const evidenceHash = b && typeof b[12] === "string" ? (b[12] as string) : null;
-  const selectionBlock = b ? BigInt(b[13] as bigint) : null;
-  const reviewRound = b ? Number(b[14]) : assignment.reviewRound;
-  const totalPledged = b ? (b[6] as bigint) : BigInt(assignment.totalPledged || "0");
+  const b = raw as OnChainBounty | undefined;
+  const status = b ? Number(b.status) : (assignment.bountyStatus ?? -1);
+  const worker = b ? b.worker : assignment.worker;
+  const arkivKey = b ? b.arkivEntityKey : null;
+  const evidenceHash = b ? b.evidenceHash : null;
+  const selectionBlock = b ? BigInt(b.selectionBlock) : null;
+  const reviewRound = b ? Number(b.reviewRound) : assignment.reviewRound;
+  const totalPledged = b ? BigInt(b.totalPledged) : BigInt(assignment.totalPledged || "0");
 
   const panelMembers = (panel as unknown as string[] | undefined) ?? [];
   const onPanel = !!address && panelMembers.some((m) => m.toLowerCase() === address.toLowerCase());
@@ -469,7 +528,7 @@ function AssignmentCard({
         if (fn === "settle") setJustSettled(true);
         onTx();
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(friendlyError(err));
       } finally {
         setBusy(false);
       }
