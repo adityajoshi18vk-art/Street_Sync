@@ -101,6 +101,7 @@ export default function WorkerPage() {
         claimDeadline: bigint;
         workDeadline: bigint;
         reworkCount: number;
+        confirmations: number;
       }
     | undefined;
   const now = useNowSeconds();
@@ -137,6 +138,25 @@ export default function WorkerPage() {
     args: bountyIdBig !== null && address ? [bountyIdBig, address] : undefined,
     query: { enabled: contractsDeployed && bountyIdBig !== null && !!address }
   }).data as boolean | undefined;
+
+  const { data: quorumRaw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "validationQuorum",
+    query: { enabled: contractsDeployed }
+  });
+  const quorum = Math.max(1, Number(quorumRaw ?? 2));
+  const awaitingNeighbours = status === STATUS.Proposed;
+  const confirmations = b ? Number(b.confirmations) : 0;
+  // Conflicts that will block claim() once the bounty opens.
+  const futureConflict = isCreator
+    ? "You reported this problem, so you won't be able to claim it."
+    : (myPledge ?? 0n) > 0n
+      ? "You pledged to this bounty, so you won't be able to claim it."
+      : (myProblemVote ?? 0) !== 0
+        ? "You voted on this problem as a neighbour, so you won't be able to claim it."
+        : null;
 
   // Mirrors the contract's claim() checks so ineligible wallets get a reason, not a revert.
   const claimBlockReason = !lc
@@ -463,7 +483,26 @@ export default function WorkerPage() {
               Connect your wallet (header) before verifying.
             </p>
           )}
-          {isConnected && claimBlockReason && !isWorker && (
+          {awaitingNeighbours && lc && (
+            <div className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 ring-1 ring-amber-200">
+              <p className="font-semibold">Not open yet — waiting for neighbours</p>
+              <p className="mt-1">
+                {confirmations} of {quorum} neighbour confirmations. The claim button appears here as soon as{" "}
+                {quorum} neighbours confirm the problem is real (voting {countdownLabel(lc.validationDeadline, now)}).
+                If voting ends without enough confirmations, the report is dismissed and pledges are refunded.
+              </p>
+              <div className="mt-2 flex gap-1" aria-hidden>
+                {Array.from({ length: quorum }, (_, i) => (
+                  <span key={i} className={`h-1.5 w-10 rounded-full ${i < confirmations ? "bg-emerald-500" : "bg-amber-200"}`} />
+                ))}
+              </div>
+              <p className="mt-2">
+                {futureConflict ??
+                  "Planning to do this job? Don't vote on it yourself — voting rules you out as the worker. Share the bounty link with people nearby so they can confirm it."}
+              </p>
+            </div>
+          )}
+          {isConnected && claimBlockReason && !isWorker && !awaitingNeighbours && (
             <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">{claimBlockReason}</p>
           )}
           {isConnected && lc && !claimBlockReason && (
