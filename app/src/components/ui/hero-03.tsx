@@ -18,8 +18,8 @@ export interface HeroRow {
 
 export interface HeroSection03Props {
   /** Accessible heading text; the oversized rows are decorative. */
-  title: string;
-  rows: HeroRow[];
+  title?: string;
+  rows?: HeroRow[];
   meta?: { start?: React.ReactNode; end?: React.ReactNode };
   signature?: { detail?: React.ReactNode; label: React.ReactNode; value: React.ReactNode };
   media?: React.ReactNode;
@@ -44,8 +44,8 @@ function Caption({ children, align }: { children: React.ReactNode; align: "start
 }
 
 export function HeroSection03({
-  title,
-  rows,
+  title = "StreetSync",
+  rows = [],
   meta,
   signature,
   media,

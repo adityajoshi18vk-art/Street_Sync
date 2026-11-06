@@ -11,12 +11,14 @@ const NAV: NavItem[] = [
   { href: "/", label: "Map", icon: Map },
   { href: "/worker", label: "Worker", icon: Hammer },
   { href: "/review", label: "Review", icon: ShieldCheck },
-  { href: "/stickers", label: "Stickers", icon: Award }
+  { href: "/stickers", label: "Stickers", icon: Award },
+  { href: "/janlekha", label: "JanLekha", icon: Landmark }
 ];
 
 // "/" matches only itself; bounty/audit pages belong to the map flow.
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/" || pathname.startsWith("/bounty") || pathname.startsWith("/audit");
+  if (href === "/janlekha") return pathname.startsWith("/janlekha") || pathname.startsWith("/projects") || pathname.startsWith("/verify");
   return pathname.startsWith(href);
 }
 
@@ -40,14 +42,6 @@ export function DesktopNav() {
           </Link>
         );
       })}
-      <a
-        href={JANLEKHA_URL}
-        className="flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-zinc-400 transition hover:bg-white/[0.08] hover:text-accent-300"
-      >
-        <Landmark className="h-4 w-4" strokeWidth={2.25} aria-hidden />
-        JanLekha
-        <ArrowUpRight className="h-3.5 w-3.5 opacity-60" aria-hidden />
-      </a>
     </nav>
   );
 }
@@ -77,10 +71,6 @@ export function MobileTabBar() {
           </Link>
         );
       })}
-      <a href={JANLEKHA_URL} className="flex flex-1 flex-col items-center gap-0.5 rounded-full py-1.5 text-[11px] font-semibold text-zinc-400">
-        <Landmark className="h-[18px] w-[18px]" strokeWidth={2.25} aria-hidden />
-        JanLekha
-      </a>
     </nav>
   );
 }

@@ -31,6 +31,22 @@ const nextConfig = {
         destination: `${janlekhaOrigin}/janlekha/:path*`
       },
       {
+        source: "/projects",
+        destination: `${janlekhaOrigin}/janlekha/projects`
+      },
+      {
+        source: "/projects/:path*",
+        destination: `${janlekhaOrigin}/janlekha/projects/:path*`
+      },
+      {
+        source: "/verify",
+        destination: `${janlekhaOrigin}/janlekha/verify`
+      },
+      {
+        source: "/verify/:path*",
+        destination: `${janlekhaOrigin}/janlekha/verify/:path*`
+      },
+      {
         source: "/demo-documents/:path*",
         destination: `${janlekhaOrigin}/janlekha/demo-documents/:path*`
       },
