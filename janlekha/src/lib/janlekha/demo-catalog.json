@@ -1,0 +1,97 @@
+{
+  "notice": "Synthetic, off-chain demo metadata. Not verified by the contract.",
+  "projects": {
+    "0xd201d0866f1b974e33803c13776ecdd091fd2722b2dd60ddf6dccc5b3a8fd042": {
+      "title": "Ward 12 storm-water drain rehabilitation (synthetic)",
+      "department": "Synthetic Municipal Engineering Department",
+      "location": "Demo City, Ward 12"
+    },
+    "0x90a69dbb607694bc3ac3ac42e0e3b0e2058176f2a7ada9ae8fc32ef52984cfe5": {
+      "title": "Government school roof waterproofing (synthetic)",
+      "department": "Synthetic School Infrastructure Cell",
+      "location": "Demo City, Ward 4"
+    },
+    "0x05a158ef070b64d52f4d33064aca04899cd08b72adae9f7566e20ed100553052": {
+      "title": "Primary health centre rooftop solar (synthetic)",
+      "department": "Synthetic Health Infrastructure Wing",
+      "location": "Demo Village PHC"
+    }
+  },
+  "documents": {
+    "0xd201d0866f1b974e33803c13776ecdd091fd2722b2dd60ddf6dccc5b3a8fd042": {
+      "title": "Sanction Order SYN/ME/2026/012",
+      "kind": "sanction",
+      "file": "/demo-documents/drain-sanction-order.pdf"
+    },
+    "0x08815dfabb68c4370aec9115e42b4df296eeb17cc04f83e119442c0d74e004b5": {
+      "title": "Tender Notice SYN/ME/T/2026/031",
+      "kind": "tender",
+      "file": "/demo-documents/drain-tender-notice.pdf"
+    },
+    "0x7a4575e6130af089c021f44dbeff89b3cb91b944ccdea139358c480afe3aa5d7": {
+      "title": "Quotation - Demo Vendor A (synthetic)",
+      "kind": "quotation",
+      "file": "/demo-documents/drain-quotation-vendor-a.pdf"
+    },
+    "0x449b14db6dc1bf1a8b7b9416b82d07cadce40ab5b504f0f91ae349ee6010fe8f": {
+      "title": "Quotation - Demo Vendor B (synthetic)",
+      "kind": "quotation",
+      "file": "/demo-documents/drain-quotation-vendor-b.pdf"
+    },
+    "0x5a92f89ac7a9c0dc1b4e3d58cf17214be26e3a26385a00df82e7181271f51128": {
+      "title": "Bid Evaluation Report",
+      "kind": "evaluation",
+      "file": "/demo-documents/drain-bid-evaluation.pdf"
+    },
+    "0xfd26411bc6fcad61fa5be78b1b864c3e4d9dd24534d29b6cb5de45efe21fa320": {
+      "title": "Contract Agreement SYN/ME/C/2026/009",
+      "kind": "contract",
+      "file": "/demo-documents/drain-contract-agreement.pdf"
+    },
+    "0x26a95853308f33a8bb2dec2aef03223649b90c8ecba85febc596ef5029df3957": {
+      "title": "Milestone 1 Specification - Desilting and survey",
+      "kind": "milestone-spec",
+      "file": "/demo-documents/drain-m1-specification.pdf"
+    },
+    "0xece032e330702b97e7540e06caed87cd6b0b487f22daaa04aff842be8e1d4e2e": {
+      "title": "Milestone 2 Specification - Relining",
+      "kind": "milestone-spec",
+      "file": "/demo-documents/drain-m2-specification.pdf"
+    },
+    "0xe3068b5bfc51d057df8fac28ef953176af60e39730f5112926c9f26521d7824b": {
+      "title": "Milestone 1 Completion Evidence",
+      "kind": "evidence",
+      "file": "/demo-documents/drain-m1-evidence.pdf"
+    },
+    "0x012548aab0760cb37185a0890f2b5323d23eab501b9ad2dc2f6704712fa56ea4": {
+      "title": "Milestone 1 Inspection Report",
+      "kind": "inspection",
+      "file": "/demo-documents/drain-m1-inspection-report.pdf"
+    },
+    "0x7fe5508b33ec8c2cbe00d0bb73839f05fa8543cf312fd099c563134be786a7de": {
+      "title": "Mock PFMS Payment Advice (synthetic)",
+      "kind": "payment-advice",
+      "file": "/demo-documents/drain-m1-mock-pfms-advice.pdf"
+    },
+    "0x8939e1d29aee9e186bcfc5c4a2f89ee52f25f8e28159c9d4b0183f04b7201fae": {
+      "title": "Milestone 2 Completion Evidence",
+      "kind": "evidence",
+      "file": "/demo-documents/drain-m2-evidence.pdf"
+    },
+    "0x90a69dbb607694bc3ac3ac42e0e3b0e2058176f2a7ada9ae8fc32ef52984cfe5": {
+      "title": "Sanction Order SYN/SIC/2026/044",
+      "kind": "sanction",
+      "file": "/demo-documents/roof-sanction-order.pdf"
+    },
+    "0xfc301876f2c63e8cde0654a05e5db289be8ad090141d97f1d8a419cbb274ca09": {
+      "title": "Tender Notice SYN/SIC/T/2026/051",
+      "kind": "tender",
+      "file": "/demo-documents/roof-tender-notice.pdf"
+    },
+    "0x05a158ef070b64d52f4d33064aca04899cd08b72adae9f7566e20ed100553052": {
+      "title": "Sanction Order SYN/HIW/2026/007",
+      "kind": "sanction",
+      "file": "/demo-documents/solar-sanction-order.pdf"
+    }
+  }
+}

@@ -153,6 +153,15 @@ db.exec(`
     updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
   );
 
+  -- Gamification stickers earned per wallet (awarded lazily from indexed activity)
+  CREATE TABLE IF NOT EXISTS stickers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet      TEXT    NOT NULL,
+    sticker_id  TEXT    NOT NULL,
+    awarded_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    UNIQUE(wallet, sticker_id)
+  );
+
   -- Indexes for common queries
   CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status);
   CREATE INDEX IF NOT EXISTS idx_bounties_region ON bounties(region_cell);
@@ -162,6 +171,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_panel_bounty ON panel_assignments(bounty_id);
   CREATE INDEX IF NOT EXISTS idx_votes_bounty ON vote_commits(bounty_id);
   CREATE INDEX IF NOT EXISTS idx_nullifiers_hash ON nullifiers(nullifier_hash);
+  CREATE INDEX IF NOT EXISTS idx_stickers_wallet ON stickers(wallet);
 `);
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -325,6 +335,41 @@ const getSettlementByBounty = db.prepare(`
   SELECT * FROM settlements WHERE bounty_id = ?
 `);
 
+// ─── Stickers & wallet activity stats ────────────────────────────────────────
+
+const insertSticker = db.prepare(`
+  INSERT OR IGNORE INTO stickers (wallet, sticker_id) VALUES (?, ?)
+`);
+
+const getStickersByWallet = db.prepare(`
+  SELECT sticker_id, awarded_at FROM stickers WHERE wallet = ? ORDER BY awarded_at ASC
+`);
+
+const countBountiesCreated = db.prepare(`
+  SELECT COUNT(*) AS c FROM bounties WHERE creator = ?
+`);
+
+const pledgeStatsByWallet = db.prepare(`
+  SELECT COUNT(DISTINCT bounty_id) AS bounties,
+         COALESCE(SUM(CAST(amount AS INTEGER)), 0) AS total
+  FROM pledges WHERE pledger = ?
+`);
+
+const workerStatsByWallet = db.prepare(`
+  SELECT COUNT(*) AS claimed,
+         SUM(CASE WHEN status = 4 THEN 1 ELSE 0 END) AS approved,
+         SUM(CASE WHEN evidence_hash IS NOT NULL THEN 1 ELSE 0 END) AS evidence
+  FROM bounties WHERE worker = ?
+`);
+
+const countRevealsByReviewer = db.prepare(`
+  SELECT COUNT(*) AS c FROM vote_commits WHERE reviewer = ? AND revealed = 1
+`);
+
+const countSlashesByReviewer = db.prepare(`
+  SELECT COUNT(*) AS c FROM reviewer_slashes WHERE reviewer = ?
+`);
+
 // ─── Events Cursor ───────────────────────────────────────────────────────────
 
 const getCursor = db.prepare(`
@@ -481,6 +526,33 @@ export const dbAccess = {
   },
   getSettlement(bountyId: string) {
     return getSettlementByBounty.get(bountyId) as Record<string, unknown> | undefined;
+  },
+
+  // ─── Stickers & wallet activity stats ───
+  awardSticker(wallet: string, stickerId: string) {
+    return insertSticker.run(wallet, stickerId);
+  },
+  getEarnedStickers(wallet: string) {
+    return getStickersByWallet.all(wallet) as { sticker_id: string; awarded_at: number }[];
+  },
+  getWalletStats(wallet: string) {
+    const created = countBountiesCreated.get(wallet) as { c: number };
+    const pledges = pledgeStatsByWallet.get(wallet) as { bounties: number; total: number };
+    const work = workerStatsByWallet.get(wallet) as {
+      claimed: number; approved: number | null; evidence: number | null;
+    };
+    const reveals = countRevealsByReviewer.get(wallet) as { c: number };
+    const slashes = countSlashesByReviewer.get(wallet) as { c: number };
+    return {
+      bountiesCreated: created.c,
+      pledgedBounties: pledges.bounties,
+      pledgedTotal: String(pledges.total),
+      bountiesClaimed: work.claimed,
+      approvedFixes: work.approved ?? 0,
+      evidenceSubmitted: work.evidence ?? 0,
+      votesRevealed: reveals.c,
+      slashes: slashes.c,
+    };
   },
 
   // ─── Events Cursor ───
