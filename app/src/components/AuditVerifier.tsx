@@ -222,7 +222,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       )}
 
       {phase === "loading" && (
-        <div className="card flex flex-col items-center gap-3 p-6 text-center text-sm text-slate-400">
+        <div className="card flex flex-col items-center gap-3 p-6 text-center text-sm text-zinc-400">
           <span className="spinner" aria-hidden />
           Fetching raw entity bytes from Arkiv and recomputing SHA-256…
         </div>
@@ -248,7 +248,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
                 <p className="label-micro">
                   Worker EIP-191 signature
                 </p>
-                <p className="truncate font-mono text-xs text-slate-300">
+                <p className="truncate font-mono text-xs text-zinc-300">
                   {recoveredWorker ?? "recovery failed"}
                 </p>
               </div>
@@ -261,8 +261,8 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
               </span>
             </div>
             <div className="card-inset flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
-              <span className="text-slate-400">Bundle size (Arkiv entity, ≤128 KiB)</span>
-              <span className="font-mono font-semibold text-slate-200">
+              <span className="text-zinc-400">Bundle size (Arkiv entity, ≤128 KiB)</span>
+              <span className="font-mono font-semibold text-zinc-200">
                 {bundleSize?.toLocaleString()} B / {MAX_ARKIV_PAYLOAD.toLocaleString()} B
               </span>
             </div>
@@ -280,7 +280,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
               </div>
             )}
             {entityKeyUsed && (
-              <p className="truncate text-[11px] text-slate-500">
+              <p className="truncate text-[11px] text-zinc-500">
                 Entity resolved via key: {entityKeyUsed}
               </p>
             )}
@@ -330,7 +330,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-white">Video Walkthrough (Ethereum Swarm)</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-zinc-400">
                 Decentralized chunked streaming via Bzz protocol · {metadata.video.durationSeconds}s · {(metadata.video.sizeBytes / 1024).toFixed(0)} KB
               </p>
             </div>
@@ -351,14 +351,14 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
             className="w-full max-h-80 rounded-xl bg-black object-contain"
           />
 
-          <div className="card-inset grid grid-cols-1 gap-2 p-3 font-mono text-[11px] text-slate-400 sm:grid-cols-2">
+          <div className="card-inset grid grid-cols-1 gap-2 p-3 font-mono text-[11px] text-zinc-400 sm:grid-cols-2">
             <div className="truncate">
-              <span className="text-slate-500">Swarm Reference: </span>
-              <span className="font-semibold text-slate-200">{metadata.video.swarmReference}</span>
+              <span className="text-zinc-500">Swarm Reference: </span>
+              <span className="font-semibold text-zinc-200">{metadata.video.swarmReference}</span>
             </div>
             <div className="truncate">
-              <span className="text-slate-500">Video SHA-256: </span>
-              <span className="font-semibold text-slate-200">{metadata.video.videoSha256}</span>
+              <span className="text-zinc-500">Video SHA-256: </span>
+              <span className="font-semibold text-zinc-200">{metadata.video.videoSha256}</span>
             </div>
           </div>
         </div>
@@ -367,7 +367,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       {phase === "done" && (
         <div className="card animate-rise p-6">
           <p className="text-sm font-semibold text-white">Tamper demonstration</p>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-zinc-400">
             Flips exactly one byte of the bundle <em>in memory only</em> (nothing is written back to
             Arkiv) and recomputes the SHA-256 — showing why the on-chain Arc hash check makes silent
             edits impossible.
@@ -434,7 +434,7 @@ function Field({
       }`}
     >
       <p className="label-micro">{label}</p>
-      <p className="font-mono text-xs font-semibold text-slate-200">{value}</p>
+      <p className="font-mono text-xs font-semibold text-zinc-200">{value}</p>
     </div>
   );
 }

@@ -12,11 +12,11 @@ html {
 }
 
 body {
-  @apply bg-ink-950 text-slate-200 antialiased;
-  /* faint ambience so the page still reads as X-style true black */
+  @apply bg-ink-950 text-zinc-300 antialiased;
+  /* faint signal-lime and violet ambience over near-black */
   background-image:
-    radial-gradient(900px 480px at 15% -10%, rgb(29 155 240 / 0.07), transparent 62%),
-    radial-gradient(760px 420px at 88% -6%, rgb(6 182 212 / 0.05), transparent 60%);
+    radial-gradient(900px 480px at 12% -10%, rgb(163 230 53 / 0.06), transparent 62%),
+    radial-gradient(760px 420px at 90% -6%, rgb(139 92 246 / 0.08), transparent 60%);
   background-attachment: fixed;
 }
 
@@ -28,14 +28,15 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    linear-gradient(rgb(255 255 255 / 0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.015) 1px, transparent 1px);
+    linear-gradient(rgb(255 255 255 / 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.022) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 78%);
 }
 
 ::selection {
-  background: rgb(29 155 240 / 0.4);
+  background: rgb(163 230 53 / 0.35);
+  color: #fff;
 }
 
 *::-webkit-scrollbar {
@@ -66,10 +67,10 @@ input[type="number"]::-webkit-inner-spin-button {
 @layer components {
   /* Surfaces */
   .card {
-    @apply rounded-2xl border border-white/[0.08] bg-white/[0.03] shadow-card backdrop-blur-xl;
+    @apply rounded-3xl border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.015] shadow-card backdrop-blur-xl;
   }
   .card-hover {
-    @apply transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-white/[0.05];
+    @apply transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-300/25 hover:shadow-glow-sm;
   }
   .card-inset {
     @apply rounded-xl border border-white/[0.06] bg-black/30;
@@ -77,16 +78,16 @@ input[type="number"]::-webkit-inner-spin-button {
 
   /* Buttons — X-style pills: solid colors, bold 15px text, uniform heights */
   .btn {
-    @apply inline-flex min-h-[2.5rem] items-center justify-center gap-2 whitespace-nowrap rounded-full text-[15px] font-bold leading-5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex min-h-[2.5rem] items-center justify-center gap-2 whitespace-nowrap rounded-full text-[15px] font-bold leading-5 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-primary {
-    @apply btn bg-brand-500 px-5 py-2 text-white shadow-glow-sm hover:bg-brand-600 hover:shadow-glow;
+    @apply btn bg-brand-400 px-5 py-2 text-ink-950 shadow-glow-sm hover:bg-brand-300 hover:shadow-glow;
   }
   .btn-white {
     @apply btn bg-white px-5 py-2 text-black hover:bg-white/90;
   }
   .btn-ghost {
-    @apply btn border border-white/25 bg-transparent px-5 py-2 text-slate-100 hover:border-white/40 hover:bg-white/10;
+    @apply btn border border-white/15 bg-white/[0.03] px-5 py-2 text-zinc-100 hover:border-white/30 hover:bg-white/[0.08];
   }
   .btn-success {
     @apply btn bg-emerald-500 px-5 py-2 text-white hover:bg-emerald-600;
@@ -101,7 +102,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
   /* Form fields */
   .field {
-    @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 transition focus:border-brand-400/60 focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-brand-400/60;
+    @apply w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 transition focus:border-brand-400/60 focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-brand-400/60;
   }
   select.field {
     @apply appearance-none pr-8 bg-no-repeat;
@@ -109,20 +110,20 @@ input[type="number"]::-webkit-inner-spin-button {
     background-position: right 0.85rem center;
   }
   select.field option {
-    @apply bg-ink-800 text-slate-100;
+    @apply bg-ink-800 text-zinc-100;
   }
 
   /* Chips / filters */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-zinc-400 transition hover:border-white/20 hover:text-zinc-200;
   }
   .chip-active {
-    @apply border-brand-400/50 bg-brand-500/15 text-brand-200 shadow-glow-sm;
+    @apply border-brand-300/50 bg-brand-400/15 text-brand-200 shadow-glow-sm;
   }
 
   /* Typography helpers */
   .label-micro {
-    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500;
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500;
   }
   .text-gradient {
     @apply bg-gradient-to-r from-brand-300 via-accent-300 to-brand-400 bg-clip-text text-transparent;
@@ -146,7 +147,7 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 
   .code-pill {
-    @apply rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-100;
+    @apply rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.85em] text-zinc-100;
   }
 
   /* Loading skeleton with shimmer */
@@ -168,6 +169,35 @@ input[type="number"]::-webkit-inner-spin-button {
   .spinner-sm {
     @apply h-4 w-4 border-2;
   }
+  /* spinner inside a filled button: takes the button's text color */
+  .spinner-inherit {
+    border-color: color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
+  }
+
+  /* Icon tile used in headings, stats and steps */
+  .icon-tile {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-brand-300;
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400;
+  }
+}
+
+/* Hero aurora: blurred drifting color fields behind the headline */
+.aurora {
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 140%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(70px);
+  opacity: 0.55;
+}
+.aurora > span {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
 }
 
 /* Staggered entrance helper: apply .animate-rise plus a .stagger-N */
@@ -197,8 +227,8 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: rgb(22 24 28 / 0.97);
-  color: #e2e8f0;
+  background: rgb(19 19 24 / 0.97);
+  color: #e4e4e7;
   box-shadow: 0 8px 30px -10px rgb(0 0 0 / 0.8), 0 0 0 1px rgb(255 255 255 / 0.1);
   backdrop-filter: blur(12px);
 }
@@ -206,21 +236,21 @@ input[type="number"]::-webkit-inner-spin-button {
   border-radius: 14px;
 }
 .leaflet-container a.leaflet-popup-close-button {
-  color: #64748b;
+  color: #71717a;
 }
 .leaflet-bar a {
-  background: rgb(22 24 28 / 0.95);
-  color: #cbd5e1;
+  background: rgb(19 19 24 / 0.95);
+  color: #d4d4d8;
   border-bottom-color: rgb(255 255 255 / 0.1);
 }
 .leaflet-bar a:hover {
-  background: rgb(47 51 54 / 0.95);
+  background: rgb(42 42 51 / 0.95);
   color: #fff;
 }
 .leaflet-control-attribution {
   background: rgb(0 0 0 / 0.7) !important;
-  color: #475569 !important;
+  color: #52525b !important;
 }
 .leaflet-control-attribution a {
-  color: #64748b !important;
+  color: #71717a !important;
 }

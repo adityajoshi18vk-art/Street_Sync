@@ -19,6 +19,9 @@ import {
 } from "@/config/contracts";
 import { approveUsdcExact } from "@/lib/tx";
 import { TestUsdcFaucet } from "@/components/TestUsdcFaucet";
+import { HomeHero } from "@/components/home/HomeHero";
+import { HowItWorks } from "@/components/home/HowItWorks";
+import { MapPinPlus, ListFilter, RefreshCw } from "lucide-react";
 import { listBounties } from "@/lib/api";
 import {
   normalizeBounty,
@@ -205,24 +208,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <section className="animate-rise space-y-3 pt-4 text-center sm:pt-8">
-        <p className="label-micro">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-glow-pulse" />
-            Live on {ACTIVE_CHAIN.name} · USDC escrow · World ID verified
-          </span>
-        </p>
-        <h1 className="heading mx-auto max-w-3xl text-3xl sm:text-5xl">
-          Fix your street.
-          <br />
-          <span className="text-gradient">Proven on-chain.</span>
-        </h1>
-        <p className="mx-auto max-w-xl text-sm text-slate-400 sm:text-base">
-          Neighbors fund it, a verified human fixes it, other verified humans confirm it —
-          USDC releases only when the community agrees.
-        </p>
-      </section>
+      <HomeHero chainName={ACTIVE_CHAIN.name} bounties={bounties} loading={loading} />
 
       {!contractsDeployed && (
         <div className="alert-warn animate-rise stagger-1">
@@ -245,6 +231,7 @@ export default function HomePage() {
             onClick={() => void loadBounties()}
             className="btn-danger btn-sm"
           >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden />
             Retry
           </button>
         </div>
@@ -268,13 +255,14 @@ export default function HomePage() {
           center={mapCenter}
           className="h-[420px] w-full overflow-hidden rounded-xl sm:h-[480px]"
         />
-        <p className="px-2 pb-1 pt-2 text-center text-[11px] text-slate-500">
+        <p className="px-2 pb-1 pt-2 text-center text-[11px] text-zinc-500">
           Tap the map to drop a new bounty pin · pins are colored by lifecycle status
         </p>
       </div>
 
       {/* Status filter chips */}
-      <div className="flex flex-wrap gap-2 animate-rise stagger-3">
+      <div className="flex flex-wrap items-center gap-2 animate-rise stagger-3">
+        <ListFilter className="mr-1 h-4 w-4 text-zinc-500" aria-label="Filter by status" />
         <button
           onClick={() => setStatusFilter(null)}
           className={`chip ${statusFilter === null ? "chip-active" : ""}`}
@@ -301,21 +289,28 @@ export default function HomePage() {
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* Create bounty panel */}
-        <section className="card animate-rise stagger-4 h-fit p-6 lg:col-span-2">
-          <h2 className="heading text-lg">Create a bounty</h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Fund a repair escrow in USDC. Tap the map first to set the location.
-          </p>
+        <section id="create" className="card animate-rise stagger-4 h-fit scroll-mt-24 p-6 lg:col-span-2">
+          <div className="flex items-start gap-3">
+            <span className="icon-tile">
+              <MapPinPlus className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <h2 className="heading text-lg">Create a bounty</h2>
+              <p className="mt-0.5 text-xs text-zinc-400">
+                Fund a repair escrow in USDC. Tap the map first to set the location.
+              </p>
+            </div>
+          </div>
 
           <div className="mt-5 space-y-3">
             <div className="card-inset px-3.5 py-2.5 text-xs">
               <p className="label-micro">Location</p>
               {draftPin ? (
-                <p className="mt-0.5 font-mono text-slate-200">
+                <p className="mt-0.5 font-mono text-zinc-200">
                   {draftPin.lat.toFixed(5)}, {draftPin.lng.toFixed(5)}
                 </p>
               ) : (
-                <p className="mt-0.5 text-slate-500">Tap the map to drop a pin</p>
+                <p className="mt-0.5 text-zinc-500">Tap the map to drop a pin</p>
               )}
             </div>
 
@@ -366,7 +361,7 @@ export default function HomePage() {
             >
               {writing ? (
                 <>
-                  <span className="spinner spinner-sm border-white/40 border-t-white" />
+                  <span className="spinner spinner-sm spinner-inherit" />
                   Confirm in wallet…
                 </>
               ) : (
@@ -374,7 +369,7 @@ export default function HomePage() {
               )}
             </button>
             {!isConnected && (
-              <p className="text-center text-[11px] text-slate-500">
+              <p className="text-center text-[11px] text-zinc-500">
                 Connect a wallet to fund bounties.
               </p>
             )}
@@ -391,9 +386,9 @@ export default function HomePage() {
                   <p className="heading text-sm">
                     Bounty #{selectedBounty.bountyId}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-zinc-400">
                     {statusName(selectedBounty.status)} · escrow{" "}
-                    <strong className="text-slate-200">
+                    <strong className="text-zinc-200">
                       {formatUsdcDisplaySafe(selectedBounty.totalPledged)} USDC
                     </strong>
                   </p>
@@ -438,7 +433,7 @@ export default function HomePage() {
           ) : bounties.length === 0 ? (
             <div className="card border-dashed p-10 text-center">
               <p className="heading text-sm">No bounties indexed yet</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-zinc-500">
                 Create the first bounty by tapping the map and funding the escrow.
               </p>
             </div>
@@ -458,12 +453,12 @@ export default function HomePage() {
                   <p className="text-sm font-bold text-white">
                     Bounty #{b.bountyId}
                     {b.description && (
-                      <span className="ml-2 truncate text-xs font-normal text-slate-500">
+                      <span className="ml-2 truncate text-xs font-normal text-zinc-500">
                         {b.description}
                       </span>
                     )}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
+                  <p className="mt-0.5 flex items-center gap-2 text-xs text-zinc-400">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
                       style={{ backgroundColor: STATUS_COLORS[statusName(b.status)], boxShadow: `0 0 5px ${STATUS_COLORS[statusName(b.status)]}` }}
@@ -484,6 +479,8 @@ export default function HomePage() {
           )}
         </section>
       </div>
+
+      <HowItWorks />
     </div>
   );
 }

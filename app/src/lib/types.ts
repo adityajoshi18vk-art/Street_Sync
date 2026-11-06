@@ -28,7 +28,7 @@ export const STATUS_TEXT_CLASSES: Record<StatusName, string> = {
   InReview: "text-orange-300 bg-orange-400/10 ring-orange-400/30",
   Approved: "text-blue-300 bg-blue-400/10 ring-blue-400/30",
   Rejected: "text-red-300 bg-red-400/10 ring-red-400/30",
-  Refunded: "text-slate-300 bg-slate-400/10 ring-slate-400/30"
+  Refunded: "text-zinc-300 bg-zinc-400/10 ring-zinc-400/30"
 };
 
 export function statusName(status: number): StatusName {

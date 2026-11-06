@@ -49,7 +49,7 @@ export function TestUsdcFaucet() {
     <div className="card-inset flex items-center justify-between gap-3 px-3.5 py-2.5">
       <div className="min-w-0 text-xs">
         <p className="label-micro">Test USDC balance</p>
-        <p className="mt-0.5 font-mono text-slate-200">
+        <p className="mt-0.5 font-mono text-zinc-200">
           {typeof balance === "bigint" ? formatUsdcDisplay(balance) : "—"}
         </p>
         {error && <p className="mt-1 truncate text-red-300">{error}</p>}

@@ -86,7 +86,7 @@ export default function MapView({
               center={[b.lat, b.lng]}
               radius={selected ? 13 : 9}
               pathOptions={{
-                color: selected ? "#1b6bf5" : color,
+                color: selected ? "#bef264" : color,
                 fillColor: color,
                 fillOpacity: 0.85,
                 weight: selected ? 3 : 1.5
@@ -101,11 +101,11 @@ export default function MapView({
                   <p className="text-xs font-semibold" style={{ color }}>
                     {statusName(b.status)}
                   </p>
-                  <p className="text-xs text-slate-400">
-                    Escrow: <strong className="text-slate-200">{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
+                  <p className="text-xs text-zinc-400">
+                    Escrow: <strong className="text-zinc-200">{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
                   </p>
                   {b.description && (
-                    <p className="line-clamp-2 text-xs text-slate-500">{b.description}</p>
+                    <p className="line-clamp-2 text-xs text-zinc-500">{b.description}</p>
                   )}
                   <Link
                     href={`/bounty/${b.bountyId}`}
@@ -124,8 +124,8 @@ export default function MapView({
             center={[draftPin.lat, draftPin.lng]}
             radius={11}
             pathOptions={{
-              color: "#1b6bf5",
-              fillColor: "#338aff",
+              color: "#bef264",
+              fillColor: "#a3e635",
               fillOpacity: 0.4,
               weight: 2,
               dashArray: "6 4"
@@ -139,7 +139,7 @@ export default function MapView({
       <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-ink-900/85 px-3 py-2 text-[11px] font-medium backdrop-blur-md">
         {(["Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map(
           (name) => (
-            <span key={name} className="flex items-center gap-1 text-slate-300">
+            <span key={name} className="flex items-center gap-1 text-zinc-300">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: STATUS_COLORS[name], boxShadow: `0 0 5px ${STATUS_COLORS[name]}` }}

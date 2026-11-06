@@ -43,7 +43,7 @@ export function HashBadge({
             {short}
           </a>
         ) : (
-          <p className="truncate font-mono text-xs text-slate-300">{short}</p>
+          <p className="truncate font-mono text-xs text-zinc-300">{short}</p>
         )}
       </div>
       {match !== undefined && (
