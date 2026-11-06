@@ -10,8 +10,8 @@
  * Offset 12..15: beforeWebpLen (4 bytes): uint32 big-endian
  * Offset 16..19: afterWebpLen (4 bytes): uint32 big-endian
  * Offset 20..    zstd(metadata_cbor) bytes
- * Next:          before_image.webp bytes (<= 45 KiB)
- * Next:          after_image.webp bytes (<= 45 KiB)
+ * Next:          before_image.webp bytes (<= 48,000 bytes)
+ * Next:          after_image.webp bytes (<= 48,000 bytes)
  * Next 65 B:     Worker EIP-191 signature over SHA-256 of all preceding bytes
  */
 
@@ -28,8 +28,9 @@ export const FLAG_ZSTD_DICT = 0x01; // Bit 0
 export const FLAG_WEBP = 0x02; // Bit 1
 export const HEADER_SIZE = 20;
 export const SIGNATURE_SIZE = 65;
+export const MAX_BUNDLE_BYTES = 100_000;
 export const MAX_SAFE_BUNDLE_BYTES = 120_000; // Arkiv safe budget
-export const MAX_ARKIV_PAYLOAD = 128_000; // Arkiv hard limit
+export const MAX_ARKIV_PAYLOAD = 128 * 1024;
 
 /**
  * SHA-256 helper returning Uint8Array
@@ -73,12 +74,12 @@ export async function packBundle(
   // 1. Strict image size validation
   if (beforeImage.length > MAX_IMAGE_BYTES) {
     throw new RangeError(
-      `Before photo is ${beforeImage.length} bytes; exceeds strict limit of ${MAX_IMAGE_BYTES} bytes (45 KiB)`
+      `Before photo is ${beforeImage.length} bytes; exceeds strict limit of ${MAX_IMAGE_BYTES} bytes`
     );
   }
   if (afterImage.length > MAX_IMAGE_BYTES) {
     throw new RangeError(
-      `After photo is ${afterImage.length} bytes; exceeds strict limit of ${MAX_IMAGE_BYTES} bytes (45 KiB)`
+      `After photo is ${afterImage.length} bytes; exceeds strict limit of ${MAX_IMAGE_BYTES} bytes`
     );
   }
 
@@ -150,6 +151,10 @@ export async function packBundle(
   bundle.set(payload, 0);
   bundle.set(signatureBytes, payloadLen);
 
+  if (bundle.length > MAX_BUNDLE_BYTES) {
+    throw new RangeError(`Evidence bundle is ${bundle.length} bytes; exceeds ${MAX_BUNDLE_BYTES}-byte target`);
+  }
+
   // 8. Compute on-chain evidenceHash (SHA-256 over complete bundle including signature)
   const evidenceHash = await sha256Bytes32(bundle);
 
@@ -211,9 +216,9 @@ export async function unpackBundle(bundle: Uint8Array): Promise<UnpackedBundle> 
   const afterWebpLen = view.getUint32(16, false);
 
   const expectedLength = HEADER_SIZE + zstdMetadataLen + beforeWebpLen + afterWebpLen + SIGNATURE_SIZE;
-  if (bundle.length < expectedLength) {
+  if (bundle.length !== expectedLength) {
     throw new RangeError(
-      `Corrupted bundle: declared content requires ${expectedLength} bytes, but bundle has ${bundle.length}`
+      `Corrupted bundle: declared content requires exactly ${expectedLength} bytes, but bundle has ${bundle.length}`
     );
   }
 
@@ -326,42 +331,4 @@ export async function verifyBundleIntegrity(
     unpacked,
     recoveredWorker,
   };
-}
-
-/**
- * Splits a bundle into chunk entities if it exceeds the target chunk size.
- */
-export function chunkBundle(
-  bundle: Uint8Array,
-  maxChunkSize: number = MAX_SAFE_BUNDLE_BYTES
-): Uint8Array[] {
-  if (bundle.length <= maxChunkSize) {
-    return [bundle];
-  }
-
-  const CHUNK_HEADER_SIZE = 4; // [0x53, 0x43 ("SC"), chunkIndex, totalChunks]
-  const dataPerChunk = maxChunkSize - CHUNK_HEADER_SIZE;
-  const totalChunks = Math.ceil(bundle.length / dataPerChunk);
-
-  if (totalChunks > 255) {
-    throw new RangeError(`Bundle requires ${totalChunks} chunks (max 255)`);
-  }
-
-  const chunks: Uint8Array[] = [];
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * dataPerChunk;
-    const end = Math.min(start + dataPerChunk, bundle.length);
-    const slice = bundle.subarray(start, end);
-
-    const chunk = new Uint8Array(CHUNK_HEADER_SIZE + slice.length);
-    chunk[0] = 0x53; // 'S'
-    chunk[1] = 0x43; // 'C'
-    chunk[2] = i;
-    chunk[3] = totalChunks;
-    chunk.set(slice, CHUNK_HEADER_SIZE);
-
-    chunks.push(chunk);
-  }
-
-  return chunks;
 }

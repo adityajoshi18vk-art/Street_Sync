@@ -5,14 +5,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   useAccount,
+  useChainId,
   useConfig,
   useReadContract,
   useWriteContract
 } from "wagmi";
-import { waitForTransactionReceipt, readContract } from "wagmi/actions";
+import { waitForTransactionReceipt } from "wagmi/actions";
 import {
   ESCROW_ABI,
   ESCROW_ADDRESS,
+  ACTIVE_CHAIN,
   contractsDeployed,
   e5ToLatLng,
   formatUsdcDisplay,
@@ -31,6 +33,8 @@ export default function BountyDetailPage() {
   const params = useParams<{ id: string }>();
   const bountyId = params.id;
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id;
   const config = useConfig();
   const { writeContractAsync } = useWriteContract();
 
@@ -39,6 +43,7 @@ export default function BountyDetailPage() {
   const [pledgeError, setPledgeError] = useState<string | null>(null);
 
   const { data: bounty, refetch, isLoading } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: ESCROW_ADDRESS ?? undefined,
     abi: ESCROW_ABI,
     functionName: "getBounty",
@@ -47,6 +52,7 @@ export default function BountyDetailPage() {
   });
 
   const { data: tally } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: ESCROW_ADDRESS ?? undefined,
     abi: ESCROW_ABI,
     functionName: "getTally",
@@ -56,6 +62,7 @@ export default function BountyDetailPage() {
   const tallyTuple = tally as readonly [number, number] | undefined;
 
   const { data: commitDeadline } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: ESCROW_ADDRESS ?? undefined,
     abi: ESCROW_ABI,
     functionName: "commitDeadline",
@@ -64,6 +71,7 @@ export default function BountyDetailPage() {
   });
 
   const { data: revealDeadline } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: ESCROW_ADDRESS ?? undefined,
     abi: ESCROW_ABI,
     functionName: "revealDeadline",
@@ -108,28 +116,30 @@ export default function BountyDetailPage() {
   const nowSeconds = Math.floor(Date.now() / 1000);
 
   const handlePledge = async () => {
-    if (!address) return;
+    if (!canWrite || !address || !ESCROW_ADDRESS) return;
     setPledgeError(null);
     setPledgeStatus(null);
     try {
-      const amountUsdc = String(Number(pledgeAmount));
-      if (Number(pledgeAmount) <= 0) throw new Error("Enter a valid USDC amount.");
+      const amountUsdc = pledgeAmount.trim();
+      if (parseUsdc(amountUsdc) <= 0n) throw new Error("Enter a valid USDC amount.");
       await approveUsdcExact({
         config,
         owner: address,
-        spender: ESCROW_ADDRESS!,
+        spender: ESCROW_ADDRESS,
         amountUsdc,
         writeContractAsync,
         onPhase: (_p, msg) => setPledgeStatus(msg ?? null)
       });
       setPledgeStatus("Pledging…");
       const hash = await writeContractAsync({
-        address: ESCROW_ADDRESS!,
+        address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "pledge",
-        args: [BigInt(bountyId), parseUsdc(amountUsdc)]
+        args: [BigInt(bountyId), parseUsdc(amountUsdc)],
+        chain: ACTIVE_CHAIN,
+        account: address
       });
-      await waitForTransactionReceipt(config, { hash });
+      await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
       setPledgeAmount("");
       setPledgeStatus("Pledge confirmed");
       void refetch();
@@ -225,7 +235,7 @@ export default function BountyDetailPage() {
               />
               <button
                 onClick={handlePledge}
-                disabled={!isConnected || !pledgeAmount}
+                disabled={!isConnected || !canWrite || !pledgeAmount}
                 className="shrink-0 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
               >
                 Pledge
