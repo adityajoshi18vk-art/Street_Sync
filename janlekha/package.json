@@ -23,13 +23,16 @@
     "contracts:smoke:local": "hardhat run scripts/smoke-test.ts --network localhost",
     "contracts:seed:local": "hardhat run scripts/seed-demo.ts --network localhost",
     "demo:documents": "hardhat run scripts/demo-documents.ts",
-    "test:e2e": "hardhat build --quiet && playwright test"
+    "test:e2e": "hardhat build --quiet && playwright test",
+    "test:feedback": "node scripts/test-feedback.mjs"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@tanstack/react-query": "^5.106.1",
+    "@worldcoin/idkit": "^4.6.0",
+    "@worldcoin/idkit-core": "^4.6.0",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -51,6 +54,7 @@
     "hardhat": "^3.21.2",
     "prisma": "^7.10.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "type": "module"

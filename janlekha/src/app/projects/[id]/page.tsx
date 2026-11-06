@@ -21,6 +21,7 @@ import type { TimelineEvent } from "@/lib/janlekha/events";
 import { findOffChainCopy } from "@/lib/documents/storage";
 import { catalogProject, formatPaise, formatTimestamp, shortHex } from "@/lib/janlekha/format";
 import { getProject, toActionState, type MilestoneView, type ProjectDetail } from "@/lib/janlekha/reads";
+import { FeedbackSection } from "@/components/feedback/FeedbackSection";
 import { ProjectActions } from "./ProjectActions";
 
 export const metadata: Metadata = { title: "Project" };
@@ -316,6 +317,10 @@ async function ProjectContent({ id }: { id: string }) {
           )}
         </Section>
       )}
+
+      <Suspense fallback={<LoadingPanel label="Loading citizen feedback…" />}>
+        <FeedbackSection projectId={p.id.toString()} />
+      </Suspense>
 
       <ProjectActions state={toActionState(p, ctx)} />
 
