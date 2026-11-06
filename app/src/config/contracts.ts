@@ -33,6 +33,8 @@ export interface DeploymentFile {
     commitWindowSeconds: number;
     revealWindowSeconds: number;
     claimDurationSeconds: number;
+    validationWindowSeconds?: number;
+    validationQuorum?: number;
     usdcDecimals: number;
   };
   contracts: {
@@ -152,6 +154,8 @@ export const WORLD_ACTION_WORKER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_WORKER ?? "claim-bounty";
 export const WORLD_ACTION_REVIEWER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_REVIEWER ?? "register-reviewer";
+export const WORLD_ACTION_NEIGHBOUR =
+  process.env.NEXT_PUBLIC_WORLD_ACTION_NEIGHBOUR ?? "vote-problem";
 
 /**
  * parseUnits(amount, 6) — the ONLY sanctioned way to turn a human USDC amount

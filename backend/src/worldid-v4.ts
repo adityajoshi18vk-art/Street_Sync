@@ -17,7 +17,11 @@ import { signRequest } from "@worldcoin/idkit-server";
 import { hashSignal } from "@worldcoin/idkit-core/hashing";
 import dbAccess from "./db.js";
 import { RoleEnum, signAttestation, isAttestationSignerReady } from "./signer.js";
-import { isAllowedWorldIdAction, isLocalWorldIdBypassEnabled, recordWorldIdNullifier, type WorldIdRole } from "./worldid.js";
+import { actionForRole, isAllowedWorldIdAction, isLocalWorldIdBypassEnabled, recordWorldIdNullifier, WORLD_ID_ROLES, type WorldIdRole } from "./worldid.js";
+import { bountyExists, readBountyOnChain } from "./chain.js";
+import { assertNeighbourEligible, NeighbourRejectedError, parseLocation, type NeighbourBounty } from "./neighbour.js";
+
+export { actionForRole };
 
 const VERIFY_BASE_URL = process.env.WORLD_VERIFY_BASE_URL ?? "https://developer.world.org";
 
@@ -34,12 +38,6 @@ export function isWorldIdConfigured(): boolean {
   const { appId, rpId, signingKey } = worldIdConfig();
   return /^app_[A-Za-z0-9_]+$/.test(appId) && /^rp_[A-Za-z0-9]+$/.test(rpId) &&
     /^(0x)?[0-9a-fA-F]{64}$/.test(signingKey);
-}
-
-export function actionForRole(role: WorldIdRole): string {
-  return role === "worker"
-    ? process.env.WORLD_ACTION_WORKER ?? "claim-bounty"
-    : process.env.WORLD_ACTION_REVIEWER ?? "register-reviewer";
 }
 
 interface IdkitResponseItem {
@@ -99,22 +97,53 @@ export function validateIdkitResult(
 function parseRoleRequest(body: unknown): { wallet: Address; role: WorldIdRole; bountyId: bigint } {
   const b = (body ?? {}) as { wallet?: unknown; role?: unknown; bountyId?: unknown };
   if (typeof b.wallet !== "string" || !isAddress(b.wallet)) throw new WorldIdRequestError("Invalid wallet");
-  if (b.role !== "worker" && b.role !== "reviewer") throw new WorldIdRequestError("Invalid role");
-  if (typeof b.bountyId !== "string" || !/^\d+$/.test(b.bountyId)) throw new WorldIdRequestError("Invalid bountyId");
+  if (b.role !== "worker" && b.role !== "reviewer" && b.role !== "neighbour") throw new WorldIdRequestError("Invalid role");
+  if (typeof b.bountyId !== "string" || !/^\d{1,30}$/.test(b.bountyId)) throw new WorldIdRequestError("Invalid bountyId");
   if (b.role === "reviewer" && b.bountyId !== "0") throw new WorldIdRequestError("Reviewer attestations use bountyId 0");
   return { wallet: b.wallet as Address, role: b.role, bountyId: BigInt(b.bountyId) };
 }
 
+const ROLE_VALUES = { worker: RoleEnum.Worker, reviewer: RoleEnum.Reviewer, neighbour: RoleEnum.Neighbour } as const;
+
 async function issueAttestation(wallet: Address, role: WorldIdRole, bountyId: bigint) {
-  return signAttestation(wallet, role === "worker" ? RoleEnum.Worker : RoleEnum.Reviewer, bountyId);
+  return signAttestation(wallet, ROLE_VALUES[role], bountyId);
 }
 
-export function registerWorldIdRoutes(app: FastifyInstance): void {
+/** Cached row first (status only moves forward, so a non-Proposed row is final); chain as fallback. */
+async function defaultLoadNeighbourBounty(bountyId: bigint): Promise<NeighbourBounty | null> {
+  const row = dbAccess.getBounty(bountyId.toString());
+  if (row) return { status: Number(row.status), latE5: Number(row.lat_e5), lngE5: Number(row.lng_e5) };
+  const onChain = await readBountyOnChain(bountyId);
+  return bountyExists(onChain) ? { status: onChain.status, latE5: onChain.latE5, lngE5: onChain.lngE5 } : null;
+}
+
+export interface WorldIdRouteDeps {
+  loadNeighbourBounty?: (bountyId: bigint) => Promise<NeighbourBounty | null>;
+}
+
+export function registerWorldIdRoutes(app: FastifyInstance, deps: WorldIdRouteDeps = {}): void {
+  const loadNeighbourBounty = deps.loadNeighbourBounty ?? defaultLoadNeighbourBounty;
+
+  /** Neighbours must be near a Proposed problem; checked before any World ID work is spent. */
+  async function checkNeighbour(body: unknown, bountyId: bigint): Promise<void> {
+    const location = parseLocation((body as { location?: unknown } | null)?.location);
+    let bounty: NeighbourBounty | null;
+    try {
+      bounty = await loadNeighbourBounty(bountyId);
+    } catch (e) {
+      throw new WorldIdRequestError(`Could not load the bounty: ${(e as Error).message}`, 502);
+    }
+    if (!bounty) throw new WorldIdRequestError("Bounty not found", 404);
+    assertNeighbourEligible(bounty, location);
+  }
+
   const chainId = Number(process.env.CHAIN_ID ?? "5042002");
   const devBypassConfigured = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
 
   app.setErrorHandler((error, request, reply) => {
-    if (error instanceof WorldIdRequestError) return reply.status(error.status).send({ error: error.message });
+    if (error instanceof WorldIdRequestError || error instanceof NeighbourRejectedError) {
+      return reply.status(error.status).send({ error: error.message });
+    }
     const status = (error as { statusCode?: number }).statusCode;
     if (!status || status >= 500) request.log.error(error);
     return reply.status(status ?? 500).send({ error: status && status < 500 ? (error as Error).message : "Internal server error" });
@@ -123,7 +152,7 @@ export function registerWorldIdRoutes(app: FastifyInstance): void {
   app.post<{ Body: { action?: unknown } }>("/api/worldid/rp-context", async (request, reply) => {
     if (!isWorldIdConfigured()) return reply.status(503).send({ error: "World ID is not configured on the backend" });
     const action = request.body?.action;
-    if (action !== actionForRole("worker") && action !== actionForRole("reviewer")) {
+    if (typeof action !== "string" || !WORLD_ID_ROLES.some((role) => action === actionForRole(role))) {
       throw new WorldIdRequestError("Unknown World ID action");
     }
     const { rpId, signingKey, appId, environment } = worldIdConfig();
@@ -143,6 +172,7 @@ export function registerWorldIdRoutes(app: FastifyInstance): void {
 
   app.post("/api/worldid/attest", async (request, reply) => {
     const { wallet, role, bountyId } = parseRoleRequest(request.body);
+    if (role === "neighbour") await checkNeighbour(request.body, bountyId);
     if (!isAttestationSignerReady()) return reply.status(503).send({ error: "Attestation signing is not configured" });
     if (!dbAccess.findVerifiedWallet(actionForRole(role), wallet)) {
       return reply.status(404).send({ error: "Wallet has not verified with World ID for this role", needsProof: true });
@@ -155,6 +185,7 @@ export function registerWorldIdRoutes(app: FastifyInstance): void {
     const body = request.body as { idkitResponse?: unknown; dev_bypass?: boolean };
     const action = actionForRole(role);
     if (!isAllowedWorldIdAction(role, action)) throw new WorldIdRequestError("Action is not configured for this role");
+    if (role === "neighbour") await checkNeighbour(request.body, bountyId);
 
     const useLocalBypass = isLocalWorldIdBypassEnabled(chainId, devBypassConfigured, body.dev_bypass);
     if (!isWorldIdConfigured() && !useLocalBypass) {
