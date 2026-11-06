@@ -15,14 +15,14 @@ import {
   createPublicClient,
   http,
   type Address,
-  type Log,
-  parseAbiItem,
+  type Hex,
   parseEventLogs,
   defineChain,
 } from "viem";
 import { ESCROW_ABI } from "./abi.js";
 import dbAccess from "./db.js";
 import { setVerifyingContract } from "./signer.js";
+import { bountyExists, bountyToRow, makeBountyReader, type BountyReader } from "./chain.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -137,273 +137,109 @@ function createClient() {
   });
 }
 
-// ─── Event Handler Dispatch ──────────────────────────────────────────────────
+// ─── Event handling ──────────────────────────────────────────────────────────
+//
+// Event handlers only write the rows that exist solely in events (pledges, panels, votes,
+// slashes, problem votes, settlements). The bounty row itself is never patched from events:
+// after each batch every touched bounty is re-read with getBounty and upserted, so all state
+// transitions (reopen, refund, rework, deadlines, counts...) stay correct by construction.
 
-function handleBountyCreated(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    creator: Address;
-    descriptionHash: `0x${string}`;
-    latE5: number;
-    lngE5: number;
-    regionCell: number;
-    initialAmount: bigint;
-    claimDeadline: bigint;
-  };
-
-  dbAccess.upsertBounty(
-    args.bountyId.toString(),
-    args.creator.toLowerCase(),
-    args.descriptionHash,
-    Number(args.latE5),
-    Number(args.lngE5),
-    Number(args.regionCell),
-    args.initialAmount.toString(),
-    Math.floor(Date.now() / 1000),
-    Number(args.claimDeadline),
-  );
-
-  // Also record as an initial pledge
-  dbAccess.insertPledge(
-    args.bountyId.toString(),
-    args.creator.toLowerCase(),
-    args.initialAmount.toString(),
-    args.initialAmount.toString(),
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-
-  console.log(`[indexer] BountyCreated #${args.bountyId} by ${args.creator}`);
+export interface DecodedLog {
+  eventName: string;
+  args: Record<string, unknown>;
+  blockNumber?: bigint | null;
+  transactionHash?: string | null;
 }
 
-function handlePledged(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    pledger: Address;
-    amount: bigint;
-    newTotal: bigint;
-  };
+const where = (log: DecodedLog) => [log.blockNumber?.toString() ?? "0", log.transactionHash ?? ""] as const;
+const lower = (a: unknown) => String(a).toLowerCase();
 
-  dbAccess.insertPledge(
-    args.bountyId.toString(),
-    args.pledger.toLowerCase(),
-    args.amount.toString(),
-    args.newTotal.toString(),
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-  dbAccess.updateBountyPledge(args.bountyId.toString(), args.newTotal.toString());
-
-  console.log(`[indexer] Pledged ${args.amount} to #${args.bountyId} by ${args.pledger}`);
+function currentRound(bountyId: string): number {
+  const panel = dbAccess.getPanel(bountyId);
+  if (panel) return Number(panel.review_round ?? 0);
+  return Number(dbAccess.getBounty(bountyId)?.review_round ?? 0);
 }
 
-function handleBountyClaimed(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    worker: Address;
-    visualChallengeCode: number;
-  };
+type Handler = (log: DecodedLog, bountyId: string) => void;
 
-  dbAccess.updateBountyClaimed(
-    args.bountyId.toString(),
-    args.worker.toLowerCase(),
-    Number(args.visualChallengeCode),
-  );
-
-  console.log(`[indexer] BountyClaimed #${args.bountyId} by ${args.worker}, code: ${args.visualChallengeCode}`);
-}
-
-function handleEvidenceSubmitted(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    worker: Address;
-    arkivEntityKey: `0x${string}`;
-    evidenceHash: `0x${string}`;
-    selectionBlock: bigint;
-  };
-
-  dbAccess.updateBountyEvidence(
-    args.bountyId.toString(),
-    args.arkivEntityKey,
-    args.evidenceHash,
-    args.selectionBlock.toString(),
-  );
-
-  console.log(`[indexer] EvidenceSubmitted #${args.bountyId}, selectionBlock: ${args.selectionBlock}`);
-}
-
-function handlePanelAssigned(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    reviewRound: number;
-    panel: readonly [Address, Address, Address];
-  };
-
-  dbAccess.insertPanel(
-    args.bountyId.toString(),
-    Number(args.reviewRound),
-    args.panel[0].toLowerCase(),
-    args.panel[1].toLowerCase(),
-    args.panel[2].toLowerCase(),
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-  dbAccess.updateBountyInReview(args.bountyId.toString(), Number(args.reviewRound));
-
-  console.log(`[indexer] PanelAssigned #${args.bountyId} round ${args.reviewRound}: [${args.panel.join(", ")}]`);
-}
-
-function handleVoteCommitted(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    reviewer: Address;
-    commitHash: `0x${string}`;
-  };
-
-  // Determine current review round from cached bounty
-  const bounty = dbAccess.getBounty(args.bountyId.toString());
-  const round = bounty ? Number(bounty.review_round ?? 0) : 0;
-
-  dbAccess.insertVoteCommit(
-    args.bountyId.toString(),
-    round,
-    args.reviewer.toLowerCase(),
-    args.commitHash,
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-
-  console.log(`[indexer] VoteCommitted #${args.bountyId} by ${args.reviewer}`);
-}
-
-function handleVoteRevealed(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    reviewer: Address;
-    approve: boolean;
-  };
-
-  dbAccess.updateVoteReveal(
-    args.bountyId.toString(),
-    args.reviewer.toLowerCase(),
-    args.approve,
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-
-  console.log(`[indexer] VoteRevealed #${args.bountyId} by ${args.reviewer}: ${args.approve ? "APPROVE" : "REJECT"}`);
-}
-
-function handleBountySettled(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    approved: boolean;
-    workerPayout: bigint;
-    reviewerCut: bigint;
-  };
-
-  const status = args.approved ? 4 : 5; // Approved = 4, Rejected = 5
-  dbAccess.updateBountySettled(args.bountyId.toString(), status);
-  dbAccess.insertSettlement(
-    args.bountyId.toString(),
-    args.approved,
-    args.workerPayout.toString(),
-    args.reviewerCut.toString(),
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-
-  console.log(`[indexer] BountySettled #${args.bountyId}: ${args.approved ? "APPROVED" : "REJECTED"}`);
-}
-
-function handleReviewerSlashed(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    reviewer: Address;
-    amount: bigint;
-  };
-
-  dbAccess.insertSlash(
-    args.bountyId.toString(),
-    args.reviewer.toLowerCase(),
-    args.amount.toString(),
-    log.blockNumber?.toString() ?? "0",
-    log.transactionHash ?? "",
-  );
-
-  console.log(`[indexer] ReviewerSlashed #${args.bountyId}: ${args.reviewer} for ${args.amount}`);
-}
-
-function handlePokeOrReplace(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    newReviewRound: number;
-    totalSlashed: bigint;
-  };
-
-  // After poke, bounty goes back to Submitted (status = 2) with new round and selectionBlock
-  // selectionBlock is set to block.number + 2 in the contract but we just approximate here
-  const selBlock = log.blockNumber ? (log.blockNumber + 2n).toString() : "0";
-  dbAccess.updateBountyPoke(
-    args.bountyId.toString(),
-    Number(args.newReviewRound),
-    selBlock,
-  );
-
-  console.log(`[indexer] PokeOrReplace #${args.bountyId}, newRound: ${args.newReviewRound}, slashed: ${args.totalSlashed}`);
-}
-
-function handleBountyReworked(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    reworkCount: number;
-  };
-
-  const bounty = dbAccess.getBounty(args.bountyId.toString());
-  const newRound = bounty ? Number(bounty.review_round ?? 0) + 1 : 1;
-  dbAccess.updateBountyRework(
-    args.bountyId.toString(),
-    newRound,
-    Number(args.reworkCount),
-  );
-
-  console.log(`[indexer] BountyReworked #${args.bountyId}, reworkCount: ${args.reworkCount}`);
-}
-
-function handlePledgeWithdrawn(log: Log & { args: Record<string, unknown> }) {
-  const args = log.args as {
-    bountyId: bigint;
-    pledger: Address;
-    amount: bigint;
-  };
-
-  // Update the bounty's total pledged (we need to re-query or compute)
-  const bounty = dbAccess.getBounty(args.bountyId.toString());
-  if (bounty) {
-    const currentTotal = BigInt(bounty.total_pledged as string);
-    const newTotal = currentTotal - args.amount;
-    dbAccess.updateBountyPledge(args.bountyId.toString(), newTotal.toString());
-  }
-
-  console.log(`[indexer] PledgeWithdrawn #${args.bountyId}: ${args.pledger} withdrew ${args.amount}`);
-}
-
-// ─── Event Name → Handler mapping ────────────────────────────────────────────
-
-const EVENT_HANDLERS: Record<string, (log: Log & { args: Record<string, unknown> }) => void> = {
-  BountyCreated:      handleBountyCreated,
-  Pledged:            handlePledged,
-  BountyClaimed:      handleBountyClaimed,
-  EvidenceSubmitted:  handleEvidenceSubmitted,
-  PanelAssigned:      handlePanelAssigned,
-  VoteCommitted:      handleVoteCommitted,
-  VoteRevealed:       handleVoteRevealed,
-  BountySettled:      handleBountySettled,
-  ReviewerSlashed:    handleReviewerSlashed,
-  PokeOrReplace:      handlePokeOrReplace,
-  BountyReworked:     handleBountyReworked,
-  PledgeWithdrawn:    handlePledgeWithdrawn,
+const EVENT_HANDLERS: Record<string, Handler> = {
+  BountyCreated(log, id) {
+    const a = log.args as { creator: Address; initialAmount: bigint };
+    dbAccess.insertPledge(id, lower(a.creator), a.initialAmount.toString(), a.initialAmount.toString(), ...where(log));
+  },
+  Pledged(log, id) {
+    const a = log.args as { pledger: Address; amount: bigint; newTotal: bigint };
+    dbAccess.insertPledge(id, lower(a.pledger), a.amount.toString(), a.newTotal.toString(), ...where(log));
+  },
+  PledgeWithdrawn(log, id) {
+    dbAccess.markPledgeWithdrawn(id, lower((log.args as { pledger: Address }).pledger));
+  },
+  PanelAssigned(log, id) {
+    const a = log.args as { reviewRound: number; panel: readonly [Address, Address, Address] };
+    dbAccess.insertPanel(id, Number(a.reviewRound), lower(a.panel[0]), lower(a.panel[1]), lower(a.panel[2]), ...where(log));
+  },
+  VoteCommitted(log, id) {
+    const a = log.args as { reviewer: Address; commitHash: Hex };
+    dbAccess.insertVoteCommit(id, currentRound(id), lower(a.reviewer), a.commitHash, ...where(log));
+  },
+  VoteRevealed(log, id) {
+    const a = log.args as { reviewer: Address; approve: boolean };
+    dbAccess.updateVoteReveal(id, lower(a.reviewer), a.approve, ...where(log), currentRound(id));
+  },
+  ReviewerSlashed(log, id) {
+    const a = log.args as { reviewer: Address; amount: bigint };
+    dbAccess.insertSlash(id, lower(a.reviewer), a.amount.toString(), ...where(log));
+  },
+  ProblemVoteCast(log, id) {
+    const a = log.args as { voter: Address; isReal: boolean };
+    dbAccess.insertProblemVote(id, lower(a.voter), a.isReal, ...where(log));
+  },
+  BountySettled(log, id) {
+    const a = log.args as { approved: boolean; workerPayout: bigint; reviewerCut: bigint };
+    dbAccess.insertSettlement(id, a.approved, a.workerPayout.toString(), a.reviewerCut.toString(), ...where(log));
+  },
+  // State-only events: the canonical refresh below captures their effect.
+  BountyClaimed() {},
+  EvidenceSubmitted() {},
+  PokeOrReplace() {},
+  BountyReworked() {},
+  ClaimReleased() {},
+  ProblemValidated() {},
+  ProblemDismissed() {},
 };
+
+/** Re-reads one bounty from the chain and upserts its canonical row. */
+export async function refreshBounty(bountyId: bigint, readBounty: BountyReader): Promise<void> {
+  const bounty = await readBounty(bountyId);
+  if (!bountyExists(bounty)) return;
+  dbAccess.upsertBountyRow(bountyToRow(bounty));
+}
+
+/**
+ * Applies a decoded log batch in order, then refreshes every touched bounty sequentially
+ * (Arc's RPC rate-limits parallel reads). A readBounty failure rejects so the caller retries
+ * the same block range; the event writes above are idempotent.
+ */
+export async function processLogs(logs: DecodedLog[], readBounty: BountyReader): Promise<{ events: number; refreshed: number }> {
+  const touched = new Set<string>();
+  let events = 0;
+  for (const log of logs) {
+    const handler = EVENT_HANDLERS[log.eventName];
+    if (!handler) continue;
+    const rawId = log.args?.bountyId;
+    if (typeof rawId !== "bigint") continue;
+    const id = rawId.toString();
+    touched.add(id);
+    try {
+      handler(log, id);
+      events++;
+    } catch (e) {
+      console.error(`[indexer] Error processing ${log.eventName}:`, e);
+    }
+  }
+  for (const id of touched) await refreshBounty(BigInt(id), readBounty);
+  return { events, refreshed: touched.size };
+}
 
 // ─── Polling-based indexer ───────────────────────────────────────────────────
 
@@ -424,6 +260,12 @@ export async function startIndexer(): Promise<void> {
 
   const client = createClient();
   const chainId = CHAIN_ID;
+  const readBounty = makeBountyReader(client, () => escrowAddress);
+
+  // Must precede the cursor lookup: a new deployment starts from an empty derived state.
+  if (dbAccess.ensureDeploymentScope(chainId, escrowAddress)) {
+    console.log(`[indexer] Deployment scope changed (chain ${chainId}, escrow ${escrowAddress}); derived tables reset`);
+  }
 
   // Verify connectivity
   try {
@@ -482,25 +324,14 @@ export async function startIndexer(): Promise<void> {
       const rawLogs = await client.getLogs({ address: escrowAddress, fromBlock, toBlock });
       const logs = parseEventLogs({ abi: ESCROW_ABI, logs: rawLogs });
 
-      // Process each log
-      for (const log of logs) {
-        const eventName = (log as any).eventName as string;
-        const handler = EVENT_HANDLERS[eventName];
-        if (handler) {
-          try {
-            handler(log as any);
-          } catch (e) {
-            console.error(`[indexer] Error processing ${eventName}:`, e);
-          }
-        }
-      }
+      const { events, refreshed } = await processLogs(logs as unknown as DecodedLog[], readBounty);
 
       // Update cursor
       lastBlock = toBlock;
       dbAccess.setCursor(chainId, lastBlock);
 
-      if (logs.length > 0) {
-        console.log(`[indexer] Processed ${logs.length} events up to block ${toBlock}`);
+      if (events > 0) {
+        console.log(`[indexer] Processed ${events} events (${refreshed} bounties refreshed) up to block ${toBlock}`);
       }
       // Keep catching up without waiting while behind the chain head.
       delayMs = toBlock < currentBlock ? CATCH_UP_DELAY_MS : POLL_INTERVAL_MS;
