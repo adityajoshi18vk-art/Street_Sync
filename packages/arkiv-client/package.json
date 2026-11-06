@@ -7,8 +7,9 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
@@ -16,7 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@streetsync/evidence": "file:../evidence",
+    "@streetsync/evidence": "^1.0.0",
     "cbor-x": "^1.6.0",
     "fzstd": "^0.1.1",
     "viem": "^2.21.0"

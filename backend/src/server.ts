@@ -58,7 +58,12 @@ interface WorldIdVerifyBody {
   wallet: string;
   role: "worker" | "reviewer";
   bountyId: string;
+  dev_bypass?: boolean;
 }
+
+// Dev bypass is only honored when the server is explicitly configured for it
+// AND the request carries an explicit dev_bypass flag. Never enabled by default.
+const DEV_BYPASS_ENABLED = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
 
 app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, reply) => {
   const {
@@ -138,14 +143,14 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
     }
   } catch (e) {
     request.log.error(`World ID API error: ${(e as Error).message}`);
-    // In dev mode, if World ID API is unreachable, we may want to proceed
-    // For production, this should be a hard failure
-    if (process.env.NODE_ENV === "production") {
+    // Hard failure unless the operator explicitly enabled the dev bypass
+    // (ALLOW_DEV_WORLD_ID_BYPASS=true) AND the client opted in per-request.
+    if (!DEV_BYPASS_ENABLED || !request.body.dev_bypass) {
       return reply.status(502).send({
         error: "Cannot reach World ID verification API",
       });
     }
-    request.log.warn("World ID API unreachable – proceeding in dev mode");
+    request.log.warn("World ID API unreachable – proceeding via ALLOW_DEV_WORLD_ID_BYPASS");
   }
 
   // ── Step 3: Record nullifier in DB ──────────────────────────────────────────

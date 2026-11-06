@@ -6,7 +6,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
-    "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:arc": "hardhat run scripts/deploy.ts --network arcTestnet",
     "clean": "hardhat clean",
     "coverage": "hardhat coverage"

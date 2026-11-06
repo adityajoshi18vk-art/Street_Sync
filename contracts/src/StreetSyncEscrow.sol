@@ -32,7 +32,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
-    uint256 public constant REVIEWER_CUT_BPS  = 1000;  // 10% in bps
+    uint256 public constant REVIEWER_CUT_BPS  = 500;   // 5% in bps
     uint256 public constant BPS_DENOMINATOR   = 10_000;
     uint8   public constant MAX_REWORK        = 1;
     uint256 public constant STALE_BLOCK_LIMIT = 250;    // Rule 4: re-roll if > 250 blocks stale
@@ -225,7 +225,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     // ─── 5. registerReviewer ──────────────────────────────────────────────────
 
-    /// @notice World-ID-verified reviewer registers and stakes 2.00 USDC.
+    /// @notice World-ID-verified reviewer registers and stakes 10.00 USDC.
     function registerReviewer(
         uint16         regionCell,
         uint256        nonce,
@@ -306,7 +306,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     /// @notice Tallies votes and distributes USDC.
     ///         Can be called after revealDeadline OR immediately once all 3 have revealed.
-    ///         Approved: 90% → worker, 10% + slashed minority stakes → majority reviewers.
+    ///         Approved: 95% → worker, 5% + slashed minority stakes → majority reviewers.
     ///         Rejected: escrow stays; rework() available once.
     function settle(uint256 bountyId) external {
         Bounty storage b = bounties[bountyId];
@@ -354,9 +354,9 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         }
 
         if (approved) {
-            // 90% → worker
-            uint256 workerPayout = (pool * 9000) / BPS_DENOMINATOR;
-            // 10% → majority reviewers (split equally) + slashed minority stakes
+            // 95% → worker
+            uint256 workerPayout = (pool * 9500) / BPS_DENOMINATOR;
+            // 5% → majority reviewers (split equally) + slashed minority stakes
             uint256 reviewerPool_ = pool - workerPayout + slashedFromMinority;
             uint256 perReviewer   = majorityCount > 0 ? reviewerPool_ / majorityCount : 0;
 

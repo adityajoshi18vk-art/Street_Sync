@@ -26,6 +26,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
     },
+    localhost: {
+      url: process.env.LOCALHOST_RPC_URL ?? "http://127.0.0.1:8545",
+      chainId: 31337,
+    },
     arcTestnet: {
       url: ARC_RPC_URL,
       chainId: 5042002,

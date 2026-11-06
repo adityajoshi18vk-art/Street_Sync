@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  ReviewerPool.sol
-//  Manages reviewer registration, staking (2.00 USDC, 6-decimal), active-pool
+//  Manages reviewer registration, staking (10.00 USDC, 6-decimal), active-pool
 //  storage by regionCell, stake slashing, reward crediting, and deterministic
 //  pseudo-random panel selection.
 //
@@ -22,7 +22,7 @@ abstract contract ReviewerPool {
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
-    uint256 public constant REVIEWER_STAKE   = 2_000_000; // 2.00 USDC (6 decimals)
+    uint256 public constant REVIEWER_STAKE   = 10_000_000; // 10.00 USDC (6 decimals)
 
     // ─── State ────────────────────────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ abstract contract ReviewerPool {
     function _registerReviewer(address wallet, uint16 regionCell) internal {
         if (reviewers[wallet].active) revert AlreadyRegistered();
 
-        // Transfer 2 USDC stake from the reviewer to this contract
+        // Transfer 10 USDC stake from the reviewer to this contract
         USDC.safeTransferFrom(wallet, address(this), REVIEWER_STAKE);
 
         reviewers[wallet] = Reviewer({

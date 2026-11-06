@@ -8,7 +8,7 @@ import { MockUSDC, StreetSyncEscrow } from "../typechain-types";
 // Constants matching the contracts
 // ─────────────────────────────────────────────────────────────────────────────
 
-const REVIEWER_STAKE    = 2_000_000n;   // 2.00 USDC (6 decimals)
+const REVIEWER_STAKE    = 10_000_000n;  // 10.00 USDC (6 decimals)
 const INITIAL_PLEDGE    = 10_000_000n;  // 10.00 USDC
 const TOP_UP_PLEDGE     = 5_000_000n;   // 5.00 USDC
 const TOTAL_POOL        = 15_000_000n;  // 15.00 USDC
@@ -326,9 +326,9 @@ describe("StreetSync", function () {
     expect(b.status).to.equal(Status.Approved);
 
     // ── Verify exact 6-decimal USDC balances ──────────────────────────────
-    // Worker gets 90% of 15 USDC = 13_500_000
-    const expectedWorkerPayout = (TOTAL_POOL * 9000n) / BPS_DENOM;
-    expect(expectedWorkerPayout).to.equal(13_500_000n);
+    // Worker gets 95% of 15 USDC = 14_250_000
+    const expectedWorkerPayout = (TOTAL_POOL * 9500n) / BPS_DENOM;
+    expect(expectedWorkerPayout).to.equal(14_250_000n);
     expect(await usdc.balanceOf(worker.address) - workerPre).to.equal(expectedWorkerPayout);
 
     // Minority reviewer (panel[2], voted false) is slashed
@@ -336,11 +336,11 @@ describe("StreetSync", function () {
     expect(minorityRev.stakedAmount).to.equal(0n);
     expect(minorityRev.active).to.equal(false);
 
-    // Reviewer cut = 10% of 15 USDC = 1_500_000 + slashed 2_000_000 = 3_500_000
-    // Split among 2 majority reviewers = 1_750_000 each
-    const reviewerPoolTotal = (TOTAL_POOL * 1000n) / BPS_DENOM + REVIEWER_STAKE;
+    // Reviewer cut = 5% of 15 USDC = 750_000 + slashed 10_000_000 = 10_750_000
+    // Split among 2 majority reviewers = 5_375_000 each
+    const reviewerPoolTotal = (TOTAL_POOL * 500n) / BPS_DENOM + REVIEWER_STAKE;
     const perMajority = reviewerPoolTotal / 2n;
-    expect(perMajority).to.equal(1_750_000n);
+    expect(perMajority).to.equal(5_375_000n);
 
     const maj0 = await getReviewer(escrow, panel[0]);
     const maj1 = await getReviewer(escrow, panel[1]);
@@ -629,16 +629,16 @@ describe("StreetSync", function () {
     // All 3 revealed → early settle (no deadline wait needed)
     await escrow.connect(anyone).settle(0n);
 
-    // Worker: 90% of 20 USDC = 18_000_000
-    const workerPayout = (pool * 9000n) / BPS_DENOM;
-    expect(workerPayout).to.equal(18_000_000n);
+    // Worker: 95% of 20 USDC = 19_000_000
+    const workerPayout = (pool * 9500n) / BPS_DENOM;
+    expect(workerPayout).to.equal(19_000_000n);
     expect(await usdc.balanceOf(worker.address) - workerBefore).to.equal(workerPayout);
 
-    // No minority → reviewerPool = 10% of 20 USDC = 2_000_000
-    // perReviewer = 2_000_000 / 3 = 666_666
-    const reviewerCut = pool - workerPayout; // 2_000_000
-    const perReviewer = reviewerCut / 3n;    // 666_666
-    expect(perReviewer).to.equal(666_666n);
+    // No minority → reviewerPool = 5% of 20 USDC = 1_000_000
+    // perReviewer = 1_000_000 / 3 = 333_333
+    const reviewerCut = pool - workerPayout; // 1_000_000
+    const perReviewer = reviewerCut / 3n;    // 333_333
+    expect(perReviewer).to.equal(333_333n);
 
     for (let i = 0; i < PANEL_SIZE; i++) {
       // Stake returned directly during settle

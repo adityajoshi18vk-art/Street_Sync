@@ -1,0 +1,26 @@
+{
+  "name": "streetsync-monorepo",
+  "version": "1.0.0",
+  "description": "StreetSync monorepo – contracts, evidence/arkiv packages, backend API, Next.js app",
+  "private": true,
+  "workspaces": [
+    "contracts",
+    "packages/*",
+    "backend",
+    "app"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client && npm run build --workspace=streetsync-backend",
+    "test:contracts": "npm run test --workspace=streetsync-contracts",
+    "test:pipeline": "npm run test --workspace=@streetsync/evidence && npm run test --workspace=@streetsync/arkiv-client",
+    "test:e2e": "npm run build && tsx scripts/e2e-verify.ts",
+    "dev": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
+    "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",
+    "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

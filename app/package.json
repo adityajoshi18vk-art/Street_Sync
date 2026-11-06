@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@streetsync/arkiv-client": "file:../packages/arkiv-client",
-    "@streetsync/evidence": "file:../packages/evidence",
+    "@streetsync/arkiv-client": "^1.0.0",
+    "@streetsync/evidence": "^1.0.0",
     "@tanstack/react-query": "^5.51.23",
     "@worldcoin/idkit": "^2.2.0",
     "leaflet": "^1.9.4",
