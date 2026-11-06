@@ -1,3 +1,4 @@
+import { parseWorldIdLevel } from "@/lib/worldid-level";
 import { defineChain, parseUnits, formatUnits, isAddress, zeroAddress, type Abi, type Address } from "viem";
 import arcTestnetDeployment from "../../../contracts/deployments/arcTestnet.json";
 import localhostDeployment from "../../../contracts/deployments/localhost.json";
@@ -156,6 +157,7 @@ export const WORLD_ACTION_REVIEWER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_REVIEWER ?? "register-reviewer";
 export const WORLD_ACTION_NEIGHBOUR =
   process.env.NEXT_PUBLIC_WORLD_ACTION_NEIGHBOUR ?? "vote-problem";
+export const WORLD_ID_LEVEL = parseWorldIdLevel(process.env.NEXT_PUBLIC_WORLD_ID_LEVEL);
 
 /**
  * parseUnits(amount, 6) — the ONLY sanctioned way to turn a human USDC amount

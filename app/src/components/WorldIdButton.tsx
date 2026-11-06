@@ -1,7 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { IDKitRequestWidget, proofOfHuman, type IDKitResult } from "@worldcoin/idkit";
+import {
+  IDKitRequestWidget,
+  deviceLegacy,
+  documentLegacy,
+  proofOfHuman,
+  secureDocumentLegacy,
+  type IDKitResult,
+  type Preset
+} from "@worldcoin/idkit";
 import {
   requestWorldIdContext,
   reuseWorldIdAttestation,
@@ -10,7 +18,23 @@ import {
   type WorldIdRequestContext,
   type WorldIdRole
 } from "@/lib/api";
-import { WORLD_ACTION_NEIGHBOUR, WORLD_ACTION_REVIEWER, WORLD_ACTION_WORKER } from "@/config/contracts";
+import { WORLD_ACTION_NEIGHBOUR, WORLD_ACTION_REVIEWER, WORLD_ACTION_WORKER, WORLD_ID_LEVEL } from "@/config/contracts";
+import { worldIdErrorMessage, type WorldIdLevel } from "@/lib/worldid-level";
+
+// Legacy presets keep the wallet as the proof signal; constraint-based requests would
+// send legacy proofs with an empty signal, which the backend rejects as unbound.
+function presetFor(level: WorldIdLevel, signal: string): Preset {
+  switch (level) {
+    case "orb":
+      return proofOfHuman({ signal });
+    case "secure_document":
+      return secureDocumentLegacy({ signal });
+    case "document":
+      return documentLegacy({ signal });
+    default:
+      return deviceLegacy({ signal });
+  }
+}
 
 const ACTIONS: Record<WorldIdRole, string> = {
   worker: WORLD_ACTION_WORKER,
@@ -84,14 +108,14 @@ export default function WorldIdButton({
           rp_context={request.rp_context}
           environment={request.environment}
           allow_legacy_proofs={true}
-          preset={proofOfHuman({ signal: wallet.toLowerCase() })}
+          preset={presetFor(WORLD_ID_LEVEL, wallet.toLowerCase())}
           handleVerify={async (result: IDKitResult) => {
             attestationRef.current = await verifyWorldIdProof({ wallet, role, bountyId, idkitResponse: result, location });
           }}
           onSuccess={async () => {
             if (attestationRef.current) await onAttestation(attestationRef.current);
           }}
-          onError={(code) => onError(`World ID error: ${code}`)}
+          onError={(code) => onError(worldIdErrorMessage(String(code), WORLD_ID_LEVEL))}
         />
       )}
     </>
