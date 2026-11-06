@@ -14,15 +14,15 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import dbAccess from "./db.js";
-import { signAttestation, attesterAddress, RoleEnum, setVerifyingContract } from "./signer.js";
+import { signAttestation, attesterAddress, getVerifyingContract, RoleEnum, setVerifyingContract } from "./signer.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
-import type { Address } from "viem";
+import { isAddress, type Address } from "viem";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-const PORT = Number(process.env.PORT ?? 3001);
+const BACKEND_PORT = Number(process.env.BACKEND_PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
-const WORLD_APP_ID = process.env.WORLD_APP_ID ?? "app_streetsync_dev";
+const WORLD_APP_ID = process.env.WORLD_APP_ID ?? "";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 
 // ─── Fastify Setup ───────────────────────────────────────────────────────────
@@ -66,6 +66,9 @@ interface WorldIdVerifyBody {
 const DEV_BYPASS_ENABLED = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
 
 app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, reply) => {
+  if (!request.body || typeof request.body !== "object") {
+    return reply.status(400).send({ error: "Invalid request body" });
+  }
   const {
     proof,
     merkle_root,
@@ -78,9 +81,18 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
   } = request.body;
 
   // Validate required fields
-  if (!proof || !merkle_root || !nullifier_hash || !action || !wallet || !role) {
+  if (
+    typeof proof !== "string" || !proof.trim() ||
+    typeof merkle_root !== "string" || !merkle_root.trim() ||
+    typeof nullifier_hash !== "string" || !nullifier_hash.trim() ||
+    typeof verification_level !== "string" || !verification_level.trim() ||
+    typeof action !== "string" || !action.trim() ||
+    typeof wallet !== "string" || !isAddress(wallet) ||
+    (role !== "worker" && role !== "reviewer") ||
+    typeof bountyId !== "string" || !/^\d+$/.test(bountyId)
+  ) {
     return reply.status(400).send({
-      error: "Missing required fields: proof, merkle_root, nullifier_hash, action, wallet, role",
+      error: "Invalid request: expected a World ID proof, action, wallet, role, and decimal bountyId",
     });
   }
 
@@ -332,6 +344,10 @@ app.get("/api/health", async (_request, reply) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function main() {
+  if (!WORLD_APP_ID || WORLD_APP_ID.includes("YOUR_")) {
+    throw new Error("WORLD_APP_ID must be configured with the StreetSync World ID application");
+  }
+
   console.log("╔══════════════════════════════════════════════╗");
   console.log("║         StreetSync Backend Server            ║");
   console.log("╚══════════════════════════════════════════════╝");
@@ -344,6 +360,8 @@ async function main() {
     setVerifyingContract(process.env.ESCROW_CONTRACT_ADDRESS as Address);
     console.log(`Escrow contract:  ${process.env.ESCROW_CONTRACT_ADDRESS}`);
   }
+  // Fail startup rather than issuing signatures for a placeholder EIP-712 domain.
+  console.log(`Signing domain contract: ${getVerifyingContract()}`);
 
   // Start event indexer in background
   startIndexer().catch((e) => {
@@ -352,8 +370,8 @@ async function main() {
 
   // Start HTTP server
   try {
-    await app.listen({ port: PORT, host: HOST });
-    console.log(`\nServer listening at http://${HOST}:${PORT}`);
+    await app.listen({ port: BACKEND_PORT, host: HOST });
+    console.log(`\nServer listening at http://${HOST}:${BACKEND_PORT}`);
     console.log("Endpoints:");
     console.log("  POST /api/worldid/verify");
     console.log("  GET  /api/bounties");
