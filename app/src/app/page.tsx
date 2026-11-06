@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAccount, useChainId, useConfig, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useConfig, useReadContract, useSwitchChain, useWriteContract } from "wagmi";
 import { decodeEventLog } from "viem";
 import { REPORT_MAX_DESCRIPTION, REPORT_MIN_DESCRIPTION, normalizeDescription, packReport } from "@streetsync/evidence";
 import {
@@ -12,10 +12,15 @@ import {
   ESCROW_ADDRESS,
   ACTIVE_CHAIN,
   contractsDeployed,
+  formatUsdcDisplay,
   latLngToE5,
   parseUsdc,
-  regionCellFromLatLng
+  regionCellFromLatLng,
+  USDC_ADDRESS
 } from "@/config/contracts";
+import { erc20Abi } from "viem";
+import HowItWorks from "@/components/HowItWorks";
+import { reportReadiness } from "@/lib/readiness";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
 import { listBounties, uploadBountyReport } from "@/lib/api";
 import { friendlyError } from "@/lib/errors";
@@ -125,6 +130,39 @@ export default function HomePage() {
   const descriptionLength = [...normalizedDescription].length;
   const descriptionValid =
     descriptionLength >= REPORT_MIN_DESCRIPTION && descriptionLength <= REPORT_MAX_DESCRIPTION;
+
+  const { switchChain, isPending: switching } = useSwitchChain();
+  const balanceQuery = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: USDC_ADDRESS ?? undefined,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!USDC_ADDRESS && !!address, refetchInterval: 20_000 }
+  });
+  const usdcBalance = typeof balanceQuery.data === "bigint" ? balanceQuery.data : null;
+  const parsedAmount = (() => {
+    try {
+      return amount.trim() ? parseUsdc(amount.trim()) : null;
+    } catch {
+      return null;
+    }
+  })();
+  const readiness = reportReadiness({
+    isConnected,
+    onActiveChain: chainId === ACTIVE_CHAIN.id,
+    contractsDeployed,
+    hasPin: !!draftPin,
+    hasPhoto: !!photo,
+    descriptionLength,
+    minDescription: REPORT_MIN_DESCRIPTION,
+    maxDescription: REPORT_MAX_DESCRIPTION,
+    amount: parsedAmount,
+    amountInput: amount,
+    balance: usdcBalance,
+    hasExpiry: windowReady && !!selectedExpiry
+  });
+  const scrollToMap = () => document.getElementById("bounty-map")?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   const handlePhotoChange = async (file: File | undefined) => {
     setPhotoError(null);
@@ -323,8 +361,10 @@ export default function HomePage() {
         </div>
       )}
 
+      <HowItWorks />
+
       {/* Map */}
-      <div className="overflow-hidden rounded-xl bg-white p-2 shadow-card ring-1 ring-gray-200">
+      <div id="bounty-map" className="overflow-hidden rounded-xl bg-white p-2 shadow-card ring-1 ring-gray-200">
         <MapView
           bounties={bounties}
           selectedId={selectedId}
@@ -342,7 +382,9 @@ export default function HomePage() {
           className="h-[420px] w-full sm:h-[480px]"
         />
         <p className="px-2 pb-1 pt-2 text-center text-[11px] text-gray-400">
-          Tap the map to drop a new bounty pin · pins are colored by lifecycle status
+          {draftPin
+            ? "Pin placed. Fill in the report form below (tap again to move it)."
+            : "Tap the map where the problem is to start a report · existing pins are coloured by status"}
         </p>
       </div>
 
@@ -397,7 +439,9 @@ export default function HomePage() {
                   {draftPin.lat.toFixed(5)}, {draftPin.lng.toFixed(5)}
                 </p>
               ) : (
-                <p className="text-gray-500">Tap the map to drop a pin</p>
+                <button type="button" onClick={scrollToMap} className="font-semibold text-brand-700 hover:underline">
+                  Tap the map to drop a pin ↑
+                </button>
               )}
             </div>
 
@@ -414,8 +458,19 @@ export default function HomePage() {
                   void handlePhotoChange(e.target.files?.[0]);
                   e.target.value = "";
                 }}
-                className="block w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+                className="sr-only"
               />
+              <label
+                htmlFor="problem-photo"
+                className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-3 text-sm font-semibold transition ${
+                  photo
+                    ? "border-gray-200 bg-white text-gray-600 hover:border-brand-300"
+                    : "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-400"
+                } ${photoBusy ? "pointer-events-none opacity-50" : ""}`}
+              >
+                <span aria-hidden>📷</span>
+                {photo ? "Change photo" : "Take or choose a photo"}
+              </label>
               {photoBusy && <p className="text-[11px] text-gray-500">Optimising photo…</p>}
               {photoError && <p className="text-[11px] text-red-600">{photoError}</p>}
               {photo && (
@@ -447,12 +502,20 @@ export default function HomePage() {
               </p>
             </div>
 
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-gray-700">Funding (USDC)</span>
+              {address && (
+                <span className="text-gray-500">
+                  Balance: {usdcBalance === null ? "…" : `${formatUsdcDisplay(usdcBalance)} USDC`}
+                </span>
+              )}
+            </div>
             <div className="flex gap-2">
               <input
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 inputMode="decimal"
-                placeholder="USDC amount (6 decimals enforced)"
+                placeholder="e.g. 5.00"
                 className="w-full rounded-lg text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <select
@@ -490,26 +553,53 @@ export default function HomePage() {
               </p>
             )}
 
+            {!readiness.ready && !txStatus && (
+              <div className="rounded-lg bg-gray-50 p-3 ring-1 ring-gray-200">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Before you can submit</p>
+                <ul className="mt-1.5 space-y-1">
+                  {readiness.items
+                    .filter((item) => !item.done)
+                    .map((item) => (
+                      <li key={item.key} className="flex items-center justify-between gap-2 text-xs text-gray-700">
+                        <span className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                          {item.label}
+                        </span>
+                        {item.key === "network" && isConnected && (
+                          <button
+                            type="button"
+                            onClick={() => switchChain({ chainId: ACTIVE_CHAIN.id })}
+                            disabled={switching}
+                            className="shrink-0 rounded-md bg-brand-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+                          >
+                            {switching ? "Switching…" : "Switch"}
+                          </button>
+                        )}
+                        {item.key === "pin" && (
+                          <button
+                            type="button"
+                            onClick={scrollToMap}
+                            className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50"
+                          >
+                            Show map
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             <button
               onClick={handleCreateBounty}
-              disabled={
-                !draftPin || !isConnected || !canWrite || writing || !!txStatus || photoBusy ||
-                !photo || !descriptionValid || !windowReady || !selectedExpiry
-              }
-              className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.99] disabled:opacity-40"
+              disabled={!readiness.ready || writing || !!txStatus || photoBusy}
+              className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none"
             >
-              {writing ? "Confirm in wallet…" : txStatus ? "Working…" : "Approve USDC & Report Problem"}
+              {writing ? "Confirm in wallet…" : txStatus ? "Working…" : "Approve USDC & report problem"}
             </button>
-            {isConnected && !canWrite && (
-              <p className="text-center text-[11px] text-amber-700">
-                Connect to {ACTIVE_CHAIN.name} with deployed contracts to create or fund bounties.
-              </p>
-            )}
-            {!isConnected && (
-              <p className="text-center text-[11px] text-gray-400">
-                Connect a wallet to fund bounties.
-              </p>
-            )}
+            <p className="text-center text-[11px] text-gray-400">
+              Two wallet confirmations: approve the exact USDC amount, then create the bounty.
+            </p>
           </div>
         </section>
 

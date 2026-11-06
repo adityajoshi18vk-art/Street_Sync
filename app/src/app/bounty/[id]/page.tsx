@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   useAccount,
+  useBlockNumber,
   useChainId,
   useConfig,
   useReadContract,
@@ -88,7 +89,7 @@ export default function BountyDetailPage() {
     ...readBase,
     functionName: "getTally",
     args: [bountyIdBig],
-    query: { enabled: chainReady }
+    query: { enabled: chainReady, refetchInterval: 15_000 }
   });
   const tallyTuple = tally as readonly [number, number] | undefined;
 
@@ -123,6 +124,11 @@ export default function BountyDetailPage() {
     ...readBase,
     functionName: "eligibleReviewerCount",
     args: [bountyIdBig],
+    query: { enabled: chainReady && Number(b?.status) === STATUS.Submitted, refetchInterval: 20_000 }
+  });
+  const { data: blockNumber } = useBlockNumber({
+    chainId: ACTIVE_CHAIN.id,
+    watch: true,
     query: { enabled: chainReady && Number(b?.status) === STATUS.Submitted }
   });
 
@@ -212,7 +218,10 @@ export default function BountyDetailPage() {
     }
   };
 
-  const runAction = async (fn: "withdrawPledge" | "releaseClaim", doneMessage: string) => {
+  const runAction = async (
+    fn: "withdrawPledge" | "releaseClaim" | "assignPanel" | "settle" | "pokeOrReplace",
+    doneMessage: string
+  ) => {
     if (!canWrite || !address || !ESCROW_ADDRESS) {
       setActionError("Connect a wallet on the configured network first.");
       return;
@@ -391,7 +400,7 @@ export default function BountyDetailPage() {
               <p className="col-span-3 text-[11px] text-gray-400">
                 Commit window ends {formatUtc(commitDeadline as bigint)} · reveal{" "}
                 {revealDeadline ? formatUtc(revealDeadline as bigint) : "—"}
-                {nowSeconds > Number(revealDeadline ?? 0n) && " (expired — pokeOrReplace available)"}
+                {nowSeconds > Number(revealDeadline ?? 0n) && " (ended)"}
               </p>
             ) : null}
           </div>
@@ -449,6 +458,25 @@ export default function BountyDetailPage() {
               Withdraw my pledge
             </button>
           </div>
+        )}
+
+        {(b.status === STATUS.Submitted || b.status === STATUS.InReview) && (
+          <ReviewProgressCard
+            status={Number(b.status)}
+            selectionBlock={BigInt(b.selectionBlock)}
+            blockNumber={typeof blockNumber === "bigint" ? blockNumber : null}
+            eligibleCount={eligibleCount}
+            revealed={tallyTuple ? Number(tallyTuple[0]) : null}
+            approvals={tallyTuple ? Number(tallyTuple[1]) : null}
+            commitDeadline={typeof commitDeadline === "bigint" ? Number(commitDeadline) : null}
+            revealDeadline={typeof revealDeadline === "bigint" ? Number(revealDeadline) : null}
+            now={now}
+            busy={actionBusy}
+            canWrite={canWrite}
+            onDraw={() => void runAction("assignPanel", "Review panel drawn. The three reviewers can now vote.")}
+            onSettle={() => void runAction("settle", "Bounty settled.")}
+            onReplace={() => void runAction("pokeOrReplace", "Inactive reviewers replaced. Draw the new panel in a few seconds.")}
+          />
         )}
 
         {showRelease && (
@@ -551,6 +579,89 @@ function ActionCard({
         className="mt-3 rounded-lg bg-brand-600 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
       >
         {cta}
+      </Link>
+    </div>
+  );
+}
+
+function ReviewProgressCard(props: {
+  status: number;
+  selectionBlock: bigint;
+  blockNumber: bigint | null;
+  eligibleCount: number | null;
+  revealed: number | null;
+  approvals: number | null;
+  commitDeadline: number | null;
+  revealDeadline: number | null;
+  now: number;
+  busy: boolean;
+  canWrite: boolean;
+  onDraw: () => void;
+  onSettle: () => void;
+  onReplace: () => void;
+}) {
+  const { status, selectionBlock, blockNumber, eligibleCount, revealed, now, busy, canWrite } = props;
+  const btn =
+    "mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500";
+
+  if (status === STATUS.Submitted) {
+    const blocksLeft = blockNumber === null ? null : Number(selectionBlock - blockNumber) + 1;
+    const tooFew = eligibleCount !== null && eligibleCount < 3;
+    const ready = blockNumber !== null && blockNumber > selectionBlock && !tooFew;
+    return (
+      <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-violet-200 md:col-span-3">
+        <p className="text-sm font-bold text-gray-900">Next step: draw the review panel</p>
+        <p className="mt-1 text-xs text-gray-500">
+          Evidence is submitted. Three reviewers are now picked at random from registered reviewers. Anyone can
+          trigger the draw.
+        </p>
+        {tooFew ? (
+          <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800 ring-1 ring-amber-200">
+            Only {eligibleCount} eligible reviewer{eligibleCount === 1 ? "" : "s"} registered; 3 are needed. Reviewers
+            register on the{" "}
+            <Link href="/review" className="font-semibold underline">
+              Review
+            </Link>{" "}
+            page. The creator, funders and worker of this bounty can&apos;t review it.
+          </p>
+        ) : blocksLeft !== null && blocksLeft > 0 ? (
+          <p className="mt-2 text-xs text-gray-500">Randomness is ready in {blocksLeft} block{blocksLeft === 1 ? "" : "s"}…</p>
+        ) : null}
+        <button type="button" disabled={!ready || busy || !canWrite} onClick={props.onDraw} className={`${btn} bg-violet-600 hover:bg-violet-700`}>
+          Draw review panel
+        </button>
+      </div>
+    );
+  }
+
+  const revealEnd = props.revealDeadline ?? 0;
+  const commitEnd = props.commitDeadline ?? 0;
+  const afterReveal = revealEnd > 0 && now > revealEnd;
+  const canSettle = revealed !== null && (revealed === 3 || (afterReveal && revealed >= 2));
+  const canReplace = revealed !== null && afterReveal && revealed < 2;
+  const phase = now <= commitEnd ? "Reviewers are committing their votes" : now <= revealEnd ? "Reviewers are revealing their votes" : "Voting has ended";
+  return (
+    <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-orange-200 md:col-span-3">
+      <p className="text-sm font-bold text-gray-900">Review in progress</p>
+      <p className="mt-1 text-xs text-gray-500">
+        {phase}. {revealed ?? 0} of 3 votes revealed, {props.approvals ?? 0} approving.
+        {!afterReveal && revealEnd > 0 && ` Voting ends ${new Date(revealEnd * 1000).toLocaleString()}.`}
+      </p>
+      {canSettle && (
+        <button type="button" disabled={busy || !canWrite} onClick={props.onSettle} className={`${btn} bg-emerald-600 hover:bg-emerald-700`}>
+          Settle &amp; release payment
+        </button>
+      )}
+      {canReplace && (
+        <>
+          <p className="mt-2 text-xs text-amber-700">Fewer than 2 reviewers revealed in time. Replace them with a new panel.</p>
+          <button type="button" disabled={busy || !canWrite} onClick={props.onReplace} className={`${btn} bg-amber-600 hover:bg-amber-700`}>
+            Replace inactive reviewers
+          </button>
+        </>
+      )}
+      <Link href="/review" className="mt-3 inline-block text-xs font-semibold text-brand-700 hover:underline">
+        Reviewers vote on the Review page →
       </Link>
     </div>
   );
