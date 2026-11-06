@@ -11,12 +11,15 @@ import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import { recoverTypedDataAddress, type Address, type Hex } from "viem";
 import dbAccess from "../src/db.js";
-import {
+// Explicit test-only signer; production never falls back to this public key.
+process.env.ATTESTER_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+process.env.ATTESTER_SIGNER_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const {
   signAttestation,
   attesterAddress,
   setVerifyingContract,
   RoleEnum,
-} from "../src/signer.js";
+} = await import("../src/signer.js");
 
 // Mock environment for test
 const MOCK_ESCROW = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address;
@@ -25,6 +28,7 @@ const CHAIN_ID = 5042002;
 describe("StreetSync Backend Test Suite", () => {
   before(() => {
     setVerifyingContract(MOCK_ESCROW);
+    assert.throws(() => setVerifyingContract("0x0000000000000000000000000000000000000000" as Address), /non-zero EVM address/);
     // Clean test tables
     dbAccess.raw.exec(`
       DELETE FROM nullifiers;
