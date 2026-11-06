@@ -59,6 +59,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/review" className="hover:text-brand-700">
                   Review
                 </Link>
+                <Link href="/stickers" className="hover:text-brand-700">
+                  Stickers
+                </Link>
               </nav>
               <ConnectButton />
             </div>
