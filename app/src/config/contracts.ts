@@ -148,8 +148,6 @@ export const QUORUM = deploymentForChain.parameters.quorum;
 export const BACKEND_API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "";
 
-export const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ??
-  "app_staging_streetsync") as `app_${string}`;
 export const WORLD_ACTION_WORKER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_WORKER ?? "claim-bounty";
 export const WORLD_ACTION_REVIEWER =
