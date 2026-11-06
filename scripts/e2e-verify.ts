@@ -10,10 +10,10 @@
  *   5. Evidence pipeline: before/after photos + GPS metadata → @streetsync/evidence
  *      CBOR + Zstd WASM compression → benchmark (<128,000 bytes) → Arkiv write (in-memory
  *      IArkivClient recording payloads) → submitEvidence on-chain
- *   6. 3 reviewers register with 10 USDC stake each
+ *   6. 3 reviewers register with 2 USDC stake each
  *   7. Advance blocks → assignPanel (3-of-3)
  *   8. Commit/reveal: 2 Approve + 1 Reject → settle
- *   9. Assert: worker 95%, majority reviewers stake back + reward incl. slashed stake,
+ *   9. Assert: worker 90%, majority reviewers stake back + reward incl. slashed stake,
  *      minority reviewer slashed; verifyEvidenceBundle PASS; flip 1 byte → TAMPER_DETECTED
  *
  * Run: npm run test:e2e
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
     await usdc.waitForDeployment();
     const usdcAddress = await usdc.getAddress();
 
-    const REVIEWER_STAKE = 10_000_000n;
+    const REVIEWER_STAKE = 2_000_000n;
     // 1-hour windows: short windows race the wall clock over JSON-RPC polling;
     // time is warped explicitly with evm_increaseTime where needed.
     const COMMIT_WINDOW = 3600n;
@@ -230,8 +230,8 @@ async function main(): Promise<void> {
     const escrowAddress = await escrow.getAddress();
 
     check("MockUSDC deployed (6 decimals)", (await usdc.decimals()) === 6n);
-    check("Escrow REVIEWER_STAKE = 10 USDC", (await escrow.REVIEWER_STAKE()) === REVIEWER_STAKE);
-    check("Escrow REVIEWER_CUT_BPS = 500 (5%)", (await escrow.REVIEWER_CUT_BPS()) === 500n);
+    check("Escrow REVIEWER_STAKE = 2 USDC", (await escrow.REVIEWER_STAKE()) === REVIEWER_STAKE);
+    check("Escrow REVIEWER_CUT_BPS = 1000 (10%)", (await escrow.REVIEWER_CUT_BPS()) === 1000n);
     check("Escrow attester matches backend signer key", (await escrow.attester()) === attesterNode.address);
 
     // Fund actors
@@ -244,11 +244,12 @@ async function main(): Promise<void> {
     // Configure the REAL backend signer (built backend/dist) to sign EIP-712 attestations
     const dbPath = join(os.tmpdir(), `streetsync-e2e-${Date.now()}.db`);
     process.env.ATTESTER_PRIVATE_KEY = attesterKey;
+    process.env.ATTESTER_SIGNER_ADDRESS = attesterNode.address;
     process.env.CHAIN_ID = "31337";
     process.env.DB_PATH = dbPath;
     const signer = await import(pathToFileURL(join(ROOT, "backend", "dist", "signer.js")).href);
     signer.setVerifyingContract(escrowAddress);
-    check("Backend signer attester address == on-chain attester", signer.attesterAddress === attesterNode.address);
+    check("Backend signer attester address == on-chain attester", signer.getAttesterAddress() === attesterNode.address);
 
     // ─── Step 3: Funding ────────────────────────────────────────────────────
     section("STEP 3 — Funding: bounty 50 USDC + pledge 25 USDC");
@@ -288,23 +289,23 @@ async function main(): Promise<void> {
     };
     const before = await makePhoto("BEFORE", 130, 84, 40);
     const after = await makePhoto("AFTER", 60, 140, 70);
-    check("before photo ≤ 45 KiB WebP", before.webpBytes.length <= 45 * 1024, `${before.webpBytes.length} bytes`);
-    check("after photo ≤ 45 KiB WebP", after.webpBytes.length <= 45 * 1024, `${after.webpBytes.length} bytes`);
+    check("before photo ≤ 48,000 bytes WebP", before.webpBytes.length <= 48_000, `${before.webpBytes.length} bytes`);
+    check("after photo ≤ 48,000 bytes WebP", after.webpBytes.length <= 48_000, `${after.webpBytes.length} bytes`);
 
     const workerKey = worker.privateKey as `0x${string}`;
     const metadata = {
+      v: 1 as const,
       bountyId: "0",
-      visualChallengeCode: challengeCode,
-      beforeTimestamp: Date.now() - 60_000,
-      afterTimestamp: Date.now(),
-      gpsLatE5: 4001200,
-      gpsLngE5: -7513000,
-      gpsAccuracyM: 5,
-      compassHeadingDeg: 180,
-      deviceSummary: "e2e-node/22",
-      beforeImageSha256: before.sha256Hex,
-      afterImageSha256: after.sha256Hex,
-      appVersion: "1.0.0-e2e",
+      workerAddress: worker.address as `0x${string}`,
+      challengeCode,
+      beforeTimestampMs: Date.now() - 60_000,
+      afterTimestampMs: Date.now(),
+      gps: { lat: 40.012, lng: -75.13, accuracyMeters: 5 },
+      orientation: { alpha: 180, beta: null, gamma: null },
+      beforeSha256: before.sha256Hex,
+      afterSha256: after.sha256Hex,
+      userAgent: "e2e-node/22",
+      notes: "",
     };
 
     const { bundle, evidenceHash, stats } = await packBundle({
@@ -320,7 +321,7 @@ async function main(): Promise<void> {
     console.log(`     metadata CBOR:     ${stats.cborMetadataBytes} bytes → zstd ${stats.zstdMetadataBytes} bytes`);
     console.log(`     bundle total:      ${stats.totalBundleBytes} bytes (limit 128,000)`);
     console.log(`     overall ratio:     ${stats.overallCompressionRatio.toFixed(2)}x (${stats.overallSavingsPercent.toFixed(1)}% savings)`);
-    check("bundle < 128,000 bytes", stats.totalBundleBytes < 128_000, `${stats.totalBundleBytes} bytes`);
+    check("bundle < 100,000 bytes", stats.totalBundleBytes < 100_000, `${stats.totalBundleBytes} bytes`);
 
     const arkiv = new MemArkivClient();
     const writeRes = await writeEvidenceBundle(arkiv, bundle, worker.address, bountyId.toString(), evidenceHash);
@@ -329,7 +330,7 @@ async function main(): Promise<void> {
     check("Arkiv attributes: project=streetsync", attrs.project === "streetsync", JSON.stringify(attrs));
     check("Arkiv attributes: entity_type=evidence", attrs.entity_type === "evidence");
     check("Arkiv attributes: bounty_id=0", attrs.bounty_id === "0");
-    check("Arkiv attributes: sha256_prefix matches", attrs.sha256_prefix === evidenceHash.slice(0, 18));
+    check("Arkiv attributes: sha256_prefix matches", attrs.sha256_prefix === evidenceHash.slice(0, 32));
     const keyBytes32 = await entityKeyToBytes32(writeRes.entityKey);
     check("entityKey→bytes32 is 0x+64 hex", /^0x[0-9a-f]{64}$/.test(keyBytes32));
 
@@ -339,17 +340,17 @@ async function main(): Promise<void> {
       bAfterSubmit[11] === keyBytes32 && bAfterSubmit[12] === evidenceHash);
 
     // ─── Step 6: Reviewer registration ──────────────────────────────────────
-    section("STEP 6 — 3 reviewers register (10 USDC stake each)");
+    section("STEP 6 — 3 reviewers register (2 USDC stake each)");
     const reviewers = [rev1, rev2, rev3];
     for (const r of reviewers) {
       const att = await signer.signAttestation(r.address, signer.RoleEnum.Reviewer, 0n);
       await (await escrow.connect(r).registerReviewer(cell, att.nonce, att.expiry, att.signature)).wait();
     }
     const escrowBalAfterReg = await usdc.balanceOf(escrowAddress);
-    check("escrow holds 75e6 pool + 30e6 stakes = 105_000_000", escrowBalAfterReg === 105_000_000n, `got ${escrowBalAfterReg}`);
+    check("escrow holds 75e6 pool + 6e6 stakes = 81_000_000", escrowBalAfterReg === 81_000_000n, `got ${escrowBalAfterReg}`);
     for (const r of reviewers) {
       const rv = await escrow.reviewers(r.address);
-      check(`reviewer ${r.address.slice(0, 8)}… staked 10 USDC, active`, rv[2] === REVIEWER_STAKE && rv[3] === true);
+      check(`reviewer ${r.address.slice(0, 8)}… staked 2 USDC, active`, rv[2] === REVIEWER_STAKE && rv[3] === true);
     }
 
     // ─── Step 7: Advance blocks + assignPanel ───────────────────────────────
@@ -391,11 +392,11 @@ async function main(): Promise<void> {
 
     // ─── Step 9: Settlement assertions + evidence audit + tamper ────────────
     section("STEP 9 — Settlement math, evidence audit, tamper detection");
-    const workerPayout = (75_000_000n * 9500n) / 10_000n; // 71_250_000
-    check("worker got 95% = 71_250_000", (await usdc.balanceOf(worker.address)) - workerPre === workerPayout);
+    const workerPayout = (75_000_000n * 9000n) / 10_000n; // 67_500_000
+    check("worker got 90% = 67_500_000", (await usdc.balanceOf(worker.address)) - workerPre === workerPayout);
 
-    const reviewerPool = 75_000_000n - workerPayout + REVIEWER_STAKE; // 3_750_000 + 10_000_000 = 13_750_000
-    const perMajority = reviewerPool / 2n; // 6_875_000
+    const reviewerPool = 75_000_000n - workerPayout + REVIEWER_STAKE; // 7_500_000 + 2_000_000 = 9_500_000
+    const perMajority = reviewerPool / 2n; // 4_750_000
     for (let i = 0; i < 2; i++) {
       const rv = await escrow.reviewers(panel[i]);
       check(`majority reviewer[${i}] stake returned + reward ${perMajority}`,
