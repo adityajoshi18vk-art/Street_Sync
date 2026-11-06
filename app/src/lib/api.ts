@@ -37,6 +37,7 @@ export async function requestAttestation(params: {
   bountyId: string;
   action: string;
   worldIdProof: WorldIdSuccessResult;
+  devBypass?: boolean;
 }): Promise<Attestation> {
   const res = await fetch(`${BACKEND_API_URL}/api/worldid/verify`, {
     method: "POST",
@@ -49,7 +50,8 @@ export async function requestAttestation(params: {
       action: params.action,
       wallet: params.wallet,
       role: params.role,
-      bountyId: params.bountyId
+      bountyId: params.bountyId,
+      dev_bypass: params.devBypass ?? false
     })
   });
 

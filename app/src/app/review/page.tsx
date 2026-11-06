@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { IDKitWidget } from "@worldcoin/idkit";
+import { IDKitWidget, VerificationLevel } from "@worldcoin/idkit";
 import type { ISuccessResult } from "@worldcoin/idkit";
 import {
   useAccount,
@@ -27,7 +27,7 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact } from "@/lib/tx";
-import { getReviewerAssignments, requestAttestation, type Attestation } from "@/lib/api";
+import { getReviewerAssignments, requestAttestation, type Attestation, type WorldIdSuccessResult } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
 import { readBountyStruct, shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
 import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
@@ -125,6 +125,34 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
     );
   }, []);
 
+  const handleDevBypassReviewer = useCallback(async () => {
+    if (!address) {
+      setError("Connect a wallet first");
+      return;
+    }
+    setError(null);
+    try {
+      const syntheticProof: WorldIdSuccessResult = {
+        nullifier_hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+        merkle_root: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        proof: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        verification_level: "device"
+      };
+      const attestation = await requestAttestation({
+        wallet: address,
+        role: "reviewer",
+        bountyId: "0",
+        action: WORLD_ACTION_REVIEWER,
+        worldIdProof: syntheticProof,
+        devBypass: true
+      });
+      attestationRef.current = attestation;
+      await register(attestation);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [address, register]);
+
   return (
     <section className="card p-5 animate-rise">
       <h2 className="heading text-sm">Reviewer registration</h2>
@@ -175,6 +203,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                 app_id={WORLD_APP_ID}
                 action={WORLD_ACTION_REVIEWER}
                 signal={address ?? undefined}
+                verification_level={VerificationLevel.Device}
                 handleVerify={async (result: ISuccessResult) => {
                   if (!address) throw new Error("Connect a wallet first");
                   const attestation = await requestAttestation({
@@ -214,6 +243,14 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                   </button>
                 )}
               </IDKitWidget>
+              <button
+                type="button"
+                onClick={handleDevBypassReviewer}
+                disabled={busy}
+                className="btn-ghost w-full py-2.5 text-xs text-brand-300 hover:text-brand-200 border border-brand-500/20 rounded-lg flex items-center justify-center gap-1.5 transition-colors hover:border-brand-500/40"
+              >
+                ⚡ Instant Reviewer Registration (Dev / Demo Bypass)
+              </button>
             </div>
           )}
         </>

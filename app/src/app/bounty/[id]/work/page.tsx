@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { IDKitWidget } from "@worldcoin/idkit";
+import { IDKitWidget, VerificationLevel } from "@worldcoin/idkit";
 import type { ISuccessResult } from "@worldcoin/idkit";
 import { useAccount, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
@@ -160,6 +160,34 @@ export default function WorkerPage() {
     },
     [address, bountyId, runClaim]
   );
+
+  const handleDevBypassVerify = useCallback(async () => {
+    if (!address) {
+      setError("Connect your wallet first");
+      return;
+    }
+    setError(null);
+    try {
+      const syntheticProof: WorldIdSuccessResult = {
+        nullifier_hash: `0x${Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+        merkle_root: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        proof: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        verification_level: "device"
+      };
+      const attestation = await requestAttestation({
+        wallet: address,
+        role: "worker",
+        bountyId,
+        action: workerActionFor(bountyId),
+        worldIdProof: syntheticProof,
+        devBypass: true
+      });
+      attestationRef.current = attestation;
+      await runClaim(attestation);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [address, bountyId, runClaim]);
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
 
@@ -348,11 +376,12 @@ export default function WorkerPage() {
             </p>
           )}
           {status === 0 && isConnected && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
               <IDKitWidget
                 app_id={WORLD_APP_ID}
                 action={workerActionFor(bountyId)}
                 signal={address}
+                verification_level={VerificationLevel.Device}
                 handleVerify={handleWorldIdVerify}
                 onSuccess={() => {
                   /* claim already ran inside handleVerify */
@@ -369,6 +398,13 @@ export default function WorkerPage() {
                   </button>
                 )}
               </IDKitWidget>
+              <button
+                type="button"
+                onClick={handleDevBypassVerify}
+                className="btn-ghost w-full py-2.5 text-xs text-brand-300 hover:text-brand-200 border border-brand-500/20 rounded-lg flex items-center justify-center gap-1.5 transition-colors hover:border-brand-500/40"
+              >
+                ⚡ Instant Claim (Dev / Demo Bypass)
+              </button>
             </div>
           )}
           {status !== 0 && (

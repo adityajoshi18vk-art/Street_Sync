@@ -185,26 +185,25 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
 
   // ── Step 2: Verify the proof with World's cloud API ─────────────────────────
   let verified: WorldVerifyResult;
-  try {
-    verified = await verifyWorldIdProof({
-      proof,
-      merkle_root,
-      nullifier_hash,
-      verification_level,
-      action: actionId,
-      signal: wallet,
-    });
-  } catch (e) {
-    request.log.error(`World ID API error: ${(e as Error).message}`);
-    // Hard failure unless the operator explicitly enabled the dev bypass
-    // (ALLOW_DEV_WORLD_ID_BYPASS=true) AND the client opted in per-request.
-    if (!DEV_BYPASS_ENABLED || !request.body.dev_bypass) {
+  if (DEV_BYPASS_ENABLED && request.body.dev_bypass) {
+    request.log.warn("World ID verification bypassed via ALLOW_DEV_WORLD_ID_BYPASS");
+    verified = { success: true };
+  } else {
+    try {
+      verified = await verifyWorldIdProof({
+        proof,
+        merkle_root,
+        nullifier_hash,
+        verification_level,
+        action: actionId,
+        signal: wallet,
+      });
+    } catch (e) {
+      request.log.error(`World ID API error: ${(e as Error).message}`);
       return reply.status(502).send({
         error: "Cannot reach World ID verification API",
       });
     }
-    request.log.warn("World ID API unreachable – proceeding via ALLOW_DEV_WORLD_ID_BYPASS");
-    verified = { success: true };
   }
 
   if (!verified.success) {
