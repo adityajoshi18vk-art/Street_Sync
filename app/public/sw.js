@@ -20,6 +20,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  if (new URL(request.url).pathname.startsWith("/api/")) return;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
   event.respondWith(
     fetch(request)
