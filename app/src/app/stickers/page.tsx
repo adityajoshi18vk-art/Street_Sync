@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
-import { getStickerProfile, type StickerProfile } from "@/lib/api";
+import { getStickerProfile, type StickerProfile, type StickerStatus } from "@/lib/api";
 import { StickerCard } from "@/components/StickerCard";
 import { formatUsdcDisplaySafe } from "@/lib/types";
 
@@ -145,7 +145,7 @@ export default function StickersPage() {
         </div>
       ) : profile ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {profile.stickers.map((s, i) => (
+          {profile.stickers.map((s: StickerStatus, i: number) => (
             <StickerCard key={s.id} sticker={s} index={i} />
           ))}
         </div>

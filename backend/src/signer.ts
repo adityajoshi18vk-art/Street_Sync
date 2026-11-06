@@ -16,6 +16,7 @@ import path from "node:path";
 import {
   createWalletClient,
   http,
+  isAddress,
   type Hex,
   type Address,
   type Chain,
@@ -25,27 +26,63 @@ import dbAccess from "./db.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-const HARDHAT_DEFAULT_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-const ATTESTER_PRIVATE_KEY = (process.env.ATTESTER_PRIVATE_KEY || HARDHAT_DEFAULT_KEY) as Hex;
-
-// Hardhat account #0's key is public; on a real network anyone could forge attestations with it.
-if (
-  Number(process.env.CHAIN_ID ?? "5042002") !== 31337 &&
-  ATTESTER_PRIVATE_KEY.toLowerCase() === HARDHAT_DEFAULT_KEY
-) {
-  throw new Error(
-    "ATTESTER_PRIVATE_KEY is Hardhat's public test key. Set a private attester key for non-local chains.",
-  );
-}
-
 export function getChainId(): number {
   return Number(process.env.CHAIN_ID ?? "5042002");
 }
 
+export function assertSafeAttesterKey(privateKey: string, chainId = getChainId()): void {
+  const publicHardhatDevKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+  if (privateKey.toLowerCase() === publicHardhatDevKey && chainId !== 31337) {
+    throw new Error("The public Hardhat development key is only allowed on local chain 31337");
+  }
+}
+
 // The verifying contract address is resolved at runtime from env or deployment artifacts
 let _verifyingContract: Address | null = null;
+let cachedAttesterAccount: ReturnType<typeof privateKeyToAccount> | null = null;
+
+function getAttesterAccount() {
+  if (cachedAttesterAccount) return cachedAttesterAccount;
+
+  const privateKey = process.env.ATTESTER_PRIVATE_KEY;
+  if (!privateKey) throw new Error("ATTESTER_PRIVATE_KEY is not configured");
+  assertSafeAttesterKey(privateKey);
+
+  const account = privateKeyToAccount(privateKey as Hex);
+  const expectedAttester = process.env.ATTESTER_SIGNER_ADDRESS ?? process.env.ATTESTER_ADDRESS;
+  if (!expectedAttester || !isAddress(expectedAttester)) {
+    throw new Error("ATTESTER_SIGNER_ADDRESS is not configured or invalid");
+  }
+  if (expectedAttester.toLowerCase() !== account.address.toLowerCase()) {
+    throw new Error("Configured attester address does not match ATTESTER_PRIVATE_KEY");
+  }
+
+  cachedAttesterAccount = account;
+  return account;
+}
+
+export function getAttesterAddress(): Address | null {
+  try {
+    return getAttesterAccount().address;
+  } catch {
+    return null;
+  }
+}
+
+export function isAttestationSignerReady(): boolean {
+  try {
+    getAttesterAccount();
+    getVerifyingContract();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function setVerifyingContract(addr: Address): void {
+  if (!isAddress(addr) || addr.toLowerCase() === "0x0000000000000000000000000000000000000000") {
+    throw new Error("ESCROW_CONTRACT_ADDRESS must be a non-zero EVM address");
+  }
   _verifyingContract = addr;
 }
 
@@ -54,7 +91,10 @@ export function getVerifyingContract(): Address {
 
   // 1. Check environment variable
   const fromEnv = process.env.ESCROW_CONTRACT_ADDRESS;
-  if (fromEnv && fromEnv !== "0x0000000000000000000000000000000000000000") {
+  if (fromEnv) {
+    if (!isAddress(fromEnv) || fromEnv.toLowerCase() === "0x0000000000000000000000000000000000000000") {
+      throw new Error("ESCROW_CONTRACT_ADDRESS must be a non-zero EVM address");
+    }
     _verifyingContract = fromEnv as Address;
     return _verifyingContract;
   }
@@ -72,7 +112,7 @@ export function getVerifyingContract(): Address {
       const addr = deployment.contracts?.StreetSyncEscrow?.address ??
                    deployment.StreetSyncEscrow?.address ??
                    deployment.address;
-      if (addr && addr !== "0x0000000000000000000000000000000000000000") {
+      if (addr && isAddress(addr) && addr.toLowerCase() !== "0x0000000000000000000000000000000000000000") {
         _verifyingContract = addr as Address;
         return _verifyingContract;
       }
@@ -81,16 +121,10 @@ export function getVerifyingContract(): Address {
     }
   }
 
-  // Fallback for tests if unconfigured
-  return "0x0000000000000000000000000000000000000001" as Address;
+  throw new Error("StreetSyncEscrow address is not configured; set ESCROW_CONTRACT_ADDRESS or DEPLOYMENTS_PATH");
 }
 
 // ─── Viem Account ────────────────────────────────────────────────────────────
-
-const attesterAccount = privateKeyToAccount(ATTESTER_PRIVATE_KEY);
-
-/** The public address derived from ATTESTER_PRIVATE_KEY. */
-export const attesterAddress: Address = attesterAccount.address;
 
 // ─── EIP-712 Domain & Types ──────────────────────────────────────────────────
 
@@ -129,6 +163,7 @@ export const RoleEnum = {
   None: 0,
   Worker: 1,
   Reviewer: 2,
+  Neighbour: 3,
 } as const;
 
 export type RoleValue = (typeof RoleEnum)[keyof typeof RoleEnum];
@@ -159,6 +194,7 @@ export async function signAttestation(
   role: RoleValue,
   bountyId: bigint,
 ): Promise<AttestationResult> {
+  const attesterAccount = getAttesterAccount();
   // Generate a unique monotonic nonce for this wallet
   const nonce = dbAccess.nextNonce(wallet.toLowerCase());
 
@@ -199,13 +235,14 @@ export async function signAttestation(
     nonce: nonce.toString(),
     expiry,
     signature,
-    attester: attesterAddress,
+    attester: attesterAccount.address,
   };
 }
 
 export default {
   signAttestation,
-  attesterAddress,
+  getAttesterAddress,
+  isAttestationSignerReady,
   setVerifyingContract,
   getVerifyingContract,
   RoleEnum,

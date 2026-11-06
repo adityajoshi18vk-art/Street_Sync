@@ -1,5 +1,6 @@
 "use client";
 
+import { BACKEND_API_URL, isLocalNetwork } from "../config/contracts";
 import type { IArkivClient } from "@streetsync/arkiv-client";
 
 /**
@@ -14,10 +15,8 @@ import type { IArkivClient } from "@streetsync/arkiv-client";
  */
 
 const ARKIV_MODE = (process.env.NEXT_PUBLIC_ARKIV_MODE ?? "http").toLowerCase();
-const ARKIV_URL =
-  process.env.NEXT_PUBLIC_ARKIV_URL ??
-  process.env.NEXT_PUBLIC_ARKIV_RPC_URL ??
-  "https://arp.testnet.arkiv.golem.network";
+// Writes go through the backend relay, which holds the Arkiv access key and gas wallet.
+const ARKIV_URL = process.env.NEXT_PUBLIC_ARKIV_URL ?? `${BACKEND_API_URL}/api/arkiv`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -208,6 +207,10 @@ export class LocalArkivClient implements IArkivClient {
 }
 
 export function getArkivClient(): IArkivClient {
-  if (ARKIV_MODE === "local") return new LocalArkivClient();
-  return new HttpArkivClient(ARKIV_URL, process.env.NEXT_PUBLIC_ARKIV_API_KEY);
+  if (ARKIV_MODE === "local") {
+    if (!isLocalNetwork) throw new Error("Browser-local evidence is only available on the local test network. Configure shared Arkiv storage for Arc Testnet.");
+    return new LocalArkivClient();
+  }
+  if (ARKIV_MODE !== "http") throw new Error("Unsupported Arkiv storage mode.");
+  return new HttpArkivClient(ARKIV_URL);
 }

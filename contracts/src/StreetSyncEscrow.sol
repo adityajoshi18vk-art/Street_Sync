@@ -6,8 +6,11 @@ pragma solidity 0.8.24;
 //  Main entry point integrating AttestationVerifier, ReviewerPool, VotingModule.
 //
 //  Lifecycle:
-//    createBounty → pledge → claim → submitEvidence → (2 blocks) → assignPanel
-//    → commitVote × 3 → revealVote × 3 → settle
+//    createBounty (Proposed) → voteProblem × quorum (Open) → pledge → claim
+//    → submitEvidence → (2 blocks) → assignPanel → commitVote × 3
+//    → revealVote × 3 → settle
+//  Recovery: finalizeValidation, releaseClaim, rework, pokeOrReplace,
+//    withdrawPledge — no state can lock funds permanently.
 //
 //  Security rules enforced:
 //    Rule 1 – All USDC via SafeERC20, never msg.value.
@@ -32,7 +35,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     // ─── Constants ────────────────────────────────────────────────────────────
 
-    uint256 public constant REVIEWER_CUT_BPS  = 500;   // 5% in bps
+    uint256 public constant REVIEWER_CUT_BPS  = 1000;  // 10% in bps
     uint256 public constant BPS_DENOMINATOR   = 10_000;
     uint8   public constant MAX_REWORK        = 1;
     uint256 public constant STALE_BLOCK_LIMIT = 250;    // Rule 4: re-roll if > 250 blocks stale
@@ -53,27 +56,52 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
     /// @notice Configurable claim duration (how long after claim() the worker has to submit).
     uint256 public claimDuration;
 
+    /// @notice Seconds neighbours have to validate a new problem report.
+    uint256 public validationWindow;
+
+    /// @notice Matching neighbour votes needed to open (or dismiss) a bounty. 0 skips validation.
+    uint8 public validationQuorum;
+
+    /// @notice Grace period after the work deadline before an unreviewable submission can be released.
+    uint256 public constant REVIEW_TIMEOUT = 3 days;
+
+    /// @notice bountyId → neighbour → PROBLEM_VOTE_* value.
+    mapping(uint256 => mapping(address => uint8)) public problemVote;
+
+    /// @notice bountyId → worker who abandoned or failed the bounty and may not claim it again.
+    mapping(uint256 => mapping(address => bool)) public blockedWorker;
+
+    /// @notice Stakes slashed by pokeOrReplace, held for the bounty's eventual settlement.
+    mapping(uint256 => uint256) public slashedPool;
+
     // ─── Constructor ──────────────────────────────────────────────────────────
 
-    /// @param usdcToken    ERC-20 USDC address (6 decimals).
-    /// @param _attester    Backend EIP-712 signer address.
-    /// @param _commitWindow Commit phase window in seconds (default 300).
-    /// @param _revealWindow Reveal phase window in seconds (default 300).
-    /// @param _claimDuration Seconds after claim() before evidence deadline (default 3600).
+    /// @param usdcToken         ERC-20 USDC address (6 decimals).
+    /// @param _attester         Backend EIP-712 signer address.
+    /// @param _commitWindow     Commit phase window in seconds.
+    /// @param _revealWindow     Reveal phase window in seconds.
+    /// @param _claimDuration    Seconds a worker has to submit evidence (and to rework).
+    /// @param _validationWindow Seconds neighbours have to validate a report.
+    /// @param _validationQuorum Matching neighbour votes required (0 disables validation).
     constructor(
         address usdcToken,
         address _attester,
         uint256 _commitWindow,
         uint256 _revealWindow,
-        uint256 _claimDuration
+        uint256 _claimDuration,
+        uint256 _validationWindow,
+        uint8   _validationQuorum
     )
         AttestationVerifier(_attester)
         ReviewerPool(usdcToken)
         Ownable(msg.sender)
     {
-        commitWindow  = _commitWindow;
-        revealWindow  = _revealWindow;
-        claimDuration = _claimDuration;
+        if (_validationQuorum > 10) revert InvalidQuorum();
+        commitWindow     = _commitWindow;
+        revealWindow     = _revealWindow;
+        claimDuration    = _claimDuration;
+        validationWindow = _validationWindow;
+        validationQuorum = _validationQuorum;
     }
 
     // ─── Owner admin ──────────────────────────────────────────────────────────
@@ -97,18 +125,32 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         emit ClaimDurationSet(secs);
     }
 
+    function setValidationWindow(uint256 secs) external onlyOwner {
+        validationWindow = secs;
+        emit ValidationWindowSet(secs);
+    }
+
+    function setValidationQuorum(uint8 quorum) external onlyOwner {
+        if (quorum > 10) revert InvalidQuorum();
+        validationQuorum = quorum;
+        emit ValidationQuorumSet(quorum);
+    }
+
     // ─── 1. createBounty ──────────────────────────────────────────────────────
 
-    /// @notice Creates a bounty and deposits `initialAmount` USDC into escrow.
-    /// @param descHash      keccak256 of the off-chain description string.
-    /// @param latE5         Latitude × 1e5 (integer).
-    /// @param lngE5         Longitude × 1e5 (integer).
-    /// @param regionCell    H3 cell index for reviewer routing.
-    /// @param initialAmount Initial pledge in 6-decimal USDC (must be > 0).
-    /// @param _claimDeadline Unix timestamp by which a worker must have completed the fix.
-    /// @return bountyId     Assigned bounty ID.
+    /// @notice Reports a problem and deposits `initialAmount` USDC into escrow.
+    ///         The bounty starts as Proposed until neighbours validate it.
+    /// @param descHash       keccak256 of the UTF-8 description.
+    /// @param reportHash     SHA-256 of the problem-report bundle stored on Arkiv.
+    /// @param latE5          Latitude × 1e5 (integer).
+    /// @param lngE5          Longitude × 1e5 (integer).
+    /// @param regionCell     Region cell index for reviewer routing.
+    /// @param initialAmount  Initial pledge in 6-decimal USDC (must be > 0).
+    /// @param _claimDeadline Unix timestamp after which the bounty can no longer be claimed.
+    /// @return bountyId      Assigned bounty ID.
     function createBounty(
         bytes32 descHash,
+        bytes32 reportHash,
         int32   latE5,
         int32   lngE5,
         uint16  regionCell,
@@ -116,47 +158,99 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         uint64  _claimDeadline
     ) external returns (uint256 bountyId) {
         if (initialAmount == 0) revert ZeroAmount();
-        if (_claimDeadline <= block.timestamp) revert InvalidDeadline();
+        if (reportHash == bytes32(0) || descHash == bytes32(0)) revert InvalidReport();
+
+        bool needsValidation = validationQuorum > 0;
+        uint64 validationEnd = needsValidation
+            ? uint64(block.timestamp + validationWindow)
+            : uint64(block.timestamp);
+        if (_claimDeadline <= validationEnd) revert InvalidDeadline();
 
         bountyId = nextBountyId++;
+        Bounty storage b = bounties[bountyId];
+        b.id                 = bountyId;
+        b.creator            = msg.sender;
+        b.descriptionHash    = descHash;
+        b.reportHash         = reportHash;
+        b.latE5              = latE5;
+        b.lngE5              = lngE5;
+        b.regionCell         = regionCell;
+        b.totalPledged       = initialAmount;
+        b.createdAt          = uint64(block.timestamp);
+        b.validationDeadline = validationEnd;
+        b.claimDeadline      = _claimDeadline;
+        b.status             = needsValidation ? Status.Proposed : Status.Open;
 
-        bounties[bountyId] = Bounty({
-            id:                 bountyId,
-            creator:            msg.sender,
-            descriptionHash:    descHash,
-            latE5:              latE5,
-            lngE5:              lngE5,
-            regionCell:         regionCell,
-            totalPledged:       initialAmount,
-            createdAt:          uint64(block.timestamp),
-            claimDeadline:      _claimDeadline,
-            worker:             address(0),
-            visualChallengeCode: 0,
-            arkivEntityKey:     bytes32(0),
-            evidenceHash:       bytes32(0),
-            selectionBlock:     0,
-            reviewRound:        0,
-            reworkCount:        0,
-            status:             Status.Open
-        });
-
-        // Record the creator as a pledger so they're excluded from panel selection (Rule 2)
+        // The creator counts as a pledger, so is excluded from claiming and review (Rule 2).
         _recordPledge(bountyId, msg.sender, initialAmount);
 
         USDC.safeTransferFrom(msg.sender, address(this), initialAmount);
 
         emit BountyCreated(
-            bountyId, msg.sender, descHash, latE5, lngE5, regionCell, initialAmount, _claimDeadline
+            bountyId, msg.sender, descHash, reportHash, latE5, lngE5, regionCell,
+            initialAmount, _claimDeadline, validationEnd, b.status
         );
+    }
+
+    // ─── 1b. Neighbour validation ─────────────────────────────────────────────
+
+    /// @notice A World-ID-verified neighbour confirms or disputes a reported problem.
+    ///         The first side to reach `validationQuorum` votes decides the outcome.
+    function voteProblem(
+        uint256        bountyId,
+        bool           isReal,
+        uint256        nonce,
+        uint64         expiry,
+        bytes calldata attestationSig
+    ) external {
+        Bounty storage b = bounties[bountyId];
+        if (b.status != Status.Proposed) revert WrongStatus(Status.Proposed, b.status);
+        if (block.timestamp > b.validationDeadline) revert ValidationClosed();
+        if (msg.sender == b.creator) revert CreatorCannotVote();
+        if (problemVote[bountyId][msg.sender] != PROBLEM_VOTE_NONE) revert AlreadyVoted();
+
+        _verifyAttestation(msg.sender, Role.Neighbour, bountyId, nonce, expiry, attestationSig);
+
+        if (isReal) {
+            problemVote[bountyId][msg.sender] = PROBLEM_VOTE_REAL;
+            b.confirmations++;
+        } else {
+            problemVote[bountyId][msg.sender] = PROBLEM_VOTE_FAKE;
+            b.disputes++;
+        }
+        emit ProblemVoteCast(bountyId, msg.sender, isReal, b.confirmations, b.disputes);
+
+        uint8 quorum = validationQuorum == 0 ? 1 : validationQuorum;
+        if (b.confirmations >= quorum) {
+            b.status = Status.Open;
+            emit ProblemValidated(bountyId);
+        } else if (b.disputes >= quorum) {
+            b.status = Status.Refunded;
+            emit ProblemDismissed(bountyId);
+        }
+    }
+
+    /// @notice Dismisses a report whose validation window ended without enough confirmations.
+    function finalizeValidation(uint256 bountyId) external {
+        Bounty storage b = bounties[bountyId];
+        if (b.status != Status.Proposed) revert WrongStatus(Status.Proposed, b.status);
+        if (block.timestamp <= b.validationDeadline) revert ValidationOpen();
+        b.status = Status.Refunded;
+        emit ProblemDismissed(bountyId);
     }
 
     // ─── 2. pledge ────────────────────────────────────────────────────────────
 
-    /// @notice Add USDC to an open bounty's escrow.
+    /// @notice Add USDC to a proposed or open bounty's escrow.
     function pledge(uint256 bountyId, uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
         Bounty storage b = bounties[bountyId];
-        if (b.status != Status.Open) revert WrongStatus(Status.Open, b.status);
+        if (b.status == Status.Proposed) {
+            if (block.timestamp > b.validationDeadline) revert ValidationClosed();
+        } else if (b.status != Status.Open) {
+            revert WrongStatus(Status.Open, b.status);
+        }
+        if (block.timestamp > b.claimDeadline) revert ClaimExpired();
 
         _recordPledge(bountyId, msg.sender, amount);
         b.totalPledged += amount;
@@ -169,7 +263,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     /// @notice World-ID-verified worker claims the bounty.
     ///         Emits a 4-digit visual challenge code (Rule 6).
-    ///         Anti-wash-trading: creator and any pledger cannot claim (Rule 2).
+    ///         The creator, pledgers and validating neighbours cannot claim (Rule 2).
     function claim(
         uint256        bountyId,
         uint256        nonce,
@@ -180,11 +274,11 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         if (b.status != Status.Open) revert WrongStatus(Status.Open, b.status);
         if (block.timestamp > b.claimDeadline) revert ClaimExpired();
 
-        // Rule 2: anti-wash-trading
         if (msg.sender == b.creator) revert CreatorCannotClaim();
         if (pledges[bountyId][msg.sender] > 0) revert PledgerCannotClaim();
+        if (problemVote[bountyId][msg.sender] != PROBLEM_VOTE_NONE) revert VoterCannotClaim();
+        if (blockedWorker[bountyId][msg.sender]) revert WorkerBlocked();
 
-        // Rule 5: verify Worker attestation for this bounty
         _verifyAttestation(msg.sender, Role.Worker, bountyId, nonce, expiry, attestationSig);
 
         // Rule 6: 4-digit visual challenge code (1000–9999)
@@ -193,13 +287,12 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
             % 9000 + 1000
         );
 
-        b.worker             = msg.sender;
+        b.worker              = msg.sender;
         b.visualChallengeCode = code;
-        b.status             = Status.Claimed;
-        // Reset claim deadline to now + claimDuration so worker has time to do the work
-        b.claimDeadline      = uint64(block.timestamp + claimDuration);
+        b.status              = Status.Claimed;
+        b.workDeadline        = uint64(block.timestamp + claimDuration);
 
-        emit BountyClaimed(bountyId, msg.sender, code);
+        emit BountyClaimed(bountyId, msg.sender, code, b.workDeadline);
     }
 
     // ─── 4. submitEvidence ────────────────────────────────────────────────────
@@ -214,6 +307,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         Bounty storage b = bounties[bountyId];
         if (b.status != Status.Claimed) revert WrongStatus(Status.Claimed, b.status);
         if (msg.sender != b.worker) revert NotWorker();
+        if (arkivEntityKey == bytes32(0) || evidenceHash_ == bytes32(0)) revert InvalidEvidence();
 
         b.arkivEntityKey  = arkivEntityKey;
         b.evidenceHash    = evidenceHash_;
@@ -225,7 +319,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     // ─── 5. registerReviewer ──────────────────────────────────────────────────
 
-    /// @notice World-ID-verified reviewer registers and stakes 10.00 USDC.
+    /// @notice World-ID-verified reviewer registers and stakes 2.00 USDC.
     function registerReviewer(
         uint16         regionCell,
         uint256        nonce,
@@ -250,9 +344,8 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         // Rule 4: staleness recovery – if too many blocks have passed, re-roll
         if (block.number > selBlock + STALE_BLOCK_LIMIT) {
             b.selectionBlock = block.number + 2;
-            selBlock = b.selectionBlock;
-            // Still return; caller must wait 2 more blocks
-            revert SelectionBlockNotReached();
+            // Persist the replacement future block; a revert would roll this back.
+            return;
         }
 
         if (block.number <= selBlock) revert SelectionBlockNotReached();
@@ -306,8 +399,8 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     /// @notice Tallies votes and distributes USDC.
     ///         Can be called after revealDeadline OR immediately once all 3 have revealed.
-    ///         Approved: 95% → worker, 5% + slashed minority stakes → majority reviewers.
-    ///         Rejected: escrow stays; rework() available once.
+    ///         Approved: 90% → worker, 10% + slashed minority stakes → majority reviewers.
+    ///         Rejected: escrow stays; rework() available once, then the bounty reopens.
     function settle(uint256 bountyId) external {
         Bounty storage b = bounties[bountyId];
         if (b.status != Status.InReview) revert WrongStatus(Status.InReview, b.status);
@@ -353,10 +446,14 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
             }
         }
 
+        // Stakes slashed by earlier pokeOrReplace rounds are paid out with this settlement.
+        slashedFromMinority += slashedPool[bountyId];
+        slashedPool[bountyId] = 0;
+
         if (approved) {
-            // 95% → worker
-            uint256 workerPayout = (pool * 9500) / BPS_DENOMINATOR;
-            // 5% → majority reviewers (split equally) + slashed minority stakes
+            // 90% → worker
+            uint256 workerPayout = (pool * (BPS_DENOMINATOR - REVIEWER_CUT_BPS)) / BPS_DENOMINATOR;
+            // 10% → majority reviewers (split equally) + slashed minority stakes
             uint256 reviewerPool_ = pool - workerPayout + slashedFromMinority;
             uint256 perReviewer   = majorityCount > 0 ? reviewerPool_ / majorityCount : 0;
 
@@ -368,18 +465,9 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
             // Credit majority reviewers (pull-based) + return their stakes
             for (uint256 i = 0; i < majorityCount; ) {
                 address rev = majority[i];
-                uint256 stakeToReturn = REVIEWER_STAKE; // return original stake
                 _creditReward(rev, perReviewer);
-                // Transfer stake back directly (reviewer may have been slashed already, guard)
-                if (reviewers[rev].stakedAmount > 0) {
-                    uint256 stake = reviewers[rev].stakedAmount;
-                    reviewers[rev].stakedAmount = 0;
-                    USDC.safeTransfer(rev, stake);
-                } else {
-                    // Stake was already zeroed; still return the nominal REVIEWER_STAKE from pool
-                    // This handles the case where majority reviewer's stake counter was used
-                    stakeToReturn = 0;
-                }
+                uint256 stake = _releaseStake(rev);
+                if (stake > 0) USDC.safeTransfer(rev, stake);
                 unchecked { ++i; }
             }
 
@@ -389,22 +477,19 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
             uint256 perReviewer = majorityCount > 0 ? slashedFromMinority / majorityCount : 0;
 
             if (b.reworkCount >= MAX_REWORK) {
-                // No rework left → Refunded so pledgers can withdraw
-                b.status = Status.Refunded;
+                // No rework left: the bounty reopens for another worker.
+                _reopen(bountyId, b, true);
             } else {
-                b.status = Status.Rejected;
+                b.status       = Status.Rejected;
+                b.workDeadline = uint64(block.timestamp + claimDuration); // rework window
             }
 
             // Credit majority reviewers with slashed portion
             for (uint256 i = 0; i < majorityCount; ) {
                 address rev = majority[i];
                 _creditReward(rev, perReviewer);
-                // Return majority stake
-                if (reviewers[rev].stakedAmount > 0) {
-                    uint256 stake = reviewers[rev].stakedAmount;
-                    reviewers[rev].stakedAmount = 0;
-                    USDC.safeTransfer(rev, stake);
-                }
+                uint256 stake = _releaseStake(rev);
+                if (stake > 0) USDC.safeTransfer(rev, stake);
                 unchecked { ++i; }
             }
 
@@ -414,20 +499,23 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     // ─── 10. rework ──────────────────────────────────────────────────────────
 
-    /// @notice Worker requests a rework after rejection (max 1 rework).
-    ///         Reopens the bounty to Claimed status so they can re-submit evidence.
+    /// @notice Worker re-attempts after a rejection (max 1), within the rework window.
     function rework(uint256 bountyId) external {
         Bounty storage b = bounties[bountyId];
         if (b.status != Status.Rejected) revert WrongStatus(Status.Rejected, b.status);
         if (msg.sender != b.worker) revert NotWorker();
         if (b.reworkCount >= MAX_REWORK) revert ReworkLimitReached();
+        if (block.timestamp > b.workDeadline) revert ReworkWindowClosed();
 
         b.reworkCount++;
-        b.status       = Status.Claimed; // Worker can now re-submitEvidence
+        b.status         = Status.Claimed; // Worker can now re-submitEvidence
         b.selectionBlock = 0;
-        b.reviewRound++;                 // New round prevents vote replay
+        b.reviewRound++;                   // New round prevents vote replay
+        b.arkivEntityKey = bytes32(0);
+        b.evidenceHash   = bytes32(0);
+        b.workDeadline   = uint64(block.timestamp + claimDuration);
 
-        emit BountyReworked(bountyId, b.reworkCount);
+        emit BountyReworked(bountyId, b.reworkCount, b.workDeadline);
     }
 
     // ─── 11. pokeOrReplace ───────────────────────────────────────────────────
@@ -450,7 +538,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
             totalSlashed += _slashReviewerForBounty(nonRevList[i], bountyId);
             unchecked { ++i; }
         }
-        // Slashed stakes stay in escrow to be distributed in settle()
+        slashedPool[bountyId] += totalSlashed; // distributed by settle()
 
         // Increment round and select new panel (Rule 3)
         b.reviewRound++;
@@ -460,25 +548,43 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         emit PokeOrReplace(bountyId, b.reviewRound, totalSlashed);
     }
 
-    // ─── 12. withdrawPledge ──────────────────────────────────────────────────
+    // ─── 12. releaseClaim ────────────────────────────────────────────────────
 
-    /// @notice Pull-based pledge refund when bounty expires without completion
-    ///         or is in Rejected/Refunded state past deadline.
+    /// @notice Reopens a bounty whose worker stalled. Anyone can call this:
+    ///         - Claimed past the work deadline (worker blocked from re-claiming),
+    ///         - Rejected past the rework window (worker blocked),
+    ///         - Submitted with no possible review panel after REVIEW_TIMEOUT.
+    function releaseClaim(uint256 bountyId) external {
+        Bounty storage b = bounties[bountyId];
+        if (b.status == Status.Claimed || b.status == Status.Rejected) {
+            if (block.timestamp <= b.workDeadline) revert NotReleasable();
+            _reopen(bountyId, b, true);
+        } else if (b.status == Status.Submitted) {
+            if (block.timestamp <= uint256(b.workDeadline) + REVIEW_TIMEOUT) revert NotReleasable();
+            (, uint256 eligible) = _eligibleReviewers(b.regionCell, b.creator, b.worker, _pledgers[bountyId]);
+            if (eligible >= PANEL_SIZE) revert NotReleasable(); // assignPanel can still proceed
+            _reopen(bountyId, b, false);
+        } else {
+            revert NotReleasable();
+        }
+    }
+
+    // ─── 13. withdrawPledge ──────────────────────────────────────────────────
+
+    /// @notice Pull-based pledge refund for dismissed, refunded or expired bounties.
     function withdrawPledge(uint256 bountyId) external {
         Bounty storage b = bounties[bountyId];
 
-        bool canWithdraw = (b.status == Status.Open || b.status == Status.Refunded) ||
-                           (b.status == Status.Rejected && b.reworkCount >= MAX_REWORK);
-
-        if (!canWithdraw) {
-            // Also allow if claim deadline passed and bounty is still Open
-            if (!(b.status == Status.Open && block.timestamp > b.claimDeadline)) {
-                revert ClaimDeadlineNotPassed();
-            }
+        if (b.status == Status.Proposed && block.timestamp > b.validationDeadline) {
+            b.status = Status.Refunded;
+            emit ProblemDismissed(bountyId);
+        } else if (b.status == Status.Open && block.timestamp > b.claimDeadline) {
+            b.status = Status.Refunded;
         }
 
-        if (b.status == Status.Open && block.timestamp <= b.claimDeadline) {
-            revert ClaimDeadlineNotPassed();
+        if (b.status != Status.Refunded) {
+            if (b.status == Status.Open) revert ClaimDeadlineNotPassed();
+            revert PledgeLocked();
         }
 
         uint256 amount = pledges[bountyId][msg.sender];
@@ -491,7 +597,7 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         emit PledgeWithdrawn(bountyId, msg.sender, amount);
     }
 
-    // ─── 13. withdrawReward ──────────────────────────────────────────────────
+    // ─── 14. withdrawReward ──────────────────────────────────────────────────
 
     /// @notice Reviewer pulls their accrued rewards.
     function withdrawReward() external {
@@ -508,6 +614,31 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
         pledges[bountyId][pledger] += amount;
     }
 
+    /// @dev Clears the worker and evidence so another worker can claim the bounty.
+    function _reopen(uint256 bountyId, Bounty storage b, bool blockWorker) private {
+        address previous = b.worker;
+        if (blockWorker && previous != address(0)) blockedWorker[bountyId][previous] = true;
+
+        b.worker              = address(0);
+        b.visualChallengeCode = 0;
+        b.arkivEntityKey      = bytes32(0);
+        b.evidenceHash        = bytes32(0);
+        b.selectionBlock      = 0;
+        b.workDeadline        = 0;
+        b.reworkCount         = 0;
+        b.reviewRound++;      // invalidates any panel or votes from the previous attempt
+        b.status              = Status.Open;
+
+        emit ClaimReleased(bountyId, previous, blockWorker);
+    }
+
+    /// @dev Returns a reviewer's stake after settlement; they must re-register to review again.
+    function _releaseStake(address rev) private returns (uint256 stake) {
+        stake = reviewers[rev].stakedAmount;
+        reviewers[rev].stakedAmount = 0;
+        reviewers[rev].active = false;
+    }
+
     // ─── View helpers ─────────────────────────────────────────────────────────
 
     function getBounty(uint256 bountyId) external view returns (Bounty memory) {
@@ -520,5 +651,11 @@ contract StreetSyncEscrow is AttestationVerifier, ReviewerPool, VotingModule, Ow
 
     function getTally(uint256 bountyId) external view returns (uint8 revealed, uint8 approvals) {
         return _tally(bountyId, bounties[bountyId].reviewRound);
+    }
+
+    /// @notice Number of reviewers that could currently be drawn for this bounty's panel.
+    function eligibleReviewerCount(uint256 bountyId) external view returns (uint256 count) {
+        Bounty storage b = bounties[bountyId];
+        (, count) = _eligibleReviewers(b.regionCell, b.creator, b.worker, _pledgers[bountyId]);
     }
 }

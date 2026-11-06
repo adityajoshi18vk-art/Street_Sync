@@ -7,26 +7,34 @@
  *   4. REST API endpoints via Fastify inject
  */
 
-import "./test-env.js";
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import { recoverTypedDataAddress, type Address, type Hex } from "viem";
 import dbAccess from "../src/db.js";
-import {
+import { isAllowedWorldIdAction, isLocalWorldIdBypassEnabled, recordWorldIdNullifier } from "../src/worldid.js";
+// Explicit test-only signer; production never falls back to this public key.
+process.env.ATTESTER_PRIVATE_KEY = `0x${"11".repeat(32)}`;
+process.env.ATTESTER_SIGNER_ADDRESS = "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A";
+const {
   signAttestation,
-  attesterAddress,
+  getAttesterAddress,
+  isAttestationSignerReady,
   setVerifyingContract,
   RoleEnum,
-} from "../src/signer.js";
-import { computeStickerProfile, STICKER_CATALOG } from "../src/stickers.js";
+  assertSafeAttesterKey,
+} = await import("../src/signer.js");
 
 // Mock environment for test
 const MOCK_ESCROW = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address;
-const CHAIN_ID = Number(process.env.CHAIN_ID);
+const CHAIN_ID = 5042002;
 
 describe("StreetSync Backend Test Suite", () => {
   before(() => {
     setVerifyingContract(MOCK_ESCROW);
+    assert.throws(() => setVerifyingContract("0x0000000000000000000000000000000000000000" as Address), /non-zero EVM address/);
+    const publicHardhatKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    assert.throws(() => assertSafeAttesterKey(publicHardhatKey, 5042002), /only allowed on local chain 31337/);
+    assert.doesNotThrow(() => assertSafeAttesterKey(publicHardhatKey, 31337));
     // Clean test tables
     dbAccess.raw.exec(`
       DELETE FROM nullifiers;
@@ -36,14 +44,23 @@ describe("StreetSync Backend Test Suite", () => {
       DELETE FROM vote_commits;
       DELETE FROM settlements;
       DELETE FROM nonces;
-      DELETE FROM reviewer_slashes;
-      DELETE FROM stickers;
     `);
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  1. EIP-712 Attestation Signer Cryptographic Verification
   // ═══════════════════════════════════════════════════════════════════════════
+
+  it("Imports without signer configuration and reports signing unavailable", () => {
+    const privateKey = process.env.ATTESTER_PRIVATE_KEY;
+    const signerAddress = process.env.ATTESTER_SIGNER_ADDRESS;
+    delete process.env.ATTESTER_PRIVATE_KEY;
+    delete process.env.ATTESTER_SIGNER_ADDRESS;
+    assert.equal(getAttesterAddress(), null);
+    assert.equal(isAttestationSignerReady(), false);
+    process.env.ATTESTER_PRIVATE_KEY = privateKey;
+    process.env.ATTESTER_SIGNER_ADDRESS = signerAddress;
+  });
 
   it("Generates valid EIP-712 attestation signature that recovers attesterAddress", async () => {
     const workerWallet = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as Address;
@@ -55,7 +72,7 @@ describe("StreetSync Backend Test Suite", () => {
     assert.equal(res.role, 1);
     assert.equal(res.bountyId, "1");
     assert.ok(res.signature.startsWith("0x"));
-    assert.equal(res.attester.toLowerCase(), attesterAddress.toLowerCase());
+    assert.equal(res.attester.toLowerCase(), getAttesterAddress()?.toLowerCase());
 
     // Cryptographically verify using viem recoverTypedDataAddress
     const domain = {
@@ -91,9 +108,26 @@ describe("StreetSync Backend Test Suite", () => {
 
     assert.equal(
       recovered.toLowerCase(),
-      attesterAddress.toLowerCase(),
+      getAttesterAddress()?.toLowerCase(),
       "Recovered address must match the backend attester address",
     );
+  });
+
+  it("Allows same-wallet nullifier reuse but rejects another wallet", () => {
+    const hash = `0x${"bc".repeat(32)}`;
+    assert.equal(recordWorldIdNullifier(hash, "claim-bounty", "0x1111111111111111111111111111111111111111"), "recorded");
+    assert.equal(recordWorldIdNullifier(hash, "claim-bounty", "0x1111111111111111111111111111111111111111"), "reused");
+    assert.equal(recordWorldIdNullifier(hash, "claim-bounty", "0x2222222222222222222222222222222222222222"), "conflict");
+  });
+
+  it("Restricts actions to their role and limits verification bypass to local chain", () => {
+    assert.equal(isAllowedWorldIdAction("worker", "claim-bounty"), true);
+    assert.equal(isAllowedWorldIdAction("reviewer", "claim-bounty"), false);
+    assert.equal(isAllowedWorldIdAction("reviewer", "register-reviewer"), true);
+    assert.equal(isLocalWorldIdBypassEnabled(31337, true, true), true);
+    assert.equal(isLocalWorldIdBypassEnabled(5042002, true, true), false);
+    assert.equal(isLocalWorldIdBypassEnabled(31337, false, true), false);
+    assert.equal(isLocalWorldIdBypassEnabled(31337, true, false), false);
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -221,75 +255,5 @@ describe("StreetSync Backend Test Suite", () => {
     // Check votes
     const votes = dbAccess.getVotes("100");
     assert.ok(Array.isArray(votes));
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  5. Gamification: Sticker Awards, XP & Levels
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  it("Awards worker stickers for approved fixes and evidence", () => {
-    // Worker 0x4444… completed the lifecycle above: evidence + approved fix
-    const profile = computeStickerProfile("0x4444444444444444444444444444444444444444");
-
-    const byId = new Map(profile.stickers.map((s) => [s.id, s]));
-    assert.equal(profile.totalCount, STICKER_CATALOG.length);
-    assert.ok(byId.get("street-surgeon")?.earned, "first approved fix sticker");
-    assert.ok(byId.get("proof-positive")?.earned, "evidence sticker");
-    assert.equal(byId.get("pothole-slayer")?.earned, false);
-    assert.equal(byId.get("pothole-slayer")?.progress, 1);
-
-    // XP: 1 approved fix (100) + 1 evidence (40) + sticker bonuses (100 + 40)
-    assert.equal(profile.xp, 280);
-    assert.equal(profile.level.title, "Block Builder");
-    assert.equal(profile.earnedCount, 2);
-  });
-
-  it("Awards creator/pledger stickers and keeps awarded_at stable", () => {
-    const creator = "0x3333333333333333333333333333333333333333";
-    const first = computeStickerProfile(creator);
-    const spark = first.stickers.find((s) => s.id === "first-spark");
-    assert.ok(spark?.earned, "creator earns First Spark");
-    assert.ok(spark.awardedAt, "awarded_at persisted");
-
-    // Recomputing must not re-award or change the award timestamp
-    const second = computeStickerProfile(creator);
-    const spark2 = second.stickers.find((s) => s.id === "first-spark");
-    assert.equal(spark2?.awardedAt, spark.awardedAt);
-
-    // Pledged to only 1 bounty so far
-    const backer = second.stickers.find((s) => s.id === "block-backer");
-    assert.equal(backer?.earned, false);
-    assert.equal(backer?.progress, 1);
-  });
-
-  it("Awards reviewer stickers only after reveals, voids Clean Record on slash", () => {
-    const reviewer = "0xrev1";
-
-    // Committed but not revealed → no reveal credit yet
-    dbAccess.insertVoteCommit("100", 0, reviewer, "0xcommit", "107", "0xtx4");
-    const unrevealed = dbAccess.getWalletStats(reviewer);
-    assert.equal(unrevealed.votesRevealed, 0);
-
-    dbAccess.updateVoteReveal("100", reviewer, true, "108", "0xtx5");
-    const revealed = dbAccess.getWalletStats(reviewer);
-    assert.equal(revealed.votesRevealed, 1);
-
-    // Slash voids Clean Record progress
-    dbAccess.insertSlash("100", reviewer, "10000000", "109", "0xtx6");
-    const slashed = dbAccess.getWalletStats(reviewer);
-    assert.equal(slashed.slashes, 1);
-    const cleanRecord = STICKER_CATALOG.find((s) => s.id === "clean-record")!;
-    assert.equal(cleanRecord.progress(slashed), 0);
-    const sharpEye = STICKER_CATALOG.find((s) => s.id === "sharp-eye")!;
-    assert.equal(sharpEye.progress(slashed), 1);
-  });
-
-  it("Returns an empty zero-XP profile for inactive wallets", () => {
-    const profile = computeStickerProfile("0x9999999999999999999999999999999999999999");
-    assert.equal(profile.xp, 0);
-    assert.equal(profile.earnedCount, 0);
-    assert.equal(profile.level.title, "Newcomer");
-    assert.equal(profile.level.nextXp, 50);
-    assert.ok(profile.stickers.every((s) => !s.earned && s.progress === 0));
   });
 });

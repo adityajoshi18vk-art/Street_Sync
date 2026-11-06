@@ -10,7 +10,7 @@ import {
 import { recoverWorkerAddress, unpackBundle } from "@streetsync/evidence";
 import { readContract } from "wagmi/actions";
 import { useConfig } from "wagmi";
-import { ESCROW_ABI, ESCROW_ADDRESS, ACTIVE_CHAIN, formatUsdcDisplay } from "@/config/contracts";
+import { ESCROW_ABI, ESCROW_ADDRESS, ACTIVE_CHAIN, assertContractsConfigured, formatUsdcDisplay } from "@/config/contracts";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
 import type { EvidenceMetadata } from "@streetsync/evidence";
 import type { OnChainBounty } from "@/lib/types";
@@ -55,8 +55,10 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       setLoadError(null);
       try {
         // 1. On-chain bounty (public RPC — wallet NOT required)
+        assertContractsConfigured();
         const raw = (await readContract(config, {
           address: ESCROW_ADDRESS!,
+          chainId: ACTIVE_CHAIN.id,
           abi: ESCROW_ABI,
           functionName: "getBounty",
           args: [BigInt(bountyId)]
@@ -147,7 +149,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
     () =>
       !!bounty &&
       !!metadata &&
-      Number(metadata.visualChallengeCode) === Number(bounty.visualChallengeCode),
+      Number(metadata.challengeCode) === Number(bounty.visualChallengeCode),
     [bounty, metadata]
   );
 
@@ -290,25 +292,25 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
             <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
               <Field
                 label="Challenge code"
-                value={String(metadata.visualChallengeCode)}
+                value={String(metadata.challengeCode)}
                 highlight={challengeMatch}
               />
               <Field
                 label="GPS accuracy"
                 value={
-                  metadata.gpsAccuracyM !== undefined
-                    ? `±${Math.round(metadata.gpsAccuracyM)} m`
+                  metadata.gps.accuracyMeters !== undefined
+                    ? `±${Math.round(metadata.gps.accuracyMeters)} m`
                     : "—"
                 }
               />
-              <Field label="Before capture" value={formatCaptureTime(metadata.beforeTimestamp)} />
-              <Field label="After capture" value={formatCaptureTime(metadata.afterTimestamp)} />
+              <Field label="Before capture" value={formatCaptureTime(metadata.beforeTimestampMs)} />
+              <Field label="After capture" value={formatCaptureTime(metadata.afterTimestampMs)} />
               <Field
                 label="Compass heading"
                 value={
-                  metadata.compassHeadingDeg !== null &&
-                  metadata.compassHeadingDeg !== undefined
-                    ? `${Math.round(metadata.compassHeadingDeg)}°`
+                  metadata.orientation.alpha !== null &&
+                  metadata.orientation.alpha !== undefined
+                    ? `${Math.round(metadata.orientation.alpha)}°`
                     : "—"
                 }
               />

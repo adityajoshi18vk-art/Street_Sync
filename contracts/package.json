@@ -9,7 +9,8 @@
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:arc": "hardhat run scripts/deploy.ts --network arcTestnet",
     "clean": "hardhat clean",
-    "coverage": "hardhat coverage"
+    "coverage": "hardhat coverage",
+    "abi:sync": "hardhat compile && node scripts/export-abi.mjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
@@ -22,4 +23,3 @@
     "dotenv": "^16.4.0"
   }
 }
-

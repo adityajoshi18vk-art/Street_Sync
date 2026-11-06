@@ -1,24 +1,26 @@
 {
   "network": "arcTestnet",
   "chainId": 5042002,
-  "deployedAt": "2026-11-06T20:50:25.636Z",
-  "deploymentBlock": 71087064,
-  "note": "Deployed by contracts/scripts/deploy.ts. Attester: 0xf5274266C5205Ea462D232B3D4016b3A9D887D3F.",
+  "deployedAt": "2026-11-06T03:44:27.616Z",
+  "deployBlock": 70967045,
+  "note": "Deployed by contracts/scripts/deploy.ts. Attester: 0xa445eD835991A70015CC12e000182E8Ff727e5CD.",
   "parameters": {
-    "reviewerStakeUsdc": "10.00",
-    "reviewerStakeRaw": "10000000",
-    "reviewerCutBps": 500,
+    "reviewerStakeUsdc": "2.00",
+    "reviewerStakeRaw": "2000000",
+    "reviewerCutBps": 1000,
     "panelSize": 3,
     "quorum": 2,
     "commitWindowSeconds": 300,
     "revealWindowSeconds": 300,
     "claimDurationSeconds": 3600,
+    "validationWindowSeconds": 86400,
+    "validationQuorum": 2,
     "usdcDecimals": 6
   },
   "contracts": {
     "StreetSyncEscrow": {
-      "address": "0xFEDA4e28E03681fb9fD02cdFD2847F352Ce1eDf9",
-      "transactionHash": "0xac3dad8849ba820e4087f8ac5a2827029c2a557115a2740e32959ad861f29fa6",
+      "address": "0x57Dd350aCb93B5A6499b3D18fc9c785446A8654F",
+      "transactionHash": "0xd9e7bd8960b8c4ea785b97769447ecffb910181625cc2a55e02a5f1694c67531",
       "abi": [
         {
           "inputs": [
@@ -46,6 +48,16 @@
               "internalType": "uint256",
               "name": "_claimDuration",
               "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "_validationWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "_validationQuorum",
+              "type": "uint8"
             }
           ],
           "stateMutability": "nonpayable",
@@ -64,6 +76,11 @@
         {
           "inputs": [],
           "name": "AlreadyRevealed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "AlreadyVoted",
           "type": "error"
         },
         {
@@ -93,6 +110,11 @@
         },
         {
           "inputs": [],
+          "name": "CreatorCannotVote",
+          "type": "error"
+        },
+        {
+          "inputs": [],
           "name": "InsufficientReviewers",
           "type": "error"
         },
@@ -108,12 +130,32 @@
         },
         {
           "inputs": [],
+          "name": "InvalidEvidence",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "InvalidQuorum",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "InvalidReport",
+          "type": "error"
+        },
+        {
+          "inputs": [],
           "name": "NonceAlreadyUsed",
           "type": "error"
         },
         {
           "inputs": [],
           "name": "NotPanelMember",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "NotReleasable",
           "type": "error"
         },
         {
@@ -150,6 +192,11 @@
         },
         {
           "inputs": [],
+          "name": "PledgeLocked",
+          "type": "error"
+        },
+        {
+          "inputs": [],
           "name": "PledgerCannotClaim",
           "type": "error"
         },
@@ -171,6 +218,11 @@
         {
           "inputs": [],
           "name": "ReworkLimitReached",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ReworkWindowClosed",
           "type": "error"
         },
         {
@@ -196,7 +248,27 @@
         },
         {
           "inputs": [],
+          "name": "ValidationClosed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ValidationOpen",
+          "type": "error"
+        },
+        {
+          "inputs": [],
           "name": "VoteHashMismatch",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "VoterCannotClaim",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "WorkerBlocked",
           "type": "error"
         },
         {
@@ -253,6 +325,12 @@
               "internalType": "uint16",
               "name": "visualChallengeCode",
               "type": "uint16"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint64",
+              "name": "workDeadline",
+              "type": "uint64"
             }
           ],
           "name": "BountyClaimed",
@@ -277,6 +355,12 @@
               "indexed": false,
               "internalType": "bytes32",
               "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "reportHash",
               "type": "bytes32"
             },
             {
@@ -308,6 +392,18 @@
               "internalType": "uint64",
               "name": "claimDeadline",
               "type": "uint64"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint64",
+              "name": "validationDeadline",
+              "type": "uint64"
+            },
+            {
+              "indexed": false,
+              "internalType": "enum Status",
+              "name": "status",
+              "type": "uint8"
             }
           ],
           "name": "BountyCreated",
@@ -327,6 +423,12 @@
               "internalType": "uint8",
               "name": "reworkCount",
               "type": "uint8"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint64",
+              "name": "workDeadline",
+              "type": "uint64"
             }
           ],
           "name": "BountyReworked",
@@ -374,6 +476,31 @@
             }
           ],
           "name": "ClaimDurationSet",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "workerBlocked",
+              "type": "bool"
+            }
+          ],
+          "name": "ClaimReleased",
           "type": "event"
         },
         {
@@ -555,6 +682,69 @@
           "anonymous": false,
           "inputs": [
             {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "ProblemDismissed",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "ProblemValidated",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "voter",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "isReal",
+              "type": "bool"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "confirmations",
+              "type": "uint8"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "disputes",
+              "type": "uint8"
+            }
+          ],
+          "name": "ProblemVoteCast",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
               "indexed": false,
               "internalType": "uint256",
               "name": "newWindow",
@@ -650,6 +840,32 @@
             }
           ],
           "name": "RewardWithdrawn",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "newQuorum",
+              "type": "uint8"
+            }
+          ],
+          "name": "ValidationQuorumSet",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newWindow",
+              "type": "uint256"
+            }
+          ],
+          "name": "ValidationWindowSet",
           "type": "event"
         },
         {
@@ -756,6 +972,19 @@
         },
         {
           "inputs": [],
+          "name": "REVIEW_TIMEOUT",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
           "name": "STALE_BLOCK_LIMIT",
           "outputs": [
             {
@@ -812,6 +1041,30 @@
               "internalType": "uint256",
               "name": "",
               "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "blockedWorker",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
             }
           ],
           "name": "bounties",
@@ -829,6 +1082,11 @@
             {
               "internalType": "bytes32",
               "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "reportHash",
               "type": "bytes32"
             },
             {
@@ -858,7 +1116,17 @@
             },
             {
               "internalType": "uint64",
+              "name": "validationDeadline",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
               "name": "claimDeadline",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "workDeadline",
               "type": "uint64"
             },
             {
@@ -894,6 +1162,16 @@
             {
               "internalType": "uint8",
               "name": "reworkCount",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "confirmations",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "disputes",
               "type": "uint8"
             },
             {
@@ -1004,6 +1282,11 @@
               "type": "bytes32"
             },
             {
+              "internalType": "bytes32",
+              "name": "reportHash",
+              "type": "bytes32"
+            },
+            {
               "internalType": "int32",
               "name": "latE5",
               "type": "int32"
@@ -1061,6 +1344,38 @@
               "type": "uint256"
             }
           ],
+          "name": "eligibleReviewerCount",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "count",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "finalizeValidation",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
           "name": "getBounty",
           "outputs": [
             {
@@ -1078,6 +1393,11 @@
                 {
                   "internalType": "bytes32",
                   "name": "descriptionHash",
+                  "type": "bytes32"
+                },
+                {
+                  "internalType": "bytes32",
+                  "name": "reportHash",
                   "type": "bytes32"
                 },
                 {
@@ -1107,7 +1427,17 @@
                 },
                 {
                   "internalType": "uint64",
+                  "name": "validationDeadline",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
                   "name": "claimDeadline",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "workDeadline",
                   "type": "uint64"
                 },
                 {
@@ -1143,6 +1473,16 @@
                 {
                   "internalType": "uint8",
                   "name": "reworkCount",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "uint8",
+                  "name": "confirmations",
+                  "type": "uint8"
+                },
+                {
+                  "internalType": "uint8",
+                  "name": "disputes",
                   "type": "uint8"
                 },
                 {
@@ -1399,6 +1739,30 @@
         {
           "inputs": [
             {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "problemVote",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "",
+              "type": "uint8"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
               "internalType": "uint16",
               "name": "regionCell",
               "type": "uint16"
@@ -1420,6 +1784,19 @@
             }
           ],
           "name": "registerReviewer",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "releaseClaim",
           "outputs": [],
           "stateMutability": "nonpayable",
           "type": "function"
@@ -1593,6 +1970,32 @@
         {
           "inputs": [
             {
+              "internalType": "uint8",
+              "name": "quorum",
+              "type": "uint8"
+            }
+          ],
+          "name": "setValidationQuorum",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "secs",
+              "type": "uint256"
+            }
+          ],
+          "name": "setValidationWindow",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
               "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
@@ -1601,6 +2004,25 @@
           "name": "settle",
           "outputs": [],
           "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "name": "slashedPool",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
           "type": "function"
         },
         {
@@ -1624,6 +2046,19 @@
           "name": "submitEvidence",
           "outputs": [],
           "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "totalReviewers",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
           "type": "function"
         },
         {
@@ -1664,6 +2099,65 @@
           "type": "function"
         },
         {
+          "inputs": [],
+          "name": "validationQuorum",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "",
+              "type": "uint8"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "validationWindow",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isReal",
+              "type": "bool"
+            },
+            {
+              "internalType": "uint256",
+              "name": "nonce",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "expiry",
+              "type": "uint64"
+            },
+            {
+              "internalType": "bytes",
+              "name": "attestationSig",
+              "type": "bytes"
+            }
+          ],
+          "name": "voteProblem",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
           "inputs": [
             {
               "internalType": "uint256",
@@ -1685,9 +2179,9 @@
         }
       ]
     },
-    "MockUSDC": {
-      "address": "0xAdC3bd879bB63329Ad1490af2845851C23215057",
-      "transactionHash": "0x7c37d9fe5eb7e31cc6adfff261179a99dd9ba15944071a8b7c26a68b29e22a4c",
+    "USDC": {
+      "address": "0x3600000000000000000000000000000000000000",
+      "transactionHash": null,
       "abi": [
         {
           "inputs": [],

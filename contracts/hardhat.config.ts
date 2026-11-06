@@ -1,9 +1,16 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+import { resolve } from "node:path";
+
+loadEnv({ path: resolve(__dirname, "../.env") });
+loadEnv();
 
 const ARC_RPC_URL = process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io";
-const DEPLOYER_PK = process.env.DEPLOYER_PRIVATE_KEY ?? "0x" + "00".repeat(32); // placeholder
+const DEPLOYER_PK =
+  process.env.DEPLOYER_PRIVATE_KEY && process.env.DEPLOYER_PRIVATE_KEY.length === 66
+    ? process.env.DEPLOYER_PRIVATE_KEY
+    : undefined;
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -33,7 +40,7 @@ const config: HardhatUserConfig = {
     arcTestnet: {
       url: ARC_RPC_URL,
       chainId: 5042002,
-      accounts: DEPLOYER_PK.startsWith("0x00000000") ? [] : [DEPLOYER_PK],
+      accounts: DEPLOYER_PK ? [DEPLOYER_PK] : [],
     },
   },
 };

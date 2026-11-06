@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
-    "dev:fresh": "npm run clean && next dev"
+    "dev:fresh": "npm run clean && next dev",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@aliimam/icons": "^1.1.3",
@@ -20,7 +21,7 @@
     "@streetsync/evidence": "^1.0.0",
     "@streetsync/swarm-client": "^1.0.0",
     "@tanstack/react-query": "^5.51.23",
-    "@worldcoin/idkit": "^2.2.0",
+    "@worldcoin/idkit": "^4.6.0",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.70.0",
@@ -44,6 +45,6 @@
     "typescript": "^5.5.4"
   },
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=22.13.0"
   }
 }

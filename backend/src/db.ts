@@ -5,19 +5,28 @@
  * Tables:
  *   nullifiers      – World ID one-human-per-action enforcement
  *   nonces          – Issued EIP-712 attestation nonces (single-use)
- *   bounties        – Indexed on-chain bounty state cache
+ *   meta            – Schema version and deployment scope (chain + escrow)
+ *   bounties        – Canonical on-chain bounty state cache
  *   pledges         – Per-bounty pledger amounts
  *   panel_assignments – Reviewer panel selections per bounty×round
  *   vote_commits    – Commit hashes and revealed votes
  *   reviewer_slashes – Slash records
+ *   problem_votes   – Neighbour validation votes
+ *   reports         – Verified problem-report bundles
  *   events_cursor   – Indexer block cursor for resumable polling
+ * See schema.ts for DDL and the v1→v2 migration.
  */
 
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
+import { ensureDeploymentScope as ensureScope, initSchema } from "./schema.js";
 
-const DB_PATH = process.env.DB_PATH ?? "data/streetsync.db";
+const DB_PATH =
+  process.env.DB_PATH ??
+  (process.env.NODE_ENV === "test" || process.argv.includes("--test") || process.execArgv.includes("--test")
+    ? "data/test.db"
+    : "data/streetsync.db");
 
 // Ensure parent directory exists
 const dbDir = path.dirname(DB_PATH);
@@ -27,155 +36,17 @@ if (!fs.existsSync(dbDir)) {
 
 const db = new DatabaseSync(DB_PATH);
 
-// Give concurrent/restarting processes time to release locks
-db.exec("PRAGMA busy_timeout = 5000;");
-
 // Enable WAL mode for better concurrent read performance
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
+// Test files and the server may open the same file concurrently.
+db.exec("PRAGMA busy_timeout = 5000;");
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Schema
 // ═══════════════════════════════════════════════════════════════════════════════
 
-db.exec(`
-  -- World ID nullifier tracking: one human per action
-  CREATE TABLE IF NOT EXISTS nullifiers (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    nullifier_hash   TEXT    NOT NULL,
-    action           TEXT    NOT NULL,
-    wallet           TEXT    NOT NULL,
-    created_at       INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(nullifier_hash, action)
-  );
-
-  -- Issued EIP-712 nonces (track which nonces we've issued so we don't reuse)
-  CREATE TABLE IF NOT EXISTS nonces (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    wallet           TEXT    NOT NULL,
-    nonce            TEXT    NOT NULL,
-    role             INTEGER NOT NULL,
-    bounty_id        TEXT    NOT NULL DEFAULT '0',
-    expiry           INTEGER NOT NULL,
-    issued_at        INTEGER NOT NULL DEFAULT (unixepoch()),
-    used             INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(wallet, nonce)
-  );
-
-  -- Bounty cache (indexed from on-chain events)
-  CREATE TABLE IF NOT EXISTS bounties (
-    bounty_id           TEXT    PRIMARY KEY,
-    creator             TEXT    NOT NULL,
-    description_hash    TEXT    NOT NULL,
-    lat_e5              INTEGER NOT NULL,
-    lng_e5              INTEGER NOT NULL,
-    region_cell         INTEGER NOT NULL,
-    total_pledged       TEXT    NOT NULL DEFAULT '0',
-    created_at          INTEGER NOT NULL,
-    claim_deadline      INTEGER NOT NULL,
-    worker              TEXT,
-    visual_challenge_code INTEGER,
-    arkiv_entity_key    TEXT,
-    evidence_hash       TEXT,
-    selection_block     TEXT,
-    review_round        INTEGER NOT NULL DEFAULT 0,
-    rework_count        INTEGER NOT NULL DEFAULT 0,
-    status              INTEGER NOT NULL DEFAULT 0,
-    updated_at          INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Pledge records
-  CREATE TABLE IF NOT EXISTS pledges (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id   TEXT    NOT NULL,
-    pledger     TEXT    NOT NULL,
-    amount      TEXT    NOT NULL,
-    new_total   TEXT    NOT NULL,
-    block_number TEXT,
-    tx_hash     TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, pledger, tx_hash)
-  );
-
-  -- Panel assignments per bounty×round
-  CREATE TABLE IF NOT EXISTS panel_assignments (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id     TEXT    NOT NULL,
-    review_round  INTEGER NOT NULL,
-    reviewer_0    TEXT    NOT NULL,
-    reviewer_1    TEXT    NOT NULL,
-    reviewer_2    TEXT    NOT NULL,
-    block_number  TEXT,
-    tx_hash       TEXT,
-    created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, review_round)
-  );
-
-  -- Vote commits and reveals
-  CREATE TABLE IF NOT EXISTS vote_commits (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id     TEXT    NOT NULL,
-    review_round  INTEGER NOT NULL DEFAULT 0,
-    reviewer      TEXT    NOT NULL,
-    commit_hash   TEXT,
-    revealed      INTEGER NOT NULL DEFAULT 0,
-    approve       INTEGER,
-    block_number  TEXT,
-    tx_hash       TEXT,
-    created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, review_round, reviewer)
-  );
-
-  -- Reviewer slashes
-  CREATE TABLE IF NOT EXISTS reviewer_slashes (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id   TEXT    NOT NULL,
-    reviewer    TEXT    NOT NULL,
-    amount      TEXT    NOT NULL,
-    block_number TEXT,
-    tx_hash     TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Settle records
-  CREATE TABLE IF NOT EXISTS settlements (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id       TEXT    NOT NULL UNIQUE,
-    approved        INTEGER NOT NULL,
-    worker_payout   TEXT    NOT NULL,
-    reviewer_cut    TEXT    NOT NULL,
-    block_number    TEXT,
-    tx_hash         TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Indexer cursor: tracks the last processed block for each chain
-  CREATE TABLE IF NOT EXISTS events_cursor (
-    chain_id    INTEGER PRIMARY KEY,
-    last_block  TEXT    NOT NULL DEFAULT '0',
-    updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Gamification stickers earned per wallet (awarded lazily from indexed activity)
-  CREATE TABLE IF NOT EXISTS stickers (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    wallet      TEXT    NOT NULL,
-    sticker_id  TEXT    NOT NULL,
-    awarded_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(wallet, sticker_id)
-  );
-
-  -- Indexes for common queries
-  CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status);
-  CREATE INDEX IF NOT EXISTS idx_bounties_region ON bounties(region_cell);
-  CREATE INDEX IF NOT EXISTS idx_bounties_creator ON bounties(creator);
-  CREATE INDEX IF NOT EXISTS idx_bounties_worker ON bounties(worker);
-  CREATE INDEX IF NOT EXISTS idx_pledges_bounty ON pledges(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_panel_bounty ON panel_assignments(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_votes_bounty ON vote_commits(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_nullifiers_hash ON nullifiers(nullifier_hash);
-  CREATE INDEX IF NOT EXISTS idx_stickers_wallet ON stickers(wallet);
-`);
+initSchema(db);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Prepared Statements
@@ -193,6 +64,10 @@ const findNullifier = db.prepare(`
 
 const findNullifierByWallet = db.prepare(`
   SELECT * FROM nullifiers WHERE nullifier_hash = ? AND action = ? AND wallet != ?
+`);
+
+const findVerifiedWallet = db.prepare(`
+  SELECT * FROM nullifiers WHERE action = ? AND wallet = ? LIMIT 1
 `);
 
 // ─── Nonces ──────────────────────────────────────────────────────────────────
@@ -252,26 +127,77 @@ const updateBountyRework = db.prepare(`
   WHERE bounty_id = ?
 `);
 
-const getBountyById = db.prepare(`
-  SELECT * FROM bounties WHERE bounty_id = ?
-`);
+const BOUNTY_SELECT = `
+  SELECT b.*, r.description AS description,
+         CASE WHEN r.bounty_id IS NULL THEN 0 ELSE 1 END AS has_report
+  FROM bounties b LEFT JOIN reports r ON r.bounty_id = b.bounty_id
+`;
 
-const listBounties = db.prepare(`
-  SELECT * FROM bounties ORDER BY created_at DESC LIMIT ? OFFSET ?
-`);
+const getBountyById = db.prepare(`${BOUNTY_SELECT} WHERE b.bounty_id = ?`);
 
-const listBountiesByStatus = db.prepare(`
-  SELECT * FROM bounties WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?
-`);
+const listBounties = db.prepare(`${BOUNTY_SELECT} ORDER BY b.created_at DESC LIMIT ? OFFSET ?`);
+
+const listBountiesByStatus = db.prepare(`${BOUNTY_SELECT} WHERE b.status = ? ORDER BY b.created_at DESC LIMIT ? OFFSET ?`);
 
 const listBountiesInBBox = db.prepare(`
-  SELECT * FROM bounties
-  WHERE lat_e5 >= ? AND lat_e5 <= ? AND lng_e5 >= ? AND lng_e5 <= ?
-  ORDER BY created_at DESC LIMIT ? OFFSET ?
+  ${BOUNTY_SELECT}
+  WHERE b.lat_e5 >= ? AND b.lat_e5 <= ? AND b.lng_e5 >= ? AND b.lng_e5 <= ?
+  ORDER BY b.created_at DESC LIMIT ? OFFSET ?
 `);
 
-const listBountiesByWorker = db.prepare(`
-  SELECT * FROM bounties WHERE worker = ? ORDER BY created_at DESC
+const listBountiesByWorker = db.prepare(`${BOUNTY_SELECT} WHERE b.worker = ? ORDER BY b.created_at DESC`);
+
+const upsertBountyRow = db.prepare(`
+  INSERT INTO bounties (
+    bounty_id, creator, description_hash, report_hash, lat_e5, lng_e5, region_cell,
+    total_pledged, created_at, validation_deadline, claim_deadline, work_deadline,
+    worker, visual_challenge_code, arkiv_entity_key, evidence_hash, selection_block,
+    review_round, rework_count, confirmations, disputes, status, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())
+  ON CONFLICT(bounty_id) DO UPDATE SET
+    creator = excluded.creator,
+    description_hash = excluded.description_hash,
+    report_hash = excluded.report_hash,
+    lat_e5 = excluded.lat_e5,
+    lng_e5 = excluded.lng_e5,
+    region_cell = excluded.region_cell,
+    total_pledged = excluded.total_pledged,
+    created_at = excluded.created_at,
+    validation_deadline = excluded.validation_deadline,
+    claim_deadline = excluded.claim_deadline,
+    work_deadline = excluded.work_deadline,
+    worker = excluded.worker,
+    visual_challenge_code = excluded.visual_challenge_code,
+    arkiv_entity_key = excluded.arkiv_entity_key,
+    evidence_hash = excluded.evidence_hash,
+    selection_block = excluded.selection_block,
+    review_round = excluded.review_round,
+    rework_count = excluded.rework_count,
+    confirmations = excluded.confirmations,
+    disputes = excluded.disputes,
+    status = excluded.status,
+    updated_at = unixepoch()
+`);
+
+// ─── Reports ─────────────────────────────────────────────────────────────────
+
+const upsertReport = db.prepare(`
+  INSERT OR REPLACE INTO reports (
+    bounty_id, entity_key, report_hash, creator, description, lat_e5, lng_e5, captured_at_ms, photo
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const getReportById = db.prepare(`SELECT * FROM reports WHERE bounty_id = ?`);
+
+// ─── Problem votes ───────────────────────────────────────────────────────────
+
+const insertProblemVote = db.prepare(`
+  INSERT OR IGNORE INTO problem_votes (bounty_id, voter, is_real, block_number, tx_hash)
+  VALUES (?, ?, ?, ?, ?)
+`);
+
+const getProblemVotesByBounty = db.prepare(`
+  SELECT * FROM problem_votes WHERE bounty_id = ? ORDER BY id ASC
 `);
 
 // ─── Pledges ─────────────────────────────────────────────────────────────────
@@ -279,6 +205,10 @@ const listBountiesByWorker = db.prepare(`
 const insertPledge = db.prepare(`
   INSERT OR IGNORE INTO pledges (bounty_id, pledger, amount, new_total, block_number, tx_hash)
   VALUES (?, ?, ?, ?, ?, ?)
+`);
+
+const markPledgeWithdrawn = db.prepare(`
+  UPDATE pledges SET withdrawn = 1 WHERE bounty_id = ? AND pledger = ?
 `);
 
 const getPledgesByBounty = db.prepare(`
@@ -314,6 +244,7 @@ const insertVoteCommit = db.prepare(`
 const updateVoteReveal = db.prepare(`
   UPDATE vote_commits SET revealed = 1, approve = ?, block_number = ?, tx_hash = ?
   WHERE bounty_id = ? AND reviewer = ?
+    AND review_round = COALESCE(?, (SELECT MAX(review_round) FROM vote_commits WHERE bounty_id = ?))
 `);
 
 const getVotesByBounty = db.prepare(`
@@ -323,7 +254,7 @@ const getVotesByBounty = db.prepare(`
 // ─── Slashes ─────────────────────────────────────────────────────────────────
 
 const insertSlash = db.prepare(`
-  INSERT INTO reviewer_slashes (bounty_id, reviewer, amount, block_number, tx_hash)
+  INSERT OR IGNORE INTO reviewer_slashes (bounty_id, reviewer, amount, block_number, tx_hash)
   VALUES (?, ?, ?, ?, ?)
 `);
 
@@ -336,41 +267,6 @@ const insertSettlement = db.prepare(`
 
 const getSettlementByBounty = db.prepare(`
   SELECT * FROM settlements WHERE bounty_id = ?
-`);
-
-// ─── Stickers & wallet activity stats ────────────────────────────────────────
-
-const insertSticker = db.prepare(`
-  INSERT OR IGNORE INTO stickers (wallet, sticker_id) VALUES (?, ?)
-`);
-
-const getStickersByWallet = db.prepare(`
-  SELECT sticker_id, awarded_at FROM stickers WHERE wallet = ? ORDER BY awarded_at ASC
-`);
-
-const countBountiesCreated = db.prepare(`
-  SELECT COUNT(*) AS c FROM bounties WHERE creator = ?
-`);
-
-const pledgeStatsByWallet = db.prepare(`
-  SELECT COUNT(DISTINCT bounty_id) AS bounties,
-         COALESCE(SUM(CAST(amount AS INTEGER)), 0) AS total
-  FROM pledges WHERE pledger = ?
-`);
-
-const workerStatsByWallet = db.prepare(`
-  SELECT COUNT(*) AS claimed,
-         SUM(CASE WHEN status = 4 THEN 1 ELSE 0 END) AS approved,
-         SUM(CASE WHEN evidence_hash IS NOT NULL THEN 1 ELSE 0 END) AS evidence
-  FROM bounties WHERE worker = ?
-`);
-
-const countRevealsByReviewer = db.prepare(`
-  SELECT COUNT(*) AS c FROM vote_commits WHERE reviewer = ? AND revealed = 1
-`);
-
-const countSlashesByReviewer = db.prepare(`
-  SELECT COUNT(*) AS c FROM reviewer_slashes WHERE reviewer = ?
 `);
 
 // ─── Events Cursor ───────────────────────────────────────────────────────────
@@ -391,12 +287,56 @@ const upsertCursor = db.prepare(`
 //  Exported Data-Access Object
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/** Canonical bounty row, mapped from getBounty (see chain.ts). */
+export interface BountyRow {
+  bounty_id: string;
+  creator: string;
+  description_hash: string;
+  report_hash: string | null;
+  lat_e5: number;
+  lng_e5: number;
+  region_cell: number;
+  total_pledged: string;
+  created_at: number;
+  validation_deadline: number;
+  claim_deadline: number;
+  work_deadline: number;
+  worker: string | null;
+  visual_challenge_code: number | null;
+  arkiv_entity_key: string | null;
+  evidence_hash: string | null;
+  selection_block: string | null;
+  review_round: number;
+  rework_count: number;
+  confirmations: number;
+  disputes: number;
+  status: number;
+}
+
+export interface StoredReport {
+  bounty_id: string;
+  entity_key: string;
+  report_hash: string;
+  creator: string;
+  description: string;
+  lat_e5: number;
+  lng_e5: number;
+  captured_at_ms: number;
+  photo: Uint8Array;
+}
+
 export const dbAccess = {
   raw: db,
 
   // ─── Nullifiers ───
   checkNullifier(nullifierHash: string, action: string) {
     return findNullifier.get(nullifierHash, action) as
+      | { nullifier_hash: string; action: string; wallet: string }
+      | undefined;
+  },
+  /** A wallet that already proved uniqueness for this action (World ID 4.0 nullifiers are per human + action). */
+  findVerifiedWallet(action: string, wallet: string) {
+    return findVerifiedWallet.get(action, wallet.toLowerCase()) as
       | { nullifier_hash: string; action: string; wallet: string }
       | undefined;
   },
@@ -450,6 +390,16 @@ export const dbAccess = {
   updateBountyRework(bountyId: string, reviewRound: number, reworkCount: number) {
     return updateBountyRework.run(reviewRound, reworkCount, bountyId);
   },
+  upsertBountyRow(row: BountyRow) {
+    return upsertBountyRow.run(
+      row.bounty_id, row.creator, row.description_hash, row.report_hash,
+      row.lat_e5, row.lng_e5, row.region_cell, row.total_pledged, row.created_at,
+      row.validation_deadline, row.claim_deadline, row.work_deadline,
+      row.worker, row.visual_challenge_code, row.arkiv_entity_key, row.evidence_hash,
+      row.selection_block, row.review_round, row.rework_count, row.confirmations,
+      row.disputes, row.status,
+    );
+  },
   getBounty(bountyId: string) {
     return getBountyById.get(bountyId) as Record<string, unknown> | undefined;
   },
@@ -475,6 +425,9 @@ export const dbAccess = {
     blockNumber: string, txHash: string,
   ) {
     return insertPledge.run(bountyId, pledger, amount, newTotal, blockNumber, txHash);
+  },
+  markPledgeWithdrawn(bountyId: string, pledger: string) {
+    return markPledgeWithdrawn.run(bountyId, pledger);
   },
   getPledges(bountyId: string) {
     return getPledgesByBounty.all(bountyId) as Record<string, unknown>[];
@@ -504,9 +457,9 @@ export const dbAccess = {
   },
   updateVoteReveal(
     bountyId: string, reviewer: string, approve: boolean,
-    blockNumber: string, txHash: string,
+    blockNumber: string, txHash: string, round: number | null = null,
   ) {
-    return updateVoteReveal.run(approve ? 1 : 0, blockNumber, txHash, bountyId, reviewer);
+    return updateVoteReveal.run(approve ? 1 : 0, blockNumber, txHash, bountyId, reviewer, round, bountyId);
   },
   getVotes(bountyId: string) {
     return getVotesByBounty.all(bountyId) as Record<string, unknown>[];
@@ -520,6 +473,33 @@ export const dbAccess = {
     return insertSlash.run(bountyId, reviewer, amount, blockNumber, txHash);
   },
 
+  // ─── Problem votes ───
+  insertProblemVote(
+    bountyId: string, voter: string, isReal: boolean, blockNumber: string, txHash: string,
+  ) {
+    return insertProblemVote.run(bountyId, voter, isReal ? 1 : 0, blockNumber, txHash);
+  },
+  getProblemVotes(bountyId: string) {
+    return getProblemVotesByBounty.all(bountyId) as Record<string, unknown>[];
+  },
+
+  // ─── Reports ───
+  upsertReport(r: StoredReport) {
+    return upsertReport.run(
+      r.bounty_id, r.entity_key, r.report_hash, r.creator, r.description,
+      r.lat_e5, r.lng_e5, r.captured_at_ms, r.photo,
+    );
+  },
+  getReport(bountyId: string): StoredReport | undefined {
+    return getReportById.get(bountyId) as StoredReport | undefined;
+  },
+
+  // ─── Deployment scope ───
+  /** Rebuilds derived tables when the chain/escrow (or schema) changed; keeps nullifiers and nonces. */
+  ensureDeploymentScope(chainId: number, escrowAddress: string): boolean {
+    return ensureScope(db, chainId, escrowAddress);
+  },
+
   // ─── Settlements ───
   insertSettlement(
     bountyId: string, approved: boolean, workerPayout: string, reviewerCut: string,
@@ -531,33 +511,6 @@ export const dbAccess = {
     return getSettlementByBounty.get(bountyId) as Record<string, unknown> | undefined;
   },
 
-  // ─── Stickers & wallet activity stats ───
-  awardSticker(wallet: string, stickerId: string) {
-    return insertSticker.run(wallet, stickerId);
-  },
-  getEarnedStickers(wallet: string) {
-    return getStickersByWallet.all(wallet) as { sticker_id: string; awarded_at: number }[];
-  },
-  getWalletStats(wallet: string) {
-    const created = countBountiesCreated.get(wallet) as { c: number };
-    const pledges = pledgeStatsByWallet.get(wallet) as { bounties: number; total: number };
-    const work = workerStatsByWallet.get(wallet) as {
-      claimed: number; approved: number | null; evidence: number | null;
-    };
-    const reveals = countRevealsByReviewer.get(wallet) as { c: number };
-    const slashes = countSlashesByReviewer.get(wallet) as { c: number };
-    return {
-      bountiesCreated: created.c,
-      pledgedBounties: pledges.bounties,
-      pledgedTotal: String(pledges.total),
-      bountiesClaimed: work.claimed,
-      approvedFixes: work.approved ?? 0,
-      evidenceSubmitted: work.evidence ?? 0,
-      votesRevealed: reveals.c,
-      slashes: slashes.c,
-    };
-  },
-
   // ─── Events Cursor ───
   getCursor(chainId: number): bigint {
     const row = getCursor.get(chainId) as { last_block: string } | undefined;
@@ -567,6 +520,8 @@ export const dbAccess = {
     return upsertCursor.run(chainId, blockNumber.toString());
   },
 };
+
+export const ensureDeploymentScope = dbAccess.ensureDeploymentScope;
 
 export type DbAccess = typeof dbAccess;
 export default dbAccess;

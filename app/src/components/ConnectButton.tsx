@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, useConnect, useSwitchChain, useChainId } from "wagmi";
+import { useAccount, useConnect, useSwitchChain, useDisconnect, useChainId } from "wagmi";
 import { ChevronDown, TriangleAlert, Wallet } from "lucide-react";
 import { ACTIVE_CHAIN, contractsDeployed } from "@/config/contracts";
 import { shortAddress } from "@/lib/types";
 
 export function ConnectButton() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
-  const { switchChain, isPending: switching } = useSwitchChain();
+  const { connect, connectors, isPending, error: connectError } = useConnect();
+  const { switchChain, isPending: switching, error: switchError } = useSwitchChain();
+  const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const [open, setOpen] = useState(false);
 
@@ -17,10 +18,11 @@ export function ConnectButton() {
 
   if (!isConnected) {
     return (
+      <div>
       <button
         onClick={() => {
           const injected = connectors.find((c) => c.id === "injected") ?? connectors[0];
-          if (injected) connect({ connector: injected });
+          if (injected) connect({ connector: injected, chainId: ACTIVE_CHAIN.id });
         }}
         disabled={isPending}
         className="btn-primary btn-sm"
@@ -37,11 +39,14 @@ export function ConnectButton() {
           </>
         )}
       </button>
+      {connectError && <p role="alert" className="mt-1 max-w-xs text-xs text-red-700">{connectError.message}</p>}
+      </div>
     );
   }
 
   return (
     <div className="flex items-center gap-2">
+      {switchError && <p role="alert" className="max-w-xs text-xs text-red-700">{switchError.message}</p>}
       {wrongChain && (
         <button
           onClick={() => switchChain({ chainId: ACTIVE_CHAIN.id })}
@@ -70,7 +75,16 @@ export function ConnectButton() {
             <p className="label-micro">Network</p>
             <p className="mb-3 mt-0.5 font-semibold text-zinc-100">{ACTIVE_CHAIN.name}</p>
             <p className="label-micro">Wallet</p>
-            <p className="mt-0.5 break-all font-mono text-[11px] text-zinc-300">{address}</p>
+            <p className="mb-3 mt-0.5 break-all font-mono text-[11px] text-zinc-300">{address}</p>
+            <button
+              onClick={() => {
+                disconnect();
+                setOpen(false);
+              }}
+              className="btn-ghost btn-sm w-full text-xs text-red-400 hover:text-red-300"
+            >
+              Disconnect
+            </button>
             {!contractsDeployed && (
               <p className="alert-warn mt-3 p-2.5 text-[11px]">
                 Escrow contracts not configured on this network.

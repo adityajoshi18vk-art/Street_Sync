@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import L from "leaflet";
 import {
@@ -13,7 +13,7 @@ import {
   useMapEvents
 } from "react-leaflet";
 import { Crosshair, LoaderCircle, LocateFixed, Maximize2, Search, X } from "lucide-react";
-import { STATUS_COLORS, statusName, formatUsdcDisplaySafe } from "@/lib/map-utils";
+import { STATUS_COLORS, STATUS_LABELS, bountyDisplayStatus, formatUsdcDisplaySafe } from "@/lib/map-utils";
 import { searchPlaces, type Place } from "@/lib/geocode";
 import type { BountyMapItem } from "@/lib/types";
 import { Basemap } from "@/components/map/Basemap";
@@ -78,7 +78,50 @@ function ControlButton({
   );
 }
 
-export default function MapView({
+/**
+ * react-leaflet can try to initialise a map twice on the same element when part of the tree
+ * suspends during the first mount ("Map container is already initialized"). Remount on a fresh
+ * element instead of letting the whole page fall into the error boundary.
+ */
+class MapRecoveryBoundary extends Component<{ children: (key: number) => ReactNode }, { key: number; failed: boolean }> {
+  state = { key: 0, failed: false };
+
+  static getDerivedStateFromError() {
+    return null;
+  }
+
+  componentDidCatch(error: Error) {
+    if (this.state.key < 3 && /already initialized/i.test(error.message)) {
+      this.setState((s) => ({ key: s.key + 1 }));
+    } else {
+      this.setState({ failed: true });
+    }
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-xl bg-ink-900 text-sm text-zinc-400">
+          The map failed to load.{" "}
+          <button type="button" onClick={() => window.location.reload()} className="ml-1 font-semibold text-brand-300 underline">
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children(this.state.key);
+  }
+}
+
+export default function MapView(props: MapViewProps) {
+  return (
+    <div className={`relative ${props.className ?? "h-[420px] w-full"}`}>
+      <MapRecoveryBoundary>{(key) => <MapViewInner key={key} {...props} />}</MapRecoveryBoundary>
+    </div>
+  );
+}
+
+function MapViewInner({
   bounties,
   selectedId,
   onSelect,
@@ -236,7 +279,8 @@ export default function MapView({
         <TapHandler onTap={(lat, lng) => onMapClick(lat, lng)} />
 
         {bounties.map((b) => {
-          const color = STATUS_COLORS[statusName(b.status)];
+          const display = bountyDisplayStatus(b, Math.floor(Date.now() / 1000));
+          const color = display.color;
           const selected = b.bountyId === selectedId;
           return (
             <CircleMarker
@@ -255,7 +299,7 @@ export default function MapView({
                 <div className="min-w-[190px] space-y-1">
                   <p className="text-sm font-semibold text-white">Bounty #{b.bountyId}</p>
                   <p className="text-xs font-semibold" style={{ color }}>
-                    {statusName(b.status)}
+                    {display.label}
                   </p>
                   <p className="text-xs text-zinc-400">
                     Escrow: <strong className="text-zinc-200">{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
@@ -398,10 +442,10 @@ export default function MapView({
       )}
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[500] hidden flex-wrap gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-ink-900/85 px-3 py-2 text-[11px] font-medium backdrop-blur-md sm:flex">
-        {(["Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map((name) => (
+        {(["Proposed", "Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map((name) => (
           <span key={name} className="flex items-center gap-1 text-zinc-300">
             <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[name] }} />
-            {name}
+            {STATUS_LABELS[name] ?? name}
           </span>
         ))}
       </div>

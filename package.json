@@ -27,11 +27,16 @@
     "test:janlekha": "npm --prefix janlekha run contracts:test && npm --prefix janlekha run test:documents",
     "deploy:janlekha:hedera": "npm --prefix janlekha run contracts:release:hedera",
     "smoke:arc": "tsx scripts/arc-smoke.ts",
-    "clean:app": "npm run clean --workspace=streetsync-app"
+    "clean:app": "npm run clean --workspace=streetsync-app",
+    "abi:sync": "npm run abi:sync --workspace=streetsync-contracts",
+    "start": "node scripts/start-production.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

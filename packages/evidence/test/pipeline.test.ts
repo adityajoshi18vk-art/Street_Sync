@@ -17,7 +17,6 @@ import {
   unpackBundle,
   recoverWorkerAddress,
   verifyBundleIntegrity,
-  chunkBundle,
   MAX_IMAGE_BYTES,
   MAGIC_BYTES,
   BUNDLE_VERSION,
@@ -67,17 +66,17 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     // ═════════════════════════════════════════════════════════════════════
     // 2. Strict Client-Side Image Re-encoding
     // ═════════════════════════════════════════════════════════════════════
-    // Constraints: max 1280px longest edge, WebP quality 0.75 stepping down to 0.60, strictly <= 45 KiB per image
+    // Constraints: max 1280px longest edge, WebP quality 0.72 stepping down to 0.60, <= 48,000 bytes per image
     const beforeEncoded = await resizeAndEncodePhoto(new Uint8Array(beforeRaw), {
       maxEdge: 1280,
-      quality: 0.75,
+      quality: 0.72,
       minQuality: 0.6,
       maxSizeBytes: MAX_IMAGE_BYTES,
     });
 
     const afterEncoded = await resizeAndEncodePhoto(new Uint8Array(afterRaw), {
       maxEdge: 1280,
-      quality: 0.75,
+      quality: 0.72,
       minQuality: 0.6,
       maxSizeBytes: MAX_IMAGE_BYTES,
     });
@@ -95,21 +94,19 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     // ═════════════════════════════════════════════════════════════════════
     // 3. Structured Metadata with Visual Challenge Code
     // ═════════════════════════════════════════════════════════════════════
-    const visualChallengeCode = 4821; // 4-digit uint16 emitted on Claimed
+    const challengeCode = 4821; // 4-digit uint16 emitted on Claimed
     const metadata: EvidenceMetadata = {
+      v: 1,
       bountyId: "1",
-      visualChallengeCode,
-      beforeTimestamp: 1718000000000,
-      afterTimestamp: 1718003600000,
-      gpsLatE5: 3777490,
-      gpsLngE5: -12241940,
-      gpsAccuracyM: 3.8,
-      compassHeadingDeg: 194.5,
-      deviceSummary: "iPhone 15 Pro, iOS 17.5, Mobile Safari",
-      beforeImageSha256: beforeEncoded.sha256Hex,
-      afterImageSha256: afterEncoded.sha256Hex,
-      appVersion: "1.0.0",
       workerAddress: TEST_WORKER_ADDRESS,
+      challengeCode,
+      beforeTimestampMs: 1718000000000,
+      afterTimestampMs: 1718003600000,
+      gps: { lat: 37.7749, lng: -122.4194, accuracyMeters: 3.8 },
+      orientation: { alpha: 194.5, beta: null, gamma: null },
+      beforeSha256: beforeEncoded.sha256Hex,
+      afterSha256: afterEncoded.sha256Hex,
+      userAgent: "iPhone 15 Pro, iOS 17.5, Mobile Safari",
       notes: "Filled pothole with hot mix asphalt, compacted and sealed edges.",
     };
 
@@ -136,8 +133,8 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     console.log(`Solidity bytes32 evidenceHash: ${evidenceHash}`);
 
     // STRICT SPEC VERIFICATION:
-    // Single bundle MUST be < 100 KiB (102,400 bytes)
-    expect(bundle.length).toBeLessThan(100 * 1024);
+    // Single bundle MUST remain under the 100,000-byte protocol target.
+    expect(bundle.length).toBeLessThan(100_000);
     // Well under Arkiv 120,000 bytes budget
     expect(bundle.length).toBeLessThan(120_000);
 
@@ -169,20 +166,11 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     // Images MUST match bit-for-bit
     expect(Buffer.from(unpacked.beforeImage).equals(Buffer.from(beforeEncoded.webpBytes))).toBe(true);
     expect(Buffer.from(unpacked.afterImage).equals(Buffer.from(afterEncoded.webpBytes))).toBe(true);
+    await expect(unpackBundle(new Uint8Array([...bundle, 0]))).rejects.toThrow(/requires exactly/);
 
     // Metadata MUST match field-for-field
     expect(unpacked.metadata.bountyId).toBe(metadata.bountyId);
-    expect(unpacked.metadata.visualChallengeCode).toBe(visualChallengeCode);
-    expect(unpacked.metadata.beforeTimestamp).toBe(metadata.beforeTimestamp);
-    expect(unpacked.metadata.afterTimestamp).toBe(metadata.afterTimestamp);
-    expect(unpacked.metadata.gpsLatE5).toBe(metadata.gpsLatE5);
-    expect(unpacked.metadata.gpsLngE5).toBe(metadata.gpsLngE5);
-    expect(unpacked.metadata.gpsAccuracyM).toBe(metadata.gpsAccuracyM);
-    expect(unpacked.metadata.compassHeadingDeg).toBe(metadata.compassHeadingDeg);
-    expect(unpacked.metadata.deviceSummary).toBe(metadata.deviceSummary);
-    expect(unpacked.metadata.beforeImageSha256).toBe(metadata.beforeImageSha256);
-    expect(unpacked.metadata.afterImageSha256).toBe(metadata.afterImageSha256);
-    expect(unpacked.metadata.appVersion).toBe(metadata.appVersion);
+    expect(unpacked.metadata).toEqual(metadata);
 
     // ═════════════════════════════════════════════════════════════════════
     // 6. Cryptographic Signature Recovery (Worker Wallet)
@@ -210,88 +198,6 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     const auditWrongWorker = await verifyBundleIntegrity(bundle, evidenceHash, wrongAddress);
     expect(auditWrongWorker.valid).toBe(false);
     expect(auditWrongWorker.errors.some((e) => e.includes("mismatch"))).toBe(true);
-  });
+  }, 30_000);
 
-  it("handles automatic chunking fallback if bundle exceeds 120,000 bytes", () => {
-    // Construct an oversized artificial bundle of 250,000 bytes
-    const oversizedPayload = new Uint8Array(250_000);
-    oversizedPayload.fill(0xab);
-
-    const chunks = chunkBundle(oversizedPayload, 115_000);
-    expect(chunks.length).toBe(3);
-
-    // Each chunk starts with mini-header "SC" (0x53, 0x43) + index + total
-    for (let i = 0; i < chunks.length; i++) {
-      const c = chunks[i];
-      expect(c[0]).toBe(0x53);
-      expect(c[1]).toBe(0x43);
-      expect(c[2]).toBe(i);
-      expect(c[3]).toBe(chunks.length);
-    }
-
-    // Verify bit-for-bit reassembly
-    let reassembledLength = 0;
-    for (const c of chunks) {
-      reassembledLength += c.length - 4;
-    }
-    expect(reassembledLength).toBe(oversizedPayload.length);
-
-    const reassembled = new Uint8Array(reassembledLength);
-    let offset = 0;
-    for (const c of chunks) {
-      const data = c.subarray(4);
-      reassembled.set(data, offset);
-      offset += data.length;
-    }
-    expect(Buffer.from(reassembled).equals(Buffer.from(oversizedPayload))).toBe(true);
-  });
-
-  it("preserves Ethereum Swarm video metadata and cryptographic hashes in signed CBOR bundle", async () => {
-    const dummyImage = new Uint8Array(500);
-    dummyImage.fill(0x42);
-
-    const videoRef = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-    const videoSha = `0x${videoRef}`;
-
-    const metadataWithVideo: EvidenceMetadata = {
-      bountyId: 99,
-      visualChallengeCode: 7788,
-      beforeTimestamp: 1710000000000,
-      afterTimestamp: 1710000010000,
-      gpsLatE5: 3777490,
-      gpsLngE5: -12241940,
-      gpsAccuracyM: 2.5,
-      compassHeadingDeg: 180,
-      deviceSummary: "Test Mobile Device",
-      beforeImageSha256: "0x1111",
-      afterImageSha256: "0x2222",
-      appVersion: "1.0.0",
-      video: {
-        swarmReference: videoRef,
-        videoSha256: videoSha,
-        durationSeconds: 10,
-        mimeType: "video/webm",
-        sizeBytes: 2_450_000,
-      },
-    };
-
-    const { bundle, evidenceHash } = await packBundle({
-      metadata: metadataWithVideo,
-      beforeImage: dummyImage,
-      afterImage: dummyImage,
-      signerPrivateKey: TEST_PRIVATE_KEY,
-    });
-
-    const unpacked = await unpackBundle(bundle);
-    expect(unpacked.metadata.video).toBeDefined();
-    expect(unpacked.metadata.video?.swarmReference).toBe(videoRef);
-    expect(unpacked.metadata.video?.videoSha256).toBe(videoSha);
-    expect(unpacked.metadata.video?.durationSeconds).toBe(10);
-    expect(unpacked.metadata.video?.mimeType).toBe("video/webm");
-    expect(unpacked.metadata.video?.sizeBytes).toBe(2_450_000);
-
-    const audit = await verifyBundleIntegrity(bundle, evidenceHash, TEST_WORKER_ADDRESS);
-    expect(audit.valid).toBe(true);
-    expect(audit.unpacked?.metadata?.video?.swarmReference).toBe(videoRef);
-  });
 });

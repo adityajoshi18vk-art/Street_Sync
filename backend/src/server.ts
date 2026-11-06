@@ -7,6 +7,9 @@
  *   GET  /api/bounties            – List bounties (filterable by status, bbox, worker)
  *   GET  /api/bounties/:id        – Full bounty detail with pledges, panel, votes
  *   GET  /api/reviewers/:address/assignments – Bounties assigned to a reviewer
+ *   POST /api/arkiv/reports       – Verified problem-report upload (Arkiv)
+ *   GET  /api/bounties/:id/report – Problem-report photo + description
+ *   GET  /api/config              – Public deployment settings
  *   GET  /api/health              – Health check
  */
 
@@ -14,19 +17,19 @@ import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import dbAccess from "./db.js";
-import { signAttestation, attesterAddress, RoleEnum, setVerifyingContract } from "./signer.js";
-import { computeStickerProfile } from "./stickers.js";
+import { getAttesterAddress, getVerifyingContract, isAttestationSignerReady, setVerifyingContract } from "./signer.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
 import type { Address } from "viem";
-import { randomBytes } from "node:crypto";
-import { hashToField } from "@worldcoin/idkit-core/hashing";
+import { isArkivRelayConfigured, registerArkivRoutes } from "./arkiv-relay.js";
+import { registerReportRoutes } from "./report-relay.js";
+import { registerConfigRoute } from "./config.js";
+import { areWorldActionsConfigured } from "./worldid.js";
+import { isWorldIdConfigured, registerWorldIdRoutes, worldIdConfig } from "./worldid-v4.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-// Not PORT: hosts and the root dev runner set PORT for the web app, which would make both bind the same port.
-const PORT = Number(process.env.BACKEND_PORT ?? 3001);
+const BACKEND_PORT = Number(process.env.BACKEND_PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
-const WORLD_APP_ID = process.env.WORLD_APP_ID ?? "app_streetsync_dev";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 
 // ─── Fastify Setup ───────────────────────────────────────────────────────────
@@ -48,200 +51,7 @@ await app.register(cors, {
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  POST /api/worldid/verify
-//  World ID v4 proof verification + EIP-712 attestation issuance
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface WorldIdVerifyBody {
-  proof: string;
-  merkle_root: string;
-  nullifier_hash: string;
-  verification_level: string;
-  action: string;
-  wallet: string;
-  role: "worker" | "reviewer";
-  bountyId: string;
-  dev_bypass?: boolean;
-}
-
-// Dev bypass is only honored when the server is explicitly configured for it
-// AND the request carries an explicit dev_bypass flag. Never enabled by default.
-const DEV_BYPASS_ENABLED = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
-
-// World ID 4.0 verify API; accepts IDKit 2.x proofs as "legacy 3.0" responses.
-// The v2 endpoint answers "Action not found" for apps migrated to 4.0.
-const WORLD_VERIFY_URL =
-  process.env.WORLD_VERIFY_URL ??
-  `https://developer.world.org/api/v4/verify/${process.env.WORLD_RP_ID ?? WORLD_APP_ID}`;
-
-interface WorldVerifyResult {
-  success: boolean;
-  code?: string;
-  detail?: string;
-}
-
-async function verifyWorldIdProof(p: {
-  proof: string;
-  merkle_root: string;
-  nullifier_hash: string;
-  verification_level: string;
-  action: string;
-  signal: string;
-}): Promise<WorldVerifyResult> {
-  const res = await fetch(WORLD_VERIFY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      protocol_version: "3.0",
-      nonce: `0x${randomBytes(16).toString("hex")}`,
-      action: p.action,
-      responses: [
-        {
-          identifier: p.verification_level,
-          proof: p.proof,
-          merkle_root: p.merkle_root,
-          nullifier: p.nullifier_hash,
-          // Same hashing IDKit applies to the widget's `signal` (the wallet address).
-          signal_hash: hashToField(p.signal).digest,
-        },
-      ],
-    }),
-  });
-  const body = (await res.json().catch(() => ({}))) as {
-    success?: boolean;
-    code?: string;
-    detail?: string;
-    results?: { success?: boolean; code?: string; detail?: string }[];
-  };
-  if (res.ok && body.success) return { success: true };
-  const failed = body.results?.find((r) => r.success === false);
-  return {
-    success: false,
-    code: failed?.code ?? body.code ?? `http_${res.status}`,
-    detail: failed?.detail ?? body.detail ?? `HTTP ${res.status}`,
-  };
-}
-
-const WORLD_ACTION_WORKER = process.env.WORLD_ACTION_WORKER ?? "claim-bounty";
-const WORLD_ACTION_REVIEWER = process.env.WORLD_ACTION_REVIEWER ?? "register-reviewer";
-
-/**
- * The action is derived here, never trusted from the client: otherwise one human could
- * mint unlimited attestations by verifying against fresh action names. Worker claims are
- * per bounty (one human, one claim per bounty); reviewer registration is once per human.
- */
-function expectedAction(role: "worker" | "reviewer", bountyId: string | undefined): string | null {
-  if (role === "reviewer") return WORLD_ACTION_REVIEWER;
-  if (role === "worker" && bountyId && /^\d+$/.test(bountyId)) return `${WORLD_ACTION_WORKER}-${bountyId}`;
-  return null;
-}
-
-app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, reply) => {
-  const {
-    proof,
-    merkle_root,
-    nullifier_hash,
-    verification_level,
-    action,
-    wallet,
-    role,
-    bountyId,
-  } = request.body;
-
-  // Validate required fields
-  if (!proof || !merkle_root || !nullifier_hash || !verification_level || !action || !wallet || !role) {
-    return reply.status(400).send({
-      error: "Missing required fields: proof, merkle_root, nullifier_hash, verification_level, action, wallet, role",
-    });
-  }
-
-  const actionId = expectedAction(role, bountyId);
-  if (!actionId || action !== actionId) {
-    return reply.status(400).send({
-      error: `World ID action mismatch: expected "${actionId ?? "(invalid role or bountyId)"}"`,
-    });
-  }
-
-  // ── Step 1: Check nullifier hasn't been used by a DIFFERENT wallet for this action ──
-  const existingNullifier = dbAccess.checkNullifierOtherWallet(
-    nullifier_hash, actionId, wallet.toLowerCase(),
-  );
-  if (existingNullifier) {
-    return reply.status(409).send({
-      error: "Sybil detected: this World ID identity already used a different wallet for this action",
-      action: actionId,
-    });
-  }
-
-  // Check if this exact wallet+nullifier+action is already attested
-  const existingExact = dbAccess.checkNullifier(nullifier_hash, actionId);
-  if (existingExact) {
-    return reply.status(409).send({
-      error: "This World ID identity has already been attested for this action",
-      action: actionId,
-    });
-  }
-
-  // ── Step 2: Verify the proof with World's cloud API ─────────────────────────
-  let verified: WorldVerifyResult;
-  if (DEV_BYPASS_ENABLED && request.body.dev_bypass) {
-    request.log.warn("World ID verification bypassed via ALLOW_DEV_WORLD_ID_BYPASS");
-    verified = { success: true };
-  } else {
-    try {
-      verified = await verifyWorldIdProof({
-        proof,
-        merkle_root,
-        nullifier_hash,
-        verification_level,
-        action: actionId,
-        signal: wallet,
-      });
-    } catch (e) {
-      request.log.error(`World ID API error: ${(e as Error).message}`);
-      return reply.status(502).send({
-        error: "Cannot reach World ID verification API",
-      });
-    }
-  }
-
-  if (!verified.success) {
-    request.log.warn(`World ID verification rejected: ${verified.code} ${verified.detail}`);
-    const alreadyUsed = /max_verifications|already_verified|exceeded/i.test(verified.code ?? "");
-    return reply.status(alreadyUsed ? 409 : 401).send({
-      error: alreadyUsed
-        ? "This World ID has already been used for this action"
-        : `World ID verification failed: ${verified.detail ?? verified.code ?? "invalid proof"}`,
-      code: verified.code,
-    });
-  }
-
-  // ── Step 3: Record nullifier in DB ──────────────────────────────────────────
-  try {
-    dbAccess.insertNullifier(nullifier_hash, actionId, wallet.toLowerCase());
-  } catch (e) {
-    // Unique constraint violation = already recorded (race condition guard)
-    return reply.status(409).send({
-      error: "Nullifier already recorded for this action",
-    });
-  }
-
-  // ── Step 4: Sign EIP-712 attestation ────────────────────────────────────────
-  const roleValue = role === "worker" ? RoleEnum.Worker : RoleEnum.Reviewer;
-  const bountyIdBigInt = BigInt(bountyId ?? "0");
-
-  const attestation = await signAttestation(
-    wallet as Address,
-    roleValue,
-    bountyIdBigInt,
-  );
-
-  return reply.status(200).send({
-    success: true,
-    attestation,
-  });
-});
+registerWorldIdRoutes(app);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/bounties
@@ -337,6 +147,7 @@ app.get<{ Params: { id: string } }>("/api/bounties/:id", async (request, reply) 
     assignedReviewers,
     reviewRound: panel?.review_round ?? 0,
     voteStatus,
+    problemVotes: dbAccess.getProblemVotes(id).map((v) => ({ voter: v.voter, isReal: !!v.is_real })),
     settlement: settlement ?? null,
   });
 });
@@ -378,28 +189,32 @@ app.get<{ Params: { address: string } }>("/api/reviewers/:address/assignments", 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  GET /api/stickers/:address
-//  Gamification: sticker collection, XP, and level for a wallet
-// ═══════════════════════════════════════════════════════════════════════════════
-
-app.get<{ Params: { address: string } }>("/api/stickers/:address", async (request, reply) => {
-  const addr = request.params.address?.toLowerCase();
-  if (!addr || !/^0x[0-9a-f]{40}$/.test(addr)) {
-    return reply.status(400).send({ error: "Invalid wallet address" });
-  }
-  return reply.send(computeStickerProfile(addr));
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/health
 // ═══════════════════════════════════════════════════════════════════════════════
 
+registerArkivRoutes(app);
+registerReportRoutes(app);
+registerConfigRoute(app);
+
 app.get("/api/health", async (_request, reply) => {
+  let escrowConfigured = true;
+  try {
+    getVerifyingContract();
+  } catch {
+    escrowConfigured = false;
+  }
+  const worldIdConfigured = isWorldIdConfigured();
+  const signerConfigured = isAttestationSignerReady();
+  const worldActions = areWorldActionsConfigured();
   return reply.send({
     status: "ok",
+    ready: worldIdConfigured && worldActions && signerConfigured && escrowConfigured && isArkivRelayConfigured(),
+    readiness: { worldId: worldIdConfigured, worldActions, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
     chainId: CHAIN_ID,
-    attester: attesterAddress,
-    worldAppId: WORLD_APP_ID,
+    attester: getAttesterAddress() ?? "",
+    worldAppId: worldIdConfig().appId,
+    worldRpId: worldIdConfig().rpId,
+    worldIdEnvironment: worldIdConfig().environment,
     timestamp: new Date().toISOString(),
   });
 });
@@ -412,14 +227,27 @@ async function main() {
   console.log("╔══════════════════════════════════════════════╗");
   console.log("║         StreetSync Backend Server            ║");
   console.log("╚══════════════════════════════════════════════╝");
-  console.log(`Attester address: ${attesterAddress}`);
+  console.log(`Attester address: ${getAttesterAddress() ?? "not configured"}`);
   console.log(`Chain ID:         ${CHAIN_ID}`);
-  console.log(`World App ID:     ${WORLD_APP_ID}`);
+  console.log(`World App ID:     ${worldIdConfig().appId || "not configured"}`);
 
   // Set verifying contract from env if available (indexer may override later)
   if (process.env.ESCROW_CONTRACT_ADDRESS) {
-    setVerifyingContract(process.env.ESCROW_CONTRACT_ADDRESS as Address);
-    console.log(`Escrow contract:  ${process.env.ESCROW_CONTRACT_ADDRESS}`);
+    try {
+      setVerifyingContract(process.env.ESCROW_CONTRACT_ADDRESS as Address);
+      dbAccess.ensureDeploymentScope(CHAIN_ID, process.env.ESCROW_CONTRACT_ADDRESS);
+      console.log(`Escrow contract:  ${process.env.ESCROW_CONTRACT_ADDRESS}`);
+    } catch {
+      console.warn("Ignoring invalid ESCROW_CONTRACT_ADDRESS; attestation signing will remain unavailable.");
+    }
+  }
+  try {
+    console.log(`Signing domain contract: ${getVerifyingContract()}`);
+  } catch {
+    console.warn("Attestation signing is disabled until StreetSyncEscrow is deployed and configured.");
+  }
+  if (!isWorldIdConfigured()) {
+    console.warn("World ID verification is disabled until WORLD_APP_ID, WORLD_RP_ID and WORLD_RP_SIGNING_KEY are configured.");
   }
 
   // Start event indexer in background
@@ -429,14 +257,20 @@ async function main() {
 
   // Start HTTP server
   try {
-    await app.listen({ port: PORT, host: HOST });
-    console.log(`\nServer listening at http://${HOST}:${PORT}`);
+    await app.listen({ port: BACKEND_PORT, host: HOST });
+    console.log(`\nServer listening at http://${HOST}:${BACKEND_PORT}`);
     console.log("Endpoints:");
+    console.log("  POST /api/worldid/rp-context");
     console.log("  POST /api/worldid/verify");
+    console.log("  POST /api/worldid/attest");
     console.log("  GET  /api/bounties");
     console.log("  GET  /api/bounties/:id");
     console.log("  GET  /api/reviewers/:address/assignments");
-    console.log("  GET  /api/stickers/:address");
+    console.log("  POST /api/arkiv/entities");
+    console.log("  POST /api/arkiv/reports");
+    console.log("  GET  /api/bounties/:id/report");
+    console.log("  GET  /api/config");
+    console.log("  GET  /api/arkiv/entities/:key");
     console.log("  GET  /api/health");
   } catch (err) {
     app.log.error(err);

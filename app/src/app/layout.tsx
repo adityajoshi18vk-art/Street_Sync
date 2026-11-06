@@ -5,7 +5,7 @@ import { Route } from "lucide-react";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
 import { DesktopNav, MobileTabBar } from "@/components/layout/SiteNav";
-import { ACTIVE_CHAIN, isLocalNetwork } from "@/config/contracts";
+import { ACTIVE_CHAIN, isLocalNetwork, contractsDeployed, DEPLOYMENT_ERROR } from "@/config/contracts";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -66,6 +66,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </header>
           <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 md:pb-16">
+            {!contractsDeployed && (
+              <div role="alert" className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+                <p className="font-semibold">Deployment required</p>
+                <p className="mt-1">{DEPLOYMENT_ERROR}</p>
+                <p className="mt-1 text-zinc-400">Funding, claiming, and reviewing are disabled until setup is complete.</p>
+              </div>
+            )}
             {children}
           </main>
           <footer className="border-t border-white/[0.06] pb-28 pt-8 md:pb-8">

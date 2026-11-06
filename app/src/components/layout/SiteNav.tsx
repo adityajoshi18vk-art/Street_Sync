@@ -9,7 +9,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Map", icon: Map },
-  { href: "/worker", label: "Worker", icon: Hammer },
+  { href: "/work", label: "Work", icon: Hammer },
   { href: "/review", label: "Review", icon: ShieldCheck },
   { href: "/stickers", label: "Stickers", icon: Award },
   { href: "/janlekha", label: "JanLekha", icon: Landmark }

@@ -16,48 +16,22 @@ const nextConfig = {
   reactStrictMode: true,
   // Same-origin proxy to the backend and JanLekha single-port integration
   async rewrites() {
-    const target = process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
+    const backend = process.env.BACKEND_API_URL ?? process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
     const janlekhaPort = process.env.JANLEKHA_PORT || "3100";
     const janlekhaHost = process.env.JANLEKHA_HOST || "127.0.0.1";
     const janlekhaOrigin = `http://${janlekhaHost}:${janlekhaPort}`;
     return [
-      { source: "/backend/:path*", destination: `${target}/:path*` },
-      {
-        source: "/janlekha",
-        destination: `${janlekhaOrigin}/janlekha`
-      },
-      {
-        source: "/janlekha/:path*",
-        destination: `${janlekhaOrigin}/janlekha/:path*`
-      },
-      {
-        source: "/projects",
-        destination: `${janlekhaOrigin}/janlekha/projects`
-      },
-      {
-        source: "/projects/:path*",
-        destination: `${janlekhaOrigin}/janlekha/projects/:path*`
-      },
-      {
-        source: "/verify",
-        destination: `${janlekhaOrigin}/janlekha/verify`
-      },
-      {
-        source: "/verify/:path*",
-        destination: `${janlekhaOrigin}/janlekha/verify/:path*`
-      },
-      {
-        source: "/demo-documents/:path*",
-        destination: `${janlekhaOrigin}/janlekha/demo-documents/:path*`
-      },
-      {
-        source: "/api/documents/:path*",
-        destination: `${janlekhaOrigin}/janlekha/api/documents/:path*`
-      },
-      {
-        source: "/api/documents",
-        destination: `${janlekhaOrigin}/janlekha/api/documents`
-      }
+      { source: "/backend/:path*", destination: `${backend}/:path*` },
+      { source: "/api/documents/:path*", destination: `${janlekhaOrigin}/janlekha/api/documents/:path*` },
+      { source: "/api/documents", destination: `${janlekhaOrigin}/janlekha/api/documents` },
+      { source: "/api/:path*", destination: `${backend}/api/:path*` },
+      { source: "/janlekha", destination: `${janlekhaOrigin}/janlekha` },
+      { source: "/janlekha/:path*", destination: `${janlekhaOrigin}/janlekha/:path*` },
+      { source: "/projects", destination: `${janlekhaOrigin}/janlekha/projects` },
+      { source: "/projects/:path*", destination: `${janlekhaOrigin}/janlekha/projects/:path*` },
+      { source: "/verify", destination: `${janlekhaOrigin}/janlekha/verify` },
+      { source: "/verify/:path*", destination: `${janlekhaOrigin}/janlekha/verify/:path*` },
+      { source: "/demo-documents/:path*", destination: `${janlekhaOrigin}/janlekha/demo-documents/:path*` }
     ];
   },
   webpack: (config, { isServer }) => {

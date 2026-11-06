@@ -17,7 +17,7 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
 
 2. **Arc Testnet (Circle - Chain ID `5042002`):**
    - EVM settlement layer with gas paid natively in USDC.
-   - All bounty escrows, top-up pledges, reviewer stakes (10.00 USDC), and settlement payouts strictly use **6-decimal ERC-20 USDC** (`1e6` base units) via OpenZeppelin `SafeERC20`.
+   - All bounty escrows, top-up pledges, reviewer stakes (2.00 USDC), and settlement payouts strictly use **6-decimal ERC-20 USDC** (`1e6` base units) via OpenZeppelin `SafeERC20`.
 
 3. **Arkiv Verifiable Entity Store:**
    - Single atomic entity writes (`<= 128,000 bytes`, target `< 120,000 bytes`).
@@ -61,11 +61,11 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
 2. **Rule 2: Anti-Wash Trading & Self-Dealing Prevention**
    - `claim()` reverts with `CreatorCannotClaim` if `msg.sender == bounty.creator`, and reverts with `PledgerCannotClaim` if `pledges[bountyId][msg.sender] > 0`.
    - `assignPanel()` strictly excludes the creator, the worker, and any pledgers from being selected as reviewers.
-   - A 5% reviewer fee is deducted on settlement and awarded to majority reviewers, ensuring that wash-trading results in an immediate net financial loss.
+   - A 10% reviewer fee is deducted on settlement and awarded to majority reviewers, ensuring that wash-trading results in an immediate net financial loss.
 
 3. **Rule 3: Commit-Reveal Deadlock Recovery (`pokeOrReplace`)**
    - If selected reviewers fail to reveal their votes before `revealDeadline`, the bounty is never locked forever.
-   - Any caller can trigger `pokeOrReplace(bountyId)` after `revealDeadline`. It immediately slashes the 10 USDC stake of non-revealers, increments `reviewRound`, draws replacement reviewers, and restarts the commit/reveal timers without requiring the worker to re-upload evidence.
+   - Any caller can trigger `pokeOrReplace(bountyId)` after `revealDeadline`. It immediately slashes the 2 USDC stake of non-revealers, increments `reviewRound`, draws replacement reviewers, and restarts the commit/reveal timers without requiring the worker to re-upload evidence.
 
 4. **Rule 4: Two-Step Future Block Randomness**
    - Decouples submission from panel selection:
@@ -131,7 +131,7 @@ streetsync/
 ## 5. Quickstart & Local Testing
 
 ### Prerequisites
-- Node.js `>= 18` (v20+ recommended)
+- Node.js `>= 22.13` (the backend uses the built-in `node:sqlite`; Node 24 recommended)
 - `npm`
 
 ### Installation
@@ -177,14 +177,8 @@ npm run dev
    - In staging mode, test using the **[World ID Simulator](https://simulator.worldcoin.org)** without needing a physical Orb.
 
 3. **Deploying to Arc Testnet** (RPC `https://rpc.testnet.arc.io`, explorer `https://explorer.testnet.arc.io`):
-   1. Create a private attester key (any fresh wallet; it needs no funds) and put it in `backend/.env.arc`
-      with `CHAIN_ID=5042002` and `DEPLOYMENTS_PATH=../contracts/deployments/arcTestnet.json` (see `backend/.env.example`).
-      The backend refuses Hardhat's public test key on non-local chains.
-   2. In `contracts/.env` set `DEPLOYER_PRIVATE_KEY` (funded from https://faucet.circle.com) and `ATTESTER_ADDRESS` (the address of that key).
-   3. Run `npm run deploy:arc`. It writes `contracts/deployments/arcTestnet.json` (addresses, ABIs, deployment block), which configures the app and backend.
-   4. Run `npm run smoke:arc` for a live lifecycle check (create → claim → review → settle → indexed); it takes about 6 minutes because the commit window is real time.
-
-   The current Arc deployment uses a publicly mintable MockUSDC; the app shows a **Get 100 test USDC** button so visitors can fund bounties (gas still comes from the Circle faucet).
+   1. Place your funded deployer private key in `contracts/.env`: `DEPLOYER_PRIVATE_KEY=0x...`
+   2. Run `npm run deploy:arc`. It updates `contracts/deployments/arcTestnet.json`.
 
 ---
 
@@ -254,9 +248,140 @@ npm --prefix janlekha run test:e2e                                              
 - StreetSync: `npm run deploy:arc` (see section 6).
 - JanLekha is deployed on Hedera Testnet at `0xb2e4942feac916fa6b8a94d9bd51adf73789fdab` (contract `0.0.11346873`,
   [HashScan](https://hashscan.io/testnet/contract/0xb2e4942feac916fa6b8a94d9bd51adf73789fdab)); details in
-  `janlekha/deployments/hederaTestnet.json`. To point the app at it, put the `NEXT_PUBLIC_*` Hedera values from
-  `janlekha/.env.example` in `janlekha/.env` with that address and `NEXT_PUBLIC_JANLEKHA_DEPLOYMENT_BLOCK=42757755`,
-  delete `janlekha/.env.development.local`, and run `npm run dev` in `janlekha/`.
-- To redeploy JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
-  `npm run deploy:janlekha:hedera` (deploy → grant roles → smoke test). Copy the printed address into
-  `janlekha/.env` as `NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS`. See `janlekha/README.md` for details.
+  `janlekha/deployments/hederaTestnet.json`.
+
+---
+
+## Arc configuration and the zero-address allowance error
+
+The original error combined an outdated RPC endpoint with undeployed placeholder
+contracts. Arc Testnet uses chain ID **5042002**, RPC
+`https://rpc.testnet.arc.io`, and the six-decimal USDC ERC-20 interface at
+`0x3600000000000000000000000000000000000000`.
+See [Arc connection details](https://docs.arc.io/arc/references/connect-to-arc)
+and [contract addresses](https://docs.arc.io/arc/references/contract-addresses).
+
+1. Configure deployment secrets securely in the root `.env` or `contracts/.env`:
+   `DEPLOYER_PRIVATE_KEY` (funded with testnet USDC) and `ATTESTER_ADDRESS`
+   (the address of the backend signer). Never commit private keys.
+2. Run `npm run deploy:arc`. Arc deployments use system USDC, not a mock token.
+   The checked-in zero escrow address deliberately means **not deployed**.
+3. Configure `backend/.env` using its example, including the matching
+   `ATTESTER_PRIVATE_KEY`, signer address, World ID app/actions, and chain.
+4. Configure `app/.env.local` using `app/.env.example`. Use the same World ID
+   app/actions as the backend. Normally use the generated deployment file;
+   explicit address overrides must be valid, nonzero, and on the selected chain.
+5. Rebuild packages and the frontend, then restart both services:
+   `npm run build && npm run build --workspace=streetsync-app`.
+
+The frontend defaults to same-origin `/api` requests. Next proxies them to
+`BACKEND_API_URL` (server-only, default `http://127.0.0.1:3001`).
+The backend uses `BACKEND_PORT=3001`, separate from Next's `PORT`.
+Do not point a hosted browser at `localhost:3001`.
+
+Before funding, the app rejects missing deployments, wrong-chain wallets,
+invalid amounts, absent escrow bytecode, and token/decimal mismatches.
+Approvals are exact amounts and reverted receipts are errors.
+
+### Verification and remaining live-service requirements
+
+Run `npm run test --workspace=streetsync-app` for configuration/approval
+regressions, plus the contract, pipeline, backend and end-to-end checks above.
+Local lifecycle tests do not prove live sponsor integrations: an actual escrow
+deployment, a configured World ID application and successful proof, and a
+working shared Arkiv storage integration must be verified separately.
+The existing `NEXT_PUBLIC_ARKIV_MODE=local` stores evidence only in one browser;
+it is not decentralized storage and cannot support cross-device review.
+The HTTP adapter requires a compatible entity gateway and is not evidence of
+a verified live Arkiv deployment. Do not use browser-local evidence for a live
+Arc bounty.
+
+## Live Arc Testnet deployment
+
+| Item | Value |
+| :--- | :--- |
+| StreetSyncEscrow | [`0x57Dd350aCb93B5A6499b3D18fc9c785446A8654F`](https://testnet.arcscan.app/address/0x57Dd350aCb93B5A6499b3D18fc9c785446A8654F) |
+| USDC (ERC-20, 6 decimals) | `0x3600000000000000000000000000000000000000` |
+| Owner | `0xAf1f2f642a44095Fb29eFF70760D0a5df3d8e354` |
+| Attester (backend signer) | `0xa445eD835991A70015CC12e000182E8Ff727e5CD` |
+| Deploy block | `70967045` |
+
+The owner can rotate the attester with `setAttester(address)`.
+
+### Arkiv evidence relay
+
+Evidence bundles are written to Arkiv (Rabdi testnet) by the backend
+(`POST /api/arkiv/entities`, `GET /api/arkiv/entities/:key`). The backend keeps the
+Arkiv access key and writer wallet. Workers do not need tGLM. The relay stores a
+bundle only when its EIP-191 signature recovers the on-chain worker of a `Claimed`
+bounty. Entities expire after 30 days. Fund the writer address
+(`ARKIV_PRIVATE_KEY`'s address) with tGLM at https://hub.arkiv.network/faucet.
+
+### World ID 4.0
+
+The app uses IDKit 4 with backend-signed requests:
+
+1. `POST /api/worldid/rp-context` returns the app ID, environment and an RP-signed
+   `rp_context` for `claim-bounty` / `register-reviewer`. The signature uses
+   `WORLD_RP_SIGNING_KEY`, which never leaves the backend.
+2. The browser asks World App for a proof whose signal is the connected wallet.
+3. `POST /api/worldid/verify` checks the action, environment and wallet-bound
+   `signal_hash`, then forwards the result to `https://developer.world.org/api/v4/verify/{rp_id}`.
+   It links the nullifier to that wallet and returns the EIP-712 attestation.
+4. `POST /api/worldid/attest` re-issues attestations for a wallet that already verified
+   for the role. Actions allow one verification per human, so a worker needs this to
+   claim later bounties. On-chain, an attestation is only valid from its own wallet.
+
+Backend variables: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`,
+`WORLD_ID_ENVIRONMENT` (`production` for World App, `staging` for the simulator).
+
+## Lifecycle (contract v2)
+
+1. **Report.** The reporter adds a photo, a description and a map pin, and funds the escrow in USDC.
+   The photo and description go to Arkiv as one bundle. The contract stores `reportHash`
+   (SHA-256 of that bundle) and `descriptionHash`, and the bounty starts **Awaiting neighbours**.
+2. **Neighbour validation.** World-ID-verified neighbours within `NEIGHBOUR_RADIUS_KM` (default 10 km)
+   vote real or not real (action `vote-problem`). Two matching votes decide the outcome (`validationQuorum`).
+   Real opens the bounty; not real, or no decision within 24 h, refunds every pledge.
+3. **Work.** A verified worker claims the bounty, gets a 4-digit code and has `claimDuration` to submit
+   before/after photos. The creator, pledgers and neighbours who voted cannot claim.
+4. **Review.** Three staked reviewers compare the reporter's photo with the worker's before/after photos,
+   then commit and reveal their votes. Approval pays the worker 90% and the majority reviewers 10%,
+   plus any slashed stakes.
+5. **Recovery.** A rejected worker may rework once within the window. Stalled claims or rework windows
+   can be reopened by anyone, and that worker is blocked from re-claiming. Refunded or expired bounties
+   let every pledger withdraw. Reviewers withdraw their rewards, and re-stake after each settled review.
+
+Operator settings: `setValidationQuorum(0..10)` (0 disables neighbour validation) and `setValidationWindow`.
+
+## Run locally (against the live Arc Testnet contract)
+
+Requirements: Node.js 22.13+ (Node 24 recommended), a browser wallet (e.g. MetaMask) on Arc Testnet,
+and World App on your phone for World ID.
+
+```bash
+git clone https://github.com/adityajoshi18vk-art/Street_Sync.git && cd Street_Sync
+git checkout hoplite/eresos-5a722ded
+npm install
+cp backend/.env.example backend/.env   # fill in the values below
+npm run build && npm run build --workspace=streetsync-app
+npm start                               # http://localhost:3000
+```
+
+`npm start` runs the backend on 127.0.0.1:3001 and the app on `PORT` (default 3000). Use `npm run dev`
+for hot reload during development. The app finds the deployed contract in
+`contracts/deployments/arcTestnet.json`.
+
+`backend/.env` must contain:
+
+| Variable | Value |
+| :--- | :--- |
+| `ATTESTER_PRIVATE_KEY` / `ATTESTER_SIGNER_ADDRESS` | Key and address of the escrow's `attester` (owner can change it with `setAttester`) |
+| `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY` | From developer.world.org (World ID 4.0) |
+| `WORLD_ACTION_WORKER`, `WORLD_ACTION_REVIEWER`, `WORLD_ACTION_NEIGHBOUR` | `claim-bounty`, `register-reviewer`, `vote-problem` |
+| `ARKIV_ACCESS_KEY`, `ARKIV_PRIVATE_KEY` | Arkiv (Rabdi) access key and a tGLM-funded writer key |
+| `CHAIN_ID`, `ARC_RPC_URL` | `5042002`, `https://rpc.testnet.arc.io` |
+
+`GET http://localhost:3000/api/health` reports `ready: true` when everything is configured.
+Camera and GPS need `http://localhost` or HTTPS; to test on a phone, tunnel port 3000
+(e.g. `npx ngrok http 3000`).
