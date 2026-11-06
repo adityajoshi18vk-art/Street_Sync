@@ -14,7 +14,7 @@
     "predev": "npm run build:packages",
     "predev:streetsync": "npm run build:packages",
     "build:packages": "npm run build --workspace=@streetsync/swarm-client && npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client",
-    "dev": "concurrently -n backend,streetsync,janlekha -c blue,green,magenta \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\" \"npm --prefix janlekha run dev:demo\"",
+    "dev": "concurrently -n backend,streetsync,janlekha -c blue,green,magenta \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\" \"npm --prefix janlekha run dev\"",
     "dev:streetsync": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
     "dev:janlekha": "npm --prefix janlekha run dev",
     "build": "npm run build --workspace=@streetsync/swarm-client && npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client && npm run build --workspace=streetsync-backend",
