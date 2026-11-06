@@ -3,12 +3,12 @@ import {
   ContractFunctionRevertedError,
   InsufficientFundsError,
   UserRejectedRequestError,
-  formatUnits,
 } from "viem";
+import { formatPaise } from "@/lib/janlekha/format";
 
 const fmt = (paise: unknown) => {
   try {
-    return `₹${formatUnits(BigInt(paise as bigint), 2)}`;
+    return formatPaise(BigInt(paise as bigint));
   } catch {
     return String(paise);
   }
@@ -58,6 +58,8 @@ export interface DescribedError {
   /** Custom error name when the contract rejected the call. */
   contractError?: string;
   rejectedByUser?: boolean;
+  /** True when the contract itself rejected the call, as opposed to a wallet, network or RPC problem. */
+  contract?: boolean;
 }
 
 export function describeTxError(error: unknown): DescribedError {
@@ -70,9 +72,9 @@ export function describeTxError(error: unknown): DescribedError {
       const name = reverted.data?.errorName;
       if (name) {
         const describe = MESSAGES[name];
-        return { message: describe ? describe(reverted.data?.args ?? []) : `The contract rejected the call (${name}).`, contractError: name };
+        return { message: describe ? describe(reverted.data?.args ?? []) : `The contract rejected the call (${name}).`, contractError: name, contract: true };
       }
-      return { message: reverted.reason ? `The contract rejected the call: ${reverted.reason}` : "The contract rejected the call." };
+      return { message: reverted.reason ? `The contract rejected the call: ${reverted.reason}` : "The contract rejected the call.", contract: true };
     }
     if (error.walk((e) => e instanceof InsufficientFundsError)) {
       return { message: "Your account does not have enough HBAR to pay the transaction fee." };

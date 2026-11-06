@@ -7,6 +7,7 @@ import {
   attachPublicDoc,
   deployContract,
   installWallet,
+  revokeRole,
   submit,
   syntheticPdf,
   type Actor,
@@ -94,7 +95,7 @@ test.describe.serial("JanLekha wallet writes", () => {
     await expect(page.getByText("₹45,50,000.00")).toHaveCount(0);
   });
 
-  test("a reveal with a tampered backup fails and public state is not changed", async () => {
+  test("a tampered backup is blocked, and a contract-rejected reveal fails without changing state", async () => {
     await advanceChainTime(DAY + 120);
     await page.reload();
     await actAs(page, ACCOUNTS.vendorB);
@@ -103,13 +104,24 @@ test.describe.serial("JanLekha wallet writes", () => {
     tampered.amountPaise = "400000000"; // claims ₹40,00,000 instead of the committed ₹45,50,000
     const tamperedPath = test.info().outputPath("vendorB-tampered.json");
     await writeFile(tamperedPath, JSON.stringify(tampered));
+    // Client-only line (localStorage): proves the reveal card has hydrated before a file is chosen.
+    await expect(page.getByTestId("active-backup")).toContainText("saved in this browser: ₹45,50,000.00");
     await page.getByTestId("reveal-bid").getByTestId("backup-import").setInputFiles(tamperedPath);
     await expect(page.getByTestId("active-backup")).toContainText("imported file: ₹40,00,000.00");
+    // The commitment is recomputed from the file's values, so tampering is caught before anything is sent.
+    const reveal = page.getByTestId("reveal-bid");
+    await expect(reveal.getByRole("button", { name: "Reveal bid" })).toBeDisabled();
+    await expect(reveal.getByTestId("blocked-reason")).toContainText("does not match your sealed bid on-chain");
 
+    // Failed transaction: the role is revoked on-chain after the page read it, so the UI still allows the
+    // click and the contract rejects it in the pre-flight check.
+    await reveal.getByTestId("backup-import").setInputFiles(backups.vendorB);
+    await expect(page.getByTestId("active-backup")).toContainText("imported file: ₹45,50,000.00");
+    await revokeRole("VENDOR_ROLE", ACCOUNTS.vendorB);
     await submit(page, "reveal-bid", "Reveal bid", "failed");
-    const status = page.getByTestId("reveal-bid").getByTestId("tx-status");
+    const status = reveal.getByTestId("tx-status");
     await expect(status).toHaveAttribute("data-stage", "preflight");
-    await expect(status).toContainText("do not match your sealed bid commitment");
+    await expect(status).toContainText("does not hold the role");
     await expect(status).toContainText("Nothing was sent");
 
     await page.reload();
@@ -138,6 +150,9 @@ test.describe.serial("JanLekha wallet writes", () => {
     await attachPublicDoc(page, "spec-doc", "milestone 1 spec");
     await submit(page, "define-milestone", "Define milestone");
     await expect(page.getByText("Milestone 1 · ₹12,00,000.00")).toBeVisible();
+    // The form resets after confirmation, so the same milestone cannot be submitted twice by accident.
+    await expect(page.getByTestId("define-milestone").getByTestId("milestone-amount")).toHaveValue("");
+    await expect(page.getByTestId("define-milestone").getByTestId("blocked-reason")).toContainText("Enter the milestone amount");
   });
 
   test("evidence, inspection approval and mock PFMS attestation", async () => {

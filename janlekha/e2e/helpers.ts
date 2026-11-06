@@ -29,6 +29,8 @@ export async function rpc<T = unknown>(method: string, params: unknown[] = []): 
   return body.result as T;
 }
 
+let deployedContract: Address | null = null;
+
 /** Deploys JanLekha from the admin account and grants the synthetic demo roles. */
 export async function deployContract(): Promise<Address> {
   await loadAccounts();
@@ -60,7 +62,24 @@ export async function deployContract(): Promise<Address> {
     });
     await client.waitForTransactionReceipt({ hash: tx });
   }
+  deployedContract = contractAddress!;
   return contractAddress!;
+}
+
+/** Admin action outside the UI, e.g. to make the UI's cached view of a role stale. */
+export async function revokeRole(role: string, account: Address) {
+  const transport = http(RPC_URL);
+  const wallet = createWalletClient({ transport, account: ACCOUNTS.admin, chain: hardhat });
+  const client = createPublicClient({ transport, chain: hardhat });
+  if (!deployedContract) throw new Error("deployContract() must run first");
+  const contract = deployedContract;
+  const hash = await wallet.writeContract({
+    address: contract,
+    abi: parseAbi(["function revokeRole(bytes32 role, address account)"]),
+    functionName: "revokeRole",
+    args: [keccak256(toHex(role)), account],
+  });
+  await client.waitForTransactionReceipt({ hash });
 }
 
 export async function latestChainTime(): Promise<number> {

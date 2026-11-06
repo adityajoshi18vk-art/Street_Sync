@@ -10,6 +10,7 @@ import { TxActivityProvider, useContractTx } from "@/components/wallet/tx";
 import { janLekhaAbi } from "@/lib/janlekha/abi";
 import { formatPaise } from "@/lib/janlekha/format";
 import { parseRupeesToPaise } from "@/lib/wallet/amounts";
+import { CONTRACT_ADDRESS } from "@/lib/wallet/chain";
 
 function CreateProjectForm() {
   const router = useRouter();
@@ -49,6 +50,7 @@ function CreateProjectForm() {
             refresh: false,
             onConfirmed: (receipt) => {
               for (const log of receipt.logs) {
+                if (!CONTRACT_ADDRESS || log.address.toLowerCase() !== CONTRACT_ADDRESS.toLowerCase()) continue;
                 try {
                   const ev = decodeEventLog({ abi: janLekhaAbi, data: log.data, topics: log.topics });
                   if (ev.eventName === "ProjectCreated") return router.push(`/projects/${ev.args.projectId}`);

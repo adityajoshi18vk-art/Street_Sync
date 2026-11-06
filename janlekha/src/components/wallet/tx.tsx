@@ -12,7 +12,8 @@ import { describeTxError } from "@/lib/wallet/errors";
 type WriteName = ContractFunctionName<typeof janLekhaAbi, "nonpayable">;
 type WriteArgs<F extends WriteName> = ContractFunctionArgs<typeof janLekhaAbi, "nonpayable", F>;
 
-export type FailureStage = "preflight" | "wallet" | "reverted" | "unconfirmed";
+/** preflight: the contract rejected it; precheck: it could not be checked (RPC/network). */
+export type FailureStage = "preflight" | "precheck" | "wallet" | "reverted" | "unconfirmed";
 
 export type TxState =
   | { status: "idle" }
@@ -102,7 +103,8 @@ export function useContractTx(label: string) {
           chainId: appChain.id,
         } as never));
       } catch (error) {
-        setState({ status: "failed", stage: "preflight", message: describeTxError(error).message });
+        const described = describeTxError(error);
+        setState({ status: "failed", stage: described.contract ? "preflight" : "precheck", message: described.message });
         return;
       }
 
@@ -157,6 +159,7 @@ function HashRef({ hash }: { hash: Hex }) {
 
 const STAGE_NOTE: Record<FailureStage, string> = {
   preflight: "The contract rejected this transaction in a pre-flight check against current state. Nothing was sent and no fee was charged.",
+  precheck: "The transaction could not be checked against the contract (network or RPC problem). Nothing was sent.",
   wallet: "Nothing was sent.",
   reverted: "",
   unconfirmed: "The page has not been updated.",
@@ -181,7 +184,7 @@ export function TxStatus({ state }: { state: TxState }) {
       return (
         <div data-testid="tx-status" data-status="confirmed" className={`${base} bg-emerald-50 text-emerald-900`}>
           <p className="font-semibold">Confirmed in block {state.blockNumber.toString()}</p>
-          <p className="mt-0.5 text-xs">Transaction <HashRef hash={state.hash} />. Public records refreshed from the contract.</p>
+          <p className="mt-0.5 text-xs">Transaction <HashRef hash={state.hash} />. This page reloads its records from the contract.</p>
         </div>
       );
     case "failed":

@@ -4,12 +4,14 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { getAddress, type Address, type Hex } from "viem";
 import { ActionCard, SubmitRow, TextInput } from "@/components/wallet/ActionCard";
 import { DocumentInput } from "@/components/wallet/DocumentInput";
+import { useConnection } from "wagmi";
 import { useChainTime, useWriteGate, type WriteGate } from "@/components/wallet/hooks";
 import { TxActivityProvider, useContractTx } from "@/components/wallet/tx";
 import type { ActionState } from "@/lib/janlekha/action-state";
 import { formatPaise, formatTimestamp, shortHex } from "@/lib/janlekha/format";
 import { fromDateTimeLocal, parseRupeesToPaise, toDateTimeLocal } from "@/lib/wallet/amounts";
 import {
+  computeCommitment,
   createBidBackup,
   downloadBidBackup,
   loadBidBackup,
@@ -151,6 +153,18 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
   );
 }
 
+/** Recomputes the commitment from the backup's own values; the file's stored commitment field is not trusted. */
+function backupMatchesBid(backup: BidBackup, onChainCommitment: Hex): boolean {
+  const recomputed = computeCommitment(
+    BigInt(backup.projectId),
+    getAddress(backup.vendor),
+    BigInt(backup.amountPaise),
+    backup.quotationDocumentHash,
+    backup.salt,
+  );
+  return recomputed.toLowerCase() === onChainCommitment.toLowerCase();
+}
+
 function subscribeStorage(onChange: () => void) {
   window.addEventListener("storage", onChange);
   return () => window.removeEventListener("storage", onChange);
@@ -184,8 +198,8 @@ function RevealBid({ s, now }: { s: ActionState; now: bigint }) {
       ? "This backup belongs to a different contract, network or project."
       : !same(backup.vendor, gate.account)
         ? `This backup belongs to vendor ${shortHex(backup.vendor)}, not the connected account.`
-        : myBid && backup.commitment.toLowerCase() !== myBid.commitment.toLowerCase()
-          ? "This backup is for a different sealed bid than the one recorded on-chain for your account."
+        : myBid && !backupMatchesBid(backup, myBid.commitment)
+          ? "This backup does not match your sealed bid on-chain: its amount, quotation hash or salt differ from what you committed."
           : null;
 
   const blocked =
@@ -374,6 +388,7 @@ function AttestPayment({ s, m }: { s: ActionState; m: ActionState["milestones"][
 
 export function ProjectActions({ state }: { state: ActionState }) {
   const now = useChainTime(BigInt(state.chainTime));
+  const connection = useConnection();
   const t = state.tender;
   const panels = useMemo(() => {
     const out: React.ReactNode[] = [];
@@ -382,7 +397,7 @@ export function ProjectActions({ state }: { state: ActionState }) {
     else if (now < BigInt(t.revealDeadline)) out.push(<RevealBid key="reveal" s={state} now={now} />);
     else if (!state.award) out.push(<AwardContract key="award" s={state} />);
     if (state.award) {
-      if (BigInt(state.award.milestoneTotalPaise) < BigInt(state.award.amountPaise)) out.push(<DefineMilestone key="define" s={state} />);
+      if (BigInt(state.award.milestoneTotalPaise) < BigInt(state.award.amountPaise)) out.push(<DefineMilestone key={`define-${state.award.milestoneCount}`} s={state} />);
       for (const m of state.milestones) {
         if (m.status === "Defined") out.push(<SubmitEvidence key={`e${m.id}`} s={state} m={m} />);
         if (m.status === "EvidenceSubmitted") out.push(<ApproveMilestone key={`a${m.id}`} s={state} m={m} />);
@@ -400,7 +415,15 @@ export function ProjectActions({ state }: { state: ActionState }) {
         is confirmed. Citizens do not need a wallet.
       </p>
       <TxActivityProvider>
-        {panels.length === 0 ? <p className="text-sm text-neutral-600">No further actions: all milestones are complete.</p> : <div className="space-y-3">{panels}</div>}
+        {panels.length === 0 ? (
+          <p className="text-sm text-neutral-600">No further actions: all milestones are complete.</p>
+        ) : (
+          // Remount every form when the account changes: one account's inputs (e.g. a confidential quotation)
+          // and confirmed-action locks must never carry over to another account.
+          <div key={connection.address ?? "disconnected"} className="space-y-3">
+            {panels}
+          </div>
+        )}
       </TxActivityProvider>
     </section>
   );

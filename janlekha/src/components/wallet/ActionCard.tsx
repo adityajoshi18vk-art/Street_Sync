@@ -31,17 +31,20 @@ export function SubmitRow({
   state: TxState;
   onSubmit: () => void;
 }) {
+  // A confirmed action stays locked until the refreshed contract state remounts or replaces this card,
+  // so a second click cannot record the same action twice.
+  const done = state.status === "confirmed";
   return (
     <div>
       <button
         type="button"
         onClick={onSubmit}
-        disabled={!!blocked || busy}
+        disabled={!!blocked || busy || done}
         className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-600"
       >
         {busy ? "Working…" : label}
       </button>
-      {blocked && !busy && (
+      {blocked && !busy && !done && (
         <p data-testid="blocked-reason" className="mt-2 text-xs text-amber-800">
           {blocked}
         </p>

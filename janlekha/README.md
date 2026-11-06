@@ -73,6 +73,9 @@ Each transaction is checked against current state, signed, then confirmed by rec
 
 - Vendor bids: the salt comes from `crypto.getRandomValues`. Committing is enabled only after the vendor downloads
   the bid backup (JSON), which is needed to reveal. Quotation PDFs are hashed in the browser and never uploaded.
+- Deployment requirement: `DOCUMENT_STORAGE_DIR` must be a **persistent, writable** volume. Every authorised
+  action attaches a document, so on a read-only or ephemeral filesystem (e.g. serverless) all writes are blocked.
+  `/health` reports the store as degraded in that case. Total storage is capped by `DOCUMENT_STORAGE_MAX_BYTES`.
 - Documents: PDF only, ≤ 2 MB, SHA-256 computed in the browser and re-checked by the server, stored under their
   hash in `DOCUMENT_STORAGE_DIR`. Synthetic/public demo documents only. A stored file is not official until an
   authorised role references its hash on-chain.
@@ -80,6 +83,7 @@ Each transaction is checked against current state, signed, then confirmed by rec
 ### End-to-end tests
 
 ```bash
+npm run test:documents   # upload API rules (node:test)
 npm run test:e2e   # Playwright: fresh Hardhat node on :8546, dedicated .next-e2e build on :3400
 ```
 

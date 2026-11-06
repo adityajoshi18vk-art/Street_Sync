@@ -1,11 +1,18 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Hex } from "viem";
 import { serverEnv } from "@/env/server";
 import { catalogDocument } from "@/lib/janlekha/format";
 import { isHash } from "./limits";
+
+export class StorageFullError extends Error {
+  constructor() {
+    super("Document storage is full.");
+  }
+}
 
 function dir() {
   return path.resolve(serverEnv.DOCUMENT_STORAGE_DIR);
@@ -20,6 +27,15 @@ export function sha256(bytes: Uint8Array): Hex {
   return `0x${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
+async function usedBytes(): Promise<number> {
+  let total = 0;
+  for (const name of await readdir(dir()).catch(() => [] as string[])) {
+    if (!name.endsWith(".pdf")) continue;
+    total += (await stat(path.join(dir(), name)).catch(() => ({ size: 0 }))).size;
+  }
+  return total;
+}
+
 /** Content-addressed write: the file name is its own SHA-256, so stored copies cannot be silently altered. */
 export async function storeDocument(bytes: Uint8Array): Promise<{ hash: Hex; existing: boolean }> {
   const hash = sha256(bytes);
@@ -31,9 +47,16 @@ export async function storeDocument(bytes: Uint8Array): Promise<{ hash: Hex; exi
     // not stored yet
   }
   await mkdir(dir(), { recursive: true });
+  // Best-effort cap: concurrent uploads may overshoot by at most one file each.
+  if ((await usedBytes()) + bytes.length > serverEnv.DOCUMENT_STORAGE_MAX_BYTES) throw new StorageFullError();
   const tmp = `${target}.${randomUUID()}.tmp`;
   await writeFile(tmp, bytes, { flag: "wx" });
-  await rename(tmp, target);
+  try {
+    await rename(tmp, target);
+  } catch (error) {
+    await unlink(tmp).catch(() => undefined);
+    throw error;
+  }
   return { hash, existing: false };
 }
 
@@ -42,6 +65,22 @@ export async function readStoredDocument(hash: string): Promise<Uint8Array | nul
     return await readFile(fileFor(hash));
   } catch {
     return null;
+  }
+}
+
+export type DocumentStoreStatus =
+  | { status: "ok"; usedBytes: number; maxBytes: number }
+  | { status: "unwritable"; detail: string };
+
+/** Writes need a persistent, writable directory; ephemeral or read-only hosts block every authorised action. */
+export async function checkDocumentStore(): Promise<DocumentStoreStatus> {
+  try {
+    await mkdir(dir(), { recursive: true });
+    await access(dir(), constants.W_OK);
+    return { status: "ok", usedBytes: await usedBytes(), maxBytes: serverEnv.DOCUMENT_STORAGE_MAX_BYTES };
+  } catch (error) {
+    console.error("[health] document store check failed:", error);
+    return { status: "unwritable", detail: "DOCUMENT_STORAGE_DIR is not writable" };
   }
 }
 

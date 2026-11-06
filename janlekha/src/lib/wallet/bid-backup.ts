@@ -59,7 +59,7 @@ export function createBidBackup(p: {
     salt,
     commitment: computeCommitment(p.projectId, p.vendor, p.amountPaise, p.quotationDocumentHash, salt),
     createdAt: new Date().toISOString(),
-    notice: "Keep this file private until you reveal. Anyone with it can reveal your bid; without it you cannot.",
+    notice: "Keep this file private until you reveal: it contains your bid amount. Only your vendor account can reveal this bid, and it cannot be revealed without this file.",
   };
 }
 

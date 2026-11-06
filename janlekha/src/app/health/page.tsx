@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { formatBytes } from "@/lib/janlekha/format";
 import { getHealth, type DatabaseStatus } from "@/lib/health";
 
 export const metadata: Metadata = { title: "Health" };
@@ -17,6 +18,12 @@ async function HealthDetails() {
   const rows: [string, string][] = [
     ["Overall", health.status === "ok" ? "OK" : "Degraded"],
     ["Database", DB_LABEL[health.database.status] + (health.database.latencyMs !== undefined ? ` (${health.database.latencyMs} ms)` : "")],
+    [
+      "Document storage",
+      health.documents.status === "ok"
+        ? `Writable (${formatBytes(health.documents.usedBytes)} of ${formatBytes(health.documents.maxBytes)} used)`
+        : "Not writable: authorised actions cannot attach documents",
+    ],
     ["Chain ID", String(health.chain.id)],
     ["RPC URL", health.chain.rpcUrl],
     ["JanLekha contract", health.chain.contractAddress ?? "Not deployed / not configured"],
