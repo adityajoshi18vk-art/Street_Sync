@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Award, Landmark, Map, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Award, Hammer, Landmark, Map, ShieldCheck, type LucideIcon } from "lucide-react";
 import { JANLEKHA_URL } from "@/config/contracts";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
 const NAV: NavItem[] = [
   { href: "/", label: "Map", icon: Map },
+  { href: "/worker", label: "Worker", icon: Hammer },
   { href: "/review", label: "Review", icon: ShieldCheck },
   { href: "/stickers", label: "Stickers", icon: Award }
 ];

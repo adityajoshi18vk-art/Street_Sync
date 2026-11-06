@@ -223,8 +223,8 @@ export default function MapView({
         ref={setMap}
         center={DEFAULT_CENTER}
         zoom={12}
-        minZoom={3}
-        maxBounds={[[-85, -180], [85, 180]]}
+        minZoom={4}
+        maxBounds={[[-70, -180], [80, 180]]}
         maxBoundsViscosity={1.0}
         scrollWheelZoom
         zoomControl={false}
@@ -355,7 +355,7 @@ export default function MapView({
       </div>
 
       {/* Quick location selector for Mumbai */}
-      <div className="absolute bottom-3 left-3 z-[500] flex max-w-[calc(100%-80px)] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/10 bg-ink-900/90 p-1 shadow-card backdrop-blur-md">
+      <div className="absolute top-16 left-3 z-[500] flex max-w-[calc(100%-80px)] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/10 bg-ink-900/90 p-1 shadow-card backdrop-blur-md">
         <span className="shrink-0 pl-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-300">
           🇮🇳 Mumbai:
         </span>
@@ -377,7 +377,7 @@ export default function MapView({
       </div>
 
       {notice && (
-        <div className="absolute left-1/2 top-16 z-[500] -translate-x-1/2 rounded-full border border-white/10 bg-ink-900/95 px-4 py-2 text-xs font-medium text-zinc-200 shadow-card">
+        <div className="absolute left-1/2 top-28 z-[500] -translate-x-1/2 rounded-full border border-white/10 bg-ink-900/95 px-4 py-2 text-xs font-medium text-zinc-200 shadow-card">
           {notice}
         </div>
       )}

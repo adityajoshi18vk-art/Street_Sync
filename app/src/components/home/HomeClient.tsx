@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,7 +21,9 @@ import { approveUsdcExact } from "@/lib/tx";
 import { TestUsdcFaucet } from "@/components/TestUsdcFaucet";
 import { HomeHero, type HeroGlyphs } from "@/components/home/HomeHero";
 import { HowItWorks } from "@/components/home/HowItWorks";
-import { MapPinPlus, ListFilter, RefreshCw, Hammer } from "lucide-react";
+import { MapPinPlus, ListFilter, RefreshCw, Hammer, Camera, ImagePlus, Video, X, Play } from "lucide-react";
+import { uploadVideo, getVideoPlaybackUrl, computeVideoSha256, type VideoEvidence } from "@streetsync/swarm-client";
+import { getArkivClient } from "@/lib/arkiv";
 import { listBounties } from "@/lib/api";
 import { reverseGeocode } from "@/lib/geocode";
 import {
@@ -72,6 +74,15 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
 
   const [pledgeAmount, setPledgeAmount] = useState("");
   const [pledgeStatus, setPledgeStatus] = useState<string | null>(null);
+
+  // Creator issue evidence (Photo on Arkiv + Video on Ethereum Swarm)
+  const [issuePhoto, setIssuePhoto] = useState<{ dataUrl: string; bytes: Uint8Array; name: string } | null>(null);
+  const [issueVideo, setIssueVideo] = useState<VideoEvidence | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadBounties = useCallback(async () => {
     setLoading(true);
@@ -125,6 +136,41 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
     };
   }, [draftPin, draftLabel]);
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+      setIssuePhoto({ dataUrl, bytes, name: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingVideo(true);
+    setVideoProgress("Uploading video to Ethereum Swarm…");
+    setVideoError(null);
+    try {
+      const res = await uploadVideo(file, {
+        filename: file.name,
+        mimeType: file.type || "video/webm"
+      });
+      setIssueVideo(res);
+      setVideoProgress(`Uploaded to Swarm: ${res.swarmReference.slice(0, 16)}…`);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : "Video upload failed");
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   const handleCreateBounty = async () => {
     if (!draftPin || !address || !ESCROW_ADDRESS) return;
     setTxError(null);
@@ -145,9 +191,45 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
     try {
       const { latE5, lngE5 } = latLngToE5(draftPin.lat, draftPin.lng);
       const regionCell = regionCellFromLatLng(draftPin.lat, draftPin.lng);
-      const descHash = keccak256(toHex(trimmed));
       const claimDeadline = BigInt(Math.floor(Date.now() / 1000) + EXPIRY_OPTIONS[expiryIdx].seconds);
       const initialAmount = parseUsdc(amountUsdc);
+
+      let descHash: `0x${string}`;
+      let issuePayload: any = null;
+      let arkivEntityKey: string | null = null;
+
+      if (issuePhoto || issueVideo) {
+        setTxStatus("Sealing issue media into Arkiv & Swarm…");
+        const photoSha256 = issuePhoto ? await computeVideoSha256(issuePhoto.bytes) : null;
+        issuePayload = {
+          version: 1,
+          type: "creator_issue_report",
+          description: trimmed,
+          location: { lat: draftPin.lat, lng: draftPin.lng, label: draftLabel },
+          photoDataUrl: issuePhoto?.dataUrl ?? null,
+          photoSha256,
+          video: issueVideo ?? null,
+          creator: address,
+          timestamp: Date.now()
+        };
+        const payloadBytes = new TextEncoder().encode(JSON.stringify(issuePayload));
+        const client = getArkivClient();
+        const arkivRes = await client.writeEntity(payloadBytes, {
+          project: "streetsync",
+          entity_type: "creator_issue",
+          creator: address.toLowerCase(),
+          has_photo: issuePhoto ? "true" : "false",
+          has_video: issueVideo ? "true" : "false"
+        });
+        arkivEntityKey = arkivRes.key;
+        descHash = keccak256(payloadBytes);
+
+        // Store mappings in localStorage
+        localStorage.setItem(`streetsync:issue:${descHash.toLowerCase()}`, JSON.stringify(issuePayload));
+        localStorage.setItem(`streetsync:issue_key:${descHash.toLowerCase()}`, arkivRes.key);
+      } else {
+        descHash = keccak256(toHex(trimmed));
+      }
 
       setTxStatus("Approving exactly " + amountUsdc + " USDC…");
       await approveUsdcExact({
@@ -185,11 +267,21 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
         }
       }
 
+      if (newId && issuePayload) {
+        localStorage.setItem(`streetsync:issue:${newId}`, JSON.stringify(issuePayload));
+        if (arkivEntityKey) {
+          localStorage.setItem(`streetsync:issue_key:${newId}`, arkivEntityKey);
+        }
+      }
+
       setTxStatus(null);
       setDescription("");
       setAmount("");
       setDraftPin(null);
       setDraftLabel(null);
+      setIssuePhoto(null);
+      setIssueVideo(null);
+      setVideoProgress(null);
       void loadBounties();
       if (newId) router.push(`/bounty/${newId}`);
     } catch (e) {
@@ -364,6 +456,116 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
               rows={3}
               className="field resize-none"
             />
+
+            {/* Media Attachments: Photo (Arkiv) + Video (Swarm) */}
+            <div className="card-inset p-3 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5 text-brand-400" />
+                  Attach Problem Evidence
+                </span>
+                <span className="text-[10px] text-zinc-500 font-mono">Arkiv + Swarm</span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  className="btn-ghost btn-sm flex items-center gap-1.5 border border-white/10 hover:border-brand-400/40 text-xs"
+                >
+                  <ImagePlus className="h-3.5 w-3.5 text-brand-300" />
+                  {issuePhoto ? "Replace Photo" : "Add Photo (Arkiv)"}
+                </button>
+
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleVideoSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={uploadingVideo}
+                  onClick={() => videoInputRef.current?.click()}
+                  className="btn-ghost btn-sm flex items-center gap-1.5 border border-white/10 hover:border-amber-400/40 text-xs text-amber-200"
+                >
+                  <Video className="h-3.5 w-3.5 text-amber-400" />
+                  {uploadingVideo ? "Uploading to Swarm…" : issueVideo ? "Replace Video" : "Add Video (Swarm)"}
+                </button>
+              </div>
+
+              {/* Photo preview */}
+              {issuePhoto && (
+                <div className="relative rounded-lg overflow-hidden border border-white/10 bg-black/40 p-2 flex items-center gap-3">
+                  <img
+                    src={issuePhoto.dataUrl}
+                    alt="Issue preview"
+                    className="h-12 w-12 rounded object-cover border border-white/10 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1 text-xs">
+                    <p className="truncate font-medium text-zinc-200">{issuePhoto.name}</p>
+                    <p className="text-[10px] text-brand-300">Ready to seal into Arkiv</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIssuePhoto(null)}
+                    className="text-zinc-500 hover:text-red-400 p-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Video upload in progress */}
+              {uploadingVideo && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-300 flex items-center gap-2">
+                  <span className="spinner spinner-sm spinner-inherit shrink-0" />
+                  <span>Uploading video to Ethereum Swarm Bee gateway…</span>
+                </div>
+              )}
+
+              {videoError && (
+                <p className="text-xs text-red-300">{videoError}</p>
+              )}
+
+              {/* Video preview / confirmed */}
+              {issueVideo && !uploadingVideo && (
+                <div className="relative rounded-lg overflow-hidden border border-amber-500/30 bg-black/40 p-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-8 w-8 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                      <Play className="h-4 w-4 text-amber-400" />
+                    </div>
+                    <div className="min-w-0 text-xs">
+                      <p className="font-semibold text-amber-200">
+                        Swarm Video Attached ({issueVideo.durationSeconds}s)
+                      </p>
+                      <p className="text-[10px] text-zinc-400 font-mono truncate">
+                        Ref: {issueVideo.swarmReference.slice(0, 16)}…
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIssueVideo(null);
+                      setVideoProgress(null);
+                    }}
+                    className="text-zinc-500 hover:text-red-400 p-1 shrink-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2">
               <input

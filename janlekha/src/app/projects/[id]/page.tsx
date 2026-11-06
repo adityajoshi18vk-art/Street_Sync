@@ -211,6 +211,23 @@ async function ProjectContent({ id }: { id: string }) {
         </p>
       </header>
 
+      {/* Citizen Public Audit Banner */}
+      <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/[0.08] p-4 text-xs text-emerald-200 space-y-1.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-bold flex items-center gap-1.5 text-emerald-300 text-sm">
+            <span>🏛️</span> Public Citizen Audit Ledger
+          </span>
+          <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[11px] font-mono text-emerald-300">
+            Open &amp; Transparent (No Wallet Required)
+          </span>
+        </div>
+        <p className="text-slate-300 leading-relaxed">
+          Every citizen can inspect the live transactions below — including the government sanction order,
+          procurement tenders, cryptographic sealed bids, milestone inspections, and PFMS payment advice. All
+          records are cryptographically anchored on Hedera Testnet.
+        </p>
+      </div>
+
       <Section title="Budget" badge={<OnChain />}>
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label="Allocation"><span className="text-lg font-semibold tabular-nums">{formatPaise(p.budget.allocationPaise)}</span></Field>

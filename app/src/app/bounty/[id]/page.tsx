@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Camera } from "lucide-react";
 import { useParams } from "next/navigation";
 import {
   useAccount,
@@ -80,6 +80,42 @@ export default function BountyDetailPage() {
 
   // Hooks must run before the early returns below, so derive the key from the raw read.
   const evidenceKey = (bounty as { arkivEntityKey?: string } | undefined)?.arkivEntityKey;
+  const descHash = (bounty as { descriptionHash?: string } | undefined)?.descriptionHash;
+
+  const [creatorIssue, setCreatorIssue] = useState<{
+    description?: string;
+    photoDataUrl?: string | null;
+    photoSha256?: string | null;
+    video?: VideoEvidence | null;
+    arkivEntityKey?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!bountyId) return;
+    const stored =
+      localStorage.getItem(`streetsync:issue:${bountyId}`) ||
+      (descHash ? localStorage.getItem(`streetsync:issue:${descHash.toLowerCase()}`) : null);
+    if (stored) {
+      try {
+        setCreatorIssue(JSON.parse(stored));
+        return;
+      } catch {}
+    }
+    if (descHash && !isZeroHash(descHash)) {
+      const arkivKey =
+        localStorage.getItem(`streetsync:issue_key:${descHash.toLowerCase()}`) ||
+        localStorage.getItem(`streetsync:issue_key:${bountyId}`);
+      if (arkivKey) {
+        getArkivClient()
+          .readEntity(arkivKey)
+          .then((res) => {
+            const text = new TextDecoder().decode(res.payload);
+            setCreatorIssue({ ...JSON.parse(text), arkivEntityKey: arkivKey });
+          })
+          .catch(() => {});
+      }
+    }
+  }, [bountyId, descHash]);
 
   useEffect(() => {
     if (!evidenceKey || isZeroHash(evidenceKey)) return;
@@ -216,6 +252,61 @@ export default function BountyDetailPage() {
           <Field label="Rework count" value={`${b.reworkCount} / 1`} />
           <Field label="Selection block" value={b.selectionBlock.toString()} />
         </div>
+
+        {creatorIssue && (creatorIssue.photoDataUrl || creatorIssue.video || creatorIssue.description) && (
+          <div className="card-inset mt-5 p-4 space-y-3 border border-white/10 rounded-xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-2">
+              <span className="label-micro !text-brand-300 flex items-center gap-1.5 font-bold">
+                <Camera className="h-3.5 w-3.5 text-brand-400" />
+                Reported Issue Evidence (Arkiv + Swarm)
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400">Sealed by Creator on Arc</span>
+            </div>
+            {creatorIssue.description && <p className="text-sm text-zinc-200">{creatorIssue.description}</p>}
+            {creatorIssue.photoDataUrl && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-zinc-300">Initial Problem Photo (Sealed on Arkiv)</p>
+                <img
+                  src={creatorIssue.photoDataUrl}
+                  alt="Reported problem"
+                  className="w-full max-h-72 rounded-lg object-contain bg-black/60 ring-1 ring-white/10"
+                />
+              </div>
+            )}
+            {creatorIssue.video && (
+              <div className="alert-warn mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-md bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/30">
+                      Ethereum Swarm (BZZ)
+                    </span>
+                    <span className="text-xs font-semibold text-amber-200">
+                      Creator Issue Video Walkthrough ({creatorIssue.video.durationSeconds}s)
+                    </span>
+                  </div>
+                  <a
+                    href={getVideoUrl(creatorIssue.video.swarmReference)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold text-amber-300 underline transition hover:text-amber-200"
+                  >
+                    Verify on Swarm Gateway ↗
+                  </a>
+                </div>
+                <video
+                  src={getVideoPlaybackUrl(creatorIssue.video.swarmReference)}
+                  controls
+                  playsInline
+                  className="w-full max-h-64 rounded-xl bg-black object-contain ring-1 ring-white/10"
+                />
+                <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-300/80">
+                  <span>Swarm Ref: {creatorIssue.video.swarmReference.slice(0, 20)}…</span>
+                  <span>SHA: {creatorIssue.video.videoSha256.slice(0, 16)}…</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {b.status === 1 && b.visualChallengeCode > 0 && (
           <div className="alert-info mt-4 flex items-center gap-4 p-5">

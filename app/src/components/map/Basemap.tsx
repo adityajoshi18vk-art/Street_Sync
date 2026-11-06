@@ -49,6 +49,9 @@ export function Basemap({ onReady, onFailed }: { onReady: () => void; onFailed: 
         layer = gl.addTo(map);
         map.attributionControl?.addAttribution(VECTOR_ATTRIBUTION);
         const lib = gl.getMaplibreMap();
+        try {
+          lib.setRenderWorldCopies(false);
+        } catch {}
         lib.once("load", () => {
           loaded = true;
           clearTimeout(timer);
@@ -87,6 +90,7 @@ export function Basemap({ onReady, onFailed }: { onReady: () => void; onFailed: 
         attribution={ESRI_ATTRIBUTION}
         maxNativeZoom={16}
         maxZoom={20}
+        noWrap
         eventHandlers={{
           tileload: () => {
             rasterStats.current.loaded++;
@@ -102,7 +106,7 @@ export function Basemap({ onReady, onFailed }: { onReady: () => void; onFailed: 
           }
         }}
       />
-      <TileLayer url={`${ESRI}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} maxZoom={20} />
+      <TileLayer url={`${ESRI}/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`} maxNativeZoom={16} maxZoom={20} noWrap />
     </>
   );
 }

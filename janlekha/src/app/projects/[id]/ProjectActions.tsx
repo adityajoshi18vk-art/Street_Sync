@@ -408,12 +408,18 @@ export function ProjectActions({ state }: { state: ActionState }) {
   }, [state, now, t]);
 
   return (
-    <section className="rounded-xl border border-blue-400/30 bg-blue-400/[0.06] p-4">
-      <h2 className="heading text-base">Authorised actions</h2>
-      <p className="mb-3 text-xs text-slate-300">
-        For department, vendor, inspector and PAO accounts. Each action is a transaction on {appChain.name}; the records above update only after it
-        is confirmed. Citizens do not need a wallet.
-      </p>
+    <section className="rounded-xl border border-blue-400/30 bg-blue-400/[0.06] p-4 space-y-3">
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="heading text-base">Authorised Government Actions</h2>
+          <span className="rounded-full bg-blue-400/20 px-2 py-0.5 text-[10px] font-bold text-blue-300">
+            Officials &amp; Vendors Only
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-slate-300">
+          This section is for authenticated Department, Vendor, Inspector, and PAO accounts to execute transactions on {appChain.name}. Citizens do not need a wallet and can audit all confirmed transactions in the public ledger above.
+        </p>
+      </div>
       <TxActivityProvider>
         {panels.length === 0 ? (
           <p className="text-sm text-slate-300">No further actions: all milestones are complete.</p>
