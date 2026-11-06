@@ -56,3 +56,13 @@ describe("Arkiv evidence relay validation", () => {
     assert.equal(reads, 0);
   });
 });
+
+describe("Indexer log window", async () => {
+  const { nextIndexerStep } = await import("../src/indexer.js");
+  it("halves the window on range errors and backs off on rate limits", () => {
+    assert.deepEqual(nextIndexerStep("Details: requested range too large", 500n), { batchSize: 250n, delayMs: 1000 });
+    assert.equal(nextIndexerStep("requested range too large", 12n).batchSize, 10n);
+    assert.deepEqual(nextIndexerStep("rate limit exceeded", 500n), { batchSize: 500n, delayMs: 9000 });
+    assert.deepEqual(nextIndexerStep("socket hang up", 500n), { batchSize: 500n, delayMs: 3000 });
+  });
+});
