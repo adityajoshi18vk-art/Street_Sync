@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Same-origin proxy to the backend, so the app works behind a tunnel or preview URL
+  // where the browser can't reach localhost:3001. Use with NEXT_PUBLIC_API_URL=/backend.
+  async rewrites() {
+    const target = process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
+    return [{ source: "/backend/:path*", destination: `${target}/:path*` }];
+  },
   webpack: (config, { isServer }) => {
     config.experiments = {
       ...config.experiments,
