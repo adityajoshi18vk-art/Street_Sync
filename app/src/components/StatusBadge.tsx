@@ -1,4 +1,4 @@
-import { STATUS_COLORS, STATUS_TEXT_CLASSES, statusName } from "@/lib/types";
+import { STATUS_COLORS, STATUS_TEXT_CLASSES, statusLabel, statusName } from "@/lib/types";
 
 export function StatusBadge({ status }: { status: number }) {
   const name = statusName(status);
@@ -10,7 +10,7 @@ export function StatusBadge({ status }: { status: number }) {
         className="mr-1.5 h-1.5 w-1.5 rounded-full"
         style={{ backgroundColor: STATUS_COLORS[name] }}
       />
-      {name}
+      {statusLabel(status)}
     </span>
   );
 }
