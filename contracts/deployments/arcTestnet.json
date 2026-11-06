@@ -1,8 +1,9 @@
 {
   "network": "arcTestnet",
   "chainId": 5042002,
-  "deployedAt": null,
-  "note": "Addresses are filled by `npm run deploy:arc` in contracts/. Until deployed, the app shows a configuration banner. NEXT_PUBLIC_ESCROW_ADDRESS / NEXT_PUBLIC_USDC_ADDRESS override these values at build time.",
+  "deployedAt": "2026-11-06T02:20:16.232Z",
+  "deployBlock": 70957147,
+  "note": "Deployed by contracts/scripts/deploy.ts. Attester: 0xa445eD835991A70015CC12e000182E8Ff727e5CD.",
   "parameters": {
     "reviewerStakeUsdc": "2.00",
     "reviewerStakeRaw": "2000000",
@@ -16,1208 +17,2008 @@
   },
   "contracts": {
     "StreetSyncEscrow": {
-      "address": "0x0000000000000000000000000000000000000000",
-      "transactionHash": null,
+      "address": "0x3Fd53ce0728BfBDbc5559C4a573f54294FfEa356",
+      "transactionHash": "0xc53774017f7550a8caef569a69e22b1a1493a62d1685b332ff7ac6dd61924165",
       "abi": [
         {
-          "type": "function",
-          "name": "createBounty",
-          "stateMutability": "nonpayable",
           "inputs": [
             {
-              "name": "descHash",
+              "internalType": "address",
+              "name": "usdcToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "_attester",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "_commitWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "_revealWindow",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "_claimDuration",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "constructor"
+        },
+        {
+          "inputs": [],
+          "name": "AlreadyCommitted",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "AlreadyRegistered",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "AlreadyRevealed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "AttestationExpired",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ClaimDeadlineNotPassed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ClaimExpired",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "CommitWindowClosed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "CreatorCannotClaim",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "InsufficientReviewers",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "InvalidAttestation",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "InvalidDeadline",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "NonceAlreadyUsed",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "NotPanelMember",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "NotWorker",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "NothingToWithdraw",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "owner",
+              "type": "address"
+            }
+          ],
+          "name": "OwnableInvalidOwner",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "account",
+              "type": "address"
+            }
+          ],
+          "name": "OwnableUnauthorizedAccount",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "PledgerCannotClaim",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "QuorumNotReached",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "RevealWindowNotOpen",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "RevealWindowOpen",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ReworkLimitReached",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "token",
+              "type": "address"
+            }
+          ],
+          "name": "SafeERC20FailedOperation",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "SelectionBlockNotReached",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "Unauthorized",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "VoteHashMismatch",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "enum Status",
+              "name": "expected",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum Status",
+              "name": "actual",
+              "type": "uint8"
+            }
+          ],
+          "name": "WrongStatus",
+          "type": "error"
+        },
+        {
+          "inputs": [],
+          "name": "ZeroAmount",
+          "type": "error"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "address",
+              "name": "newAttester",
+              "type": "address"
+            }
+          ],
+          "name": "AttesterUpdated",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint16",
+              "name": "visualChallengeCode",
+              "type": "uint16"
+            }
+          ],
+          "name": "BountyClaimed",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "descriptionHash",
               "type": "bytes32"
             },
             {
+              "indexed": false,
+              "internalType": "int32",
               "name": "latE5",
               "type": "int32"
             },
             {
+              "indexed": false,
+              "internalType": "int32",
               "name": "lngE5",
               "type": "int32"
             },
             {
+              "indexed": false,
+              "internalType": "uint16",
               "name": "regionCell",
               "type": "uint16"
             },
             {
+              "indexed": false,
+              "internalType": "uint256",
               "name": "initialAmount",
               "type": "uint256"
             },
             {
+              "indexed": false,
+              "internalType": "uint64",
               "name": "claimDeadline",
               "type": "uint64"
             }
           ],
-          "outputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ]
+          "name": "BountyCreated",
+          "type": "event"
         },
         {
-          "type": "function",
-          "name": "pledge",
-          "stateMutability": "nonpayable",
+          "anonymous": false,
           "inputs": [
             {
+              "indexed": true,
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             },
             {
-              "name": "amount",
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "reworkCount",
+              "type": "uint8"
+            }
+          ],
+          "name": "BountyReworked",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "approved",
+              "type": "bool"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "workerPayout",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "reviewerCut",
               "type": "uint256"
             }
           ],
-          "outputs": []
+          "name": "BountySettled",
+          "type": "event"
         },
         {
-          "type": "function",
-          "name": "claim",
-          "stateMutability": "nonpayable",
+          "anonymous": false,
           "inputs": [
             {
-              "name": "bountyId",
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newDuration",
               "type": "uint256"
-            },
-            {
-              "name": "nonce",
-              "type": "uint256"
-            },
-            {
-              "name": "expiry",
-              "type": "uint64"
-            },
-            {
-              "name": "attestationSig",
-              "type": "bytes"
             }
           ],
-          "outputs": []
+          "name": "ClaimDurationSet",
+          "type": "event"
         },
         {
-          "type": "function",
-          "name": "submitEvidence",
-          "stateMutability": "nonpayable",
+          "anonymous": false,
           "inputs": [
             {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newWindow",
+              "type": "uint256"
+            }
+          ],
+          "name": "CommitWindowSet",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             },
             {
+              "indexed": true,
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes32",
               "name": "arkivEntityKey",
               "type": "bytes32"
             },
             {
+              "indexed": false,
+              "internalType": "bytes32",
               "name": "evidenceHash",
               "type": "bytes32"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "selectionBlock",
+              "type": "uint256"
             }
           ],
-          "outputs": []
+          "name": "EvidenceSubmitted",
+          "type": "event"
         },
         {
-          "type": "function",
-          "name": "registerReviewer",
-          "stateMutability": "nonpayable",
+          "anonymous": false,
           "inputs": [
             {
+              "indexed": true,
+              "internalType": "address",
+              "name": "previousOwner",
+              "type": "address"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "newOwner",
+              "type": "address"
+            }
+          ],
+          "name": "OwnershipTransferred",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "reviewRound",
+              "type": "uint8"
+            },
+            {
+              "indexed": false,
+              "internalType": "address[3]",
+              "name": "panel",
+              "type": "address[3]"
+            }
+          ],
+          "name": "PanelAssigned",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "pledger",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "PledgeWithdrawn",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "pledger",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newTotal",
+              "type": "uint256"
+            }
+          ],
+          "name": "Pledged",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint8",
+              "name": "newReviewRound",
+              "type": "uint8"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "totalSlashed",
+              "type": "uint256"
+            }
+          ],
+          "name": "PokeOrReplace",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "newWindow",
+              "type": "uint256"
+            }
+          ],
+          "name": "RevealWindowSet",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint16",
               "name": "regionCell",
               "type": "uint16"
             },
             {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "stakeAmount",
+              "type": "uint256"
+            }
+          ],
+          "name": "ReviewerRegistered",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "ReviewerRewardCredited",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "ReviewerSlashed",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "RewardWithdrawn",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bytes32",
+              "name": "commitHash",
+              "type": "bytes32"
+            }
+          ],
+          "name": "VoteCommitted",
+          "type": "event"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "indexed": true,
+              "internalType": "address",
+              "name": "reviewer",
+              "type": "address"
+            },
+            {
+              "indexed": false,
+              "internalType": "bool",
+              "name": "approve",
+              "type": "bool"
+            }
+          ],
+          "name": "VoteRevealed",
+          "type": "event"
+        },
+        {
+          "inputs": [],
+          "name": "BPS_DENOMINATOR",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "MAX_REWORK",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "",
+              "type": "uint8"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "REVIEWER_CUT_BPS",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "REVIEWER_STAKE",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "STALE_BLOCK_LIMIT",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "USDC",
+          "outputs": [
+            {
+              "internalType": "contract IERC20",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "assignPanel",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "attester",
+          "outputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "name": "bounties",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "descriptionHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "int32",
+              "name": "latE5",
+              "type": "int32"
+            },
+            {
+              "internalType": "int32",
+              "name": "lngE5",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint16",
+              "name": "regionCell",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint256",
+              "name": "totalPledged",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint64",
+              "name": "createdAt",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint64",
+              "name": "claimDeadline",
+              "type": "uint64"
+            },
+            {
+              "internalType": "address",
+              "name": "worker",
+              "type": "address"
+            },
+            {
+              "internalType": "uint16",
+              "name": "visualChallengeCode",
+              "type": "uint16"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "arkivEntityKey",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "evidenceHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "uint256",
+              "name": "selectionBlock",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reviewRound",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reworkCount",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum Status",
+              "name": "status",
+              "type": "uint8"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
               "name": "nonce",
               "type": "uint256"
             },
             {
+              "internalType": "uint64",
               "name": "expiry",
               "type": "uint64"
             },
             {
+              "internalType": "bytes",
               "name": "attestationSig",
               "type": "bytes"
             }
           ],
-          "outputs": []
+          "name": "claim",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "assignPanel",
-          "stateMutability": "nonpayable",
-          "inputs": [
+          "inputs": [],
+          "name": "claimDuration",
+          "outputs": [
             {
-              "name": "bountyId",
+              "internalType": "uint256",
+              "name": "",
               "type": "uint256"
             }
           ],
-          "outputs": []
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "commitVote",
-          "stateMutability": "nonpayable",
           "inputs": [
             {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "name": "commitDeadline",
+          "outputs": [
+            {
+              "internalType": "uint64",
+              "name": "",
+              "type": "uint64"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             },
             {
+              "internalType": "bytes32",
               "name": "voteHash",
               "type": "bytes32"
             }
           ],
-          "outputs": []
+          "name": "commitVote",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "revealVote",
-          "stateMutability": "nonpayable",
+          "inputs": [],
+          "name": "commitWindow",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
           "inputs": [
             {
-              "name": "bountyId",
+              "internalType": "bytes32",
+              "name": "descHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "int32",
+              "name": "latE5",
+              "type": "int32"
+            },
+            {
+              "internalType": "int32",
+              "name": "lngE5",
+              "type": "int32"
+            },
+            {
+              "internalType": "uint16",
+              "name": "regionCell",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint256",
+              "name": "initialAmount",
               "type": "uint256"
             },
             {
-              "name": "approve",
-              "type": "bool"
-            },
+              "internalType": "uint64",
+              "name": "_claimDeadline",
+              "type": "uint64"
+            }
+          ],
+          "name": "createBounty",
+          "outputs": [
             {
-              "name": "salt",
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "domainSeparator",
+          "outputs": [
+            {
+              "internalType": "bytes32",
+              "name": "",
               "type": "bytes32"
             }
           ],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "settle",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "rework",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "pokeOrReplace",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "withdrawPledge",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "withdrawReward",
-          "stateMutability": "nonpayable",
-          "inputs": [],
-          "outputs": []
-        },
-        {
-          "type": "function",
-          "name": "getBounty",
           "stateMutability": "view",
+          "type": "function"
+        },
+        {
           "inputs": [
             {
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             }
           ],
+          "name": "getBounty",
           "outputs": [
             {
-              "name": "",
-              "type": "tuple",
               "components": [
                 {
+                  "internalType": "uint256",
                   "name": "id",
                   "type": "uint256"
                 },
                 {
+                  "internalType": "address",
                   "name": "creator",
                   "type": "address"
                 },
                 {
+                  "internalType": "bytes32",
                   "name": "descriptionHash",
                   "type": "bytes32"
                 },
                 {
+                  "internalType": "int32",
                   "name": "latE5",
                   "type": "int32"
                 },
                 {
+                  "internalType": "int32",
                   "name": "lngE5",
                   "type": "int32"
                 },
                 {
+                  "internalType": "uint16",
                   "name": "regionCell",
                   "type": "uint16"
                 },
                 {
+                  "internalType": "uint256",
                   "name": "totalPledged",
                   "type": "uint256"
                 },
                 {
+                  "internalType": "uint64",
                   "name": "createdAt",
                   "type": "uint64"
                 },
                 {
+                  "internalType": "uint64",
                   "name": "claimDeadline",
                   "type": "uint64"
                 },
                 {
+                  "internalType": "address",
                   "name": "worker",
                   "type": "address"
                 },
                 {
+                  "internalType": "uint16",
                   "name": "visualChallengeCode",
                   "type": "uint16"
                 },
                 {
+                  "internalType": "bytes32",
                   "name": "arkivEntityKey",
                   "type": "bytes32"
                 },
                 {
+                  "internalType": "bytes32",
                   "name": "evidenceHash",
                   "type": "bytes32"
                 },
                 {
+                  "internalType": "uint256",
                   "name": "selectionBlock",
                   "type": "uint256"
                 },
                 {
+                  "internalType": "uint8",
                   "name": "reviewRound",
                   "type": "uint8"
                 },
                 {
+                  "internalType": "uint8",
                   "name": "reworkCount",
                   "type": "uint8"
                 },
                 {
+                  "internalType": "enum Status",
                   "name": "status",
                   "type": "uint8"
                 }
-              ]
+              ],
+              "internalType": "struct Bounty",
+              "name": "",
+              "type": "tuple"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "getPledgers",
-          "stateMutability": "view",
           "inputs": [
             {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "reviewRound",
+              "type": "uint8"
+            }
+          ],
+          "name": "getPanel",
+          "outputs": [
+            {
+              "internalType": "address[3]",
+              "name": "",
+              "type": "address[3]"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             }
           ],
+          "name": "getPledgers",
           "outputs": [
             {
+              "internalType": "address[]",
               "name": "",
               "type": "address[]"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "getTally",
-          "stateMutability": "view",
           "inputs": [
             {
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             }
           ],
+          "name": "getTally",
           "outputs": [
             {
+              "internalType": "uint8",
               "name": "revealed",
               "type": "uint8"
             },
             {
+              "internalType": "uint8",
               "name": "approvals",
               "type": "uint8"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "pledges",
-          "stateMutability": "view",
           "inputs": [
             {
+              "internalType": "uint256",
               "name": "bountyId",
               "type": "uint256"
             },
             {
-              "name": "pledger",
-              "type": "address"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "nextBountyId",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "claimDuration",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "commitWindow",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "revealWindow",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "commitDeadline",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint64"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "revealDeadline",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint64"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "USDC",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "address"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "attester",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "address"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "usedNonces",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "wallet",
-              "type": "address"
+              "internalType": "uint8",
+              "name": "reviewRound",
+              "type": "uint8"
             },
             {
-              "name": "nonce",
-              "type": "uint256"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bool"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "domainSeparator",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bytes32"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "REVIEWER_STAKE",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "REVIEWER_CUT_BPS",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "reviewers",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "wallet",
+              "internalType": "address",
+              "name": "reviewer",
               "type": "address"
             }
           ],
+          "name": "getVote",
           "outputs": [
             {
-              "name": "",
-              "type": "tuple",
               "components": [
                 {
-                  "name": "wallet",
-                  "type": "address"
+                  "internalType": "bytes32",
+                  "name": "commitHash",
+                  "type": "bytes32"
                 },
                 {
-                  "name": "regionCell",
-                  "type": "uint16"
-                },
-                {
-                  "name": "stakedAmount",
-                  "type": "uint256"
-                },
-                {
-                  "name": "active",
+                  "internalType": "bool",
+                  "name": "revealed",
                   "type": "bool"
                 },
                 {
-                  "name": "rewardBalance",
-                  "type": "uint256"
+                  "internalType": "bool",
+                  "name": "approve",
+                  "type": "bool"
+                },
+                {
+                  "internalType": "bool",
+                  "name": "committed",
+                  "type": "bool"
                 }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "poolSize",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "regionCell",
-              "type": "uint16"
+              ],
+              "internalType": "struct VoteCommit",
+              "name": "",
+              "type": "tuple"
             }
           ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "nextBountyId",
           "outputs": [
             {
+              "internalType": "uint256",
               "name": "",
               "type": "uint256"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "poolAddresses",
+          "inputs": [],
+          "name": "owner",
+          "outputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
           "stateMutability": "view",
+          "type": "function"
+        },
+        {
           "inputs": [
             {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            }
+          ],
+          "name": "pledge",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            }
+          ],
+          "name": "pledges",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "pokeOrReplace",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint16",
               "name": "regionCell",
               "type": "uint16"
             }
           ],
+          "name": "poolAddresses",
           "outputs": [
             {
+              "internalType": "address[]",
               "name": "",
               "type": "address[]"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "BountyCreated",
-          "anonymous": false,
           "inputs": [
             {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "creator",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "descriptionHash",
-              "type": "bytes32",
-              "indexed": false
-            },
-            {
-              "name": "latE5",
-              "type": "int32",
-              "indexed": false
-            },
-            {
-              "name": "lngE5",
-              "type": "int32",
-              "indexed": false
-            },
-            {
+              "internalType": "uint16",
               "name": "regionCell",
-              "type": "uint16",
-              "indexed": false
-            },
-            {
-              "name": "initialAmount",
-              "type": "uint256",
-              "indexed": false
-            },
-            {
-              "name": "claimDeadline",
-              "type": "uint64",
-              "indexed": false
+              "type": "uint16"
             }
-          ]
+          ],
+          "name": "poolSize",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "Pledged",
-          "anonymous": false,
           "inputs": [
             {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
+              "internalType": "uint16",
+              "name": "regionCell",
+              "type": "uint16"
             },
             {
-              "name": "pledger",
-              "type": "address",
-              "indexed": true
+              "internalType": "uint256",
+              "name": "nonce",
+              "type": "uint256"
             },
             {
-              "name": "amount",
-              "type": "uint256",
-              "indexed": false
+              "internalType": "uint64",
+              "name": "expiry",
+              "type": "uint64"
             },
             {
-              "name": "newTotal",
-              "type": "uint256",
-              "indexed": false
+              "internalType": "bytes",
+              "name": "attestationSig",
+              "type": "bytes"
             }
-          ]
+          ],
+          "name": "registerReviewer",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "BountyClaimed",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "worker",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "visualChallengeCode",
-              "type": "uint16",
-              "indexed": false
-            }
-          ]
+          "inputs": [],
+          "name": "renounceOwnership",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "EvidenceSubmitted",
-          "anonymous": false,
           "inputs": [
             {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "worker",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "arkivEntityKey",
-              "type": "bytes32",
-              "indexed": false
-            },
-            {
-              "name": "evidenceHash",
-              "type": "bytes32",
-              "indexed": false
-            },
-            {
-              "name": "selectionBlock",
-              "type": "uint256",
-              "indexed": false
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
             }
-          ]
+          ],
+          "name": "revealDeadline",
+          "outputs": [
+            {
+              "internalType": "uint64",
+              "name": "",
+              "type": "uint64"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "PanelAssigned",
-          "anonymous": false,
           "inputs": [
             {
+              "internalType": "uint256",
               "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
+              "type": "uint256"
             },
             {
-              "name": "reviewRound",
-              "type": "uint8",
-              "indexed": false
-            },
-            {
-              "name": "panel",
-              "type": "address[3]",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "VoteCommitted",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "reviewer",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "commitHash",
-              "type": "bytes32",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "VoteRevealed",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "reviewer",
-              "type": "address",
-              "indexed": true
-            },
-            {
+              "internalType": "bool",
               "name": "approve",
-              "type": "bool",
-              "indexed": false
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "salt",
+              "type": "bytes32"
             }
-          ]
+          ],
+          "name": "revealVote",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "BountySettled",
-          "anonymous": false,
-          "inputs": [
+          "inputs": [],
+          "name": "revealWindow",
+          "outputs": [
             {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "approved",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "workerPayout",
-              "type": "uint256",
-              "indexed": false
-            },
-            {
-              "name": "reviewerCut",
-              "type": "uint256",
-              "indexed": false
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "event",
-          "name": "ReviewerSlashed",
-          "anonymous": false,
           "inputs": [
             {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "reviewer",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "amount",
-              "type": "uint256",
-              "indexed": false
+              "internalType": "address",
+              "name": "",
+              "type": "address"
             }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "ReviewerRegistered",
-          "anonymous": false,
-          "inputs": [
+          ],
+          "name": "reviewers",
+          "outputs": [
             {
-              "name": "reviewer",
-              "type": "address",
-              "indexed": true
+              "internalType": "address",
+              "name": "wallet",
+              "type": "address"
             },
             {
+              "internalType": "uint16",
               "name": "regionCell",
-              "type": "uint16",
-              "indexed": false
+              "type": "uint16"
             },
             {
-              "name": "stakeAmount",
-              "type": "uint256",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "RewardWithdrawn",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "reviewer",
-              "type": "address",
-              "indexed": true
+              "internalType": "uint256",
+              "name": "stakedAmount",
+              "type": "uint256"
             },
             {
-              "name": "amount",
-              "type": "uint256",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "PledgeWithdrawn",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
+              "internalType": "bool",
+              "name": "active",
+              "type": "bool"
             },
             {
-              "name": "pledger",
-              "type": "address",
-              "indexed": true
-            },
-            {
-              "name": "amount",
-              "type": "uint256",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "PokeOrReplace",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "newReviewRound",
-              "type": "uint8",
-              "indexed": false
-            },
-            {
-              "name": "totalSlashed",
-              "type": "uint256",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "event",
-          "name": "BountyReworked",
-          "anonymous": false,
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "indexed": true
-            },
-            {
-              "name": "reworkCount",
-              "type": "uint8",
-              "indexed": false
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "getPanel",
-          "stateMutability": "view",
-          "inputs": [
-            {
-              "name": "bountyId",
-              "type": "uint256",
-              "internalType": "uint256"
-            },
-            {
-              "name": "reviewRound",
-              "type": "uint8",
-              "internalType": "uint8"
+              "internalType": "uint256",
+              "name": "rewardBalance",
+              "type": "uint256"
             }
           ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "address[3]",
-              "internalType": "address[3]"
-            }
-          ]
+          "stateMutability": "view",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "getVote",
-          "stateMutability": "view",
           "inputs": [
             {
+              "internalType": "uint256",
               "name": "bountyId",
-              "type": "uint256",
-              "internalType": "uint256"
-            },
-            {
-              "name": "reviewRound",
-              "type": "uint8",
-              "internalType": "uint8"
-            },
-            {
-              "name": "reviewer",
-              "type": "address",
-              "internalType": "address"
+              "type": "uint256"
             }
           ],
+          "name": "rework",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "newAttester",
+              "type": "address"
+            }
+          ],
+          "name": "setAttester",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "secs",
+              "type": "uint256"
+            }
+          ],
+          "name": "setClaimDuration",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "secs",
+              "type": "uint256"
+            }
+          ],
+          "name": "setCommitWindow",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "secs",
+              "type": "uint256"
+            }
+          ],
+          "name": "setRevealWindow",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "settle",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "arkivEntityKey",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "evidenceHash_",
+              "type": "bytes32"
+            }
+          ],
+          "name": "submitEvidence",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "newOwner",
+              "type": "address"
+            }
+          ],
+          "name": "transferOwnership",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "name": "usedNonces",
           "outputs": [
             {
+              "internalType": "bool",
               "name": "",
-              "type": "tuple",
-              "internalType": "struct StreetSyncTypes.VoteCommit",
-              "components": [
-                {
-                  "name": "commitHash",
-                  "type": "bytes32",
-                  "internalType": "bytes32"
-                },
-                {
-                  "name": "revealed",
-                  "type": "bool",
-                  "internalType": "bool"
-                },
-                {
-                  "name": "approve",
-                  "type": "bool",
-                  "internalType": "bool"
-                },
-                {
-                  "name": "committed",
-                  "type": "bool",
-                  "internalType": "bool"
-                }
-              ]
+              "type": "bool"
             }
-          ]
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "uint256",
+              "name": "bountyId",
+              "type": "uint256"
+            }
+          ],
+          "name": "withdrawPledge",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "withdrawReward",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
         }
       ]
     },
     "USDC": {
       "address": "0x3600000000000000000000000000000000000000",
       "transactionHash": null,
-      "note": "Arc Testnet system USDC ERC-20 interface (6 decimals).",
       "abi": [
         {
-          "type": "function",
-          "name": "name",
-          "stateMutability": "view",
           "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "string"
-            }
-          ]
+          "stateMutability": "nonpayable",
+          "type": "constructor"
         },
         {
-          "type": "function",
-          "name": "symbol",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "string"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "decimals",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint8"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "totalSupply",
-          "stateMutability": "view",
-          "inputs": [],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "balanceOf",
-          "stateMutability": "view",
           "inputs": [
             {
-              "name": "account",
+              "internalType": "address",
+              "name": "spender",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "allowance",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "needed",
+              "type": "uint256"
+            }
+          ],
+          "name": "ERC20InsufficientAllowance",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "sender",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "balance",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "needed",
+              "type": "uint256"
+            }
+          ],
+          "name": "ERC20InsufficientBalance",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "approver",
               "type": "address"
             }
           ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
+          "name": "ERC20InvalidApprover",
+          "type": "error"
         },
         {
-          "type": "function",
-          "name": "allowance",
-          "stateMutability": "view",
           "inputs": [
             {
+              "internalType": "address",
+              "name": "receiver",
+              "type": "address"
+            }
+          ],
+          "name": "ERC20InvalidReceiver",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "sender",
+              "type": "address"
+            }
+          ],
+          "name": "ERC20InvalidSender",
+          "type": "error"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "spender",
+              "type": "address"
+            }
+          ],
+          "name": "ERC20InvalidSpender",
+          "type": "error"
+        },
+        {
+          "anonymous": false,
+          "inputs": [
+            {
+              "indexed": true,
+              "internalType": "address",
               "name": "owner",
               "type": "address"
             },
             {
-              "name": "spender",
-              "type": "address"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "uint256"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "approve",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
+              "indexed": true,
+              "internalType": "address",
               "name": "spender",
               "type": "address"
             },
             {
-              "name": "amount",
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "value",
               "type": "uint256"
             }
           ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bool"
-            }
-          ]
+          "name": "Approval",
+          "type": "event"
         },
         {
-          "type": "function",
-          "name": "transfer",
-          "stateMutability": "nonpayable",
+          "anonymous": false,
           "inputs": [
             {
-              "name": "to",
-              "type": "address"
-            },
-            {
-              "name": "amount",
-              "type": "uint256"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bool"
-            }
-          ]
-        },
-        {
-          "type": "function",
-          "name": "transferFrom",
-          "stateMutability": "nonpayable",
-          "inputs": [
-            {
+              "indexed": true,
+              "internalType": "address",
               "name": "from",
               "type": "address"
             },
             {
+              "indexed": true,
+              "internalType": "address",
               "name": "to",
               "type": "address"
             },
             {
-              "name": "amount",
+              "indexed": false,
+              "internalType": "uint256",
+              "name": "value",
               "type": "uint256"
             }
           ],
+          "name": "Transfer",
+          "type": "event"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "owner",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "spender",
+              "type": "address"
+            }
+          ],
+          "name": "allowance",
           "outputs": [
             {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "spender",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "value",
+              "type": "uint256"
+            }
+          ],
+          "name": "approve",
+          "outputs": [
+            {
+              "internalType": "bool",
               "name": "",
               "type": "bool"
             }
-          ]
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function"
         },
         {
-          "type": "function",
-          "name": "mint",
-          "stateMutability": "nonpayable",
           "inputs": [
             {
+              "internalType": "address",
+              "name": "account",
+              "type": "address"
+            }
+          ],
+          "name": "balanceOf",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "decimals",
+          "outputs": [
+            {
+              "internalType": "uint8",
+              "name": "",
+              "type": "uint8"
+            }
+          ],
+          "stateMutability": "pure",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
               "name": "to",
               "type": "address"
             },
             {
+              "internalType": "uint256",
               "name": "amount",
               "type": "uint256"
             }
           ],
-          "outputs": []
+          "name": "mint",
+          "outputs": [],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "name",
+          "outputs": [
+            {
+              "internalType": "string",
+              "name": "",
+              "type": "string"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "symbol",
+          "outputs": [
+            {
+              "internalType": "string",
+              "name": "",
+              "type": "string"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [],
+          "name": "totalSupply",
+          "outputs": [
+            {
+              "internalType": "uint256",
+              "name": "",
+              "type": "uint256"
+            }
+          ],
+          "stateMutability": "view",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "to",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "value",
+              "type": "uint256"
+            }
+          ],
+          "name": "transfer",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function"
+        },
+        {
+          "inputs": [
+            {
+              "internalType": "address",
+              "name": "from",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "to",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "value",
+              "type": "uint256"
+            }
+          ],
+          "name": "transferFrom",
+          "outputs": [
+            {
+              "internalType": "bool",
+              "name": "",
+              "type": "bool"
+            }
+          ],
+          "stateMutability": "nonpayable",
+          "type": "function"
         }
       ]
     }
