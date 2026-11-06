@@ -22,9 +22,16 @@ export function ConnectButton() {
           if (injected) connect({ connector: injected });
         }}
         disabled={isPending}
-        className="btn-primary px-4 py-2 text-sm"
+        className="btn-primary btn-sm"
       >
-        {isPending ? "Connecting…" : "Connect Wallet"}
+        {isPending ? (
+          <>
+            <span className="spinner spinner-sm border-white/40 border-t-white" />
+            Connecting…
+          </>
+        ) : (
+          "Connect Wallet"
+        )}
       </button>
     );
   }
@@ -35,7 +42,7 @@ export function ConnectButton() {
         <button
           onClick={() => switchChain({ chainId: ACTIVE_CHAIN.id })}
           disabled={switching}
-          className="btn rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300 hover:bg-red-400/20"
+          className="btn btn-sm border border-red-400/30 bg-red-400/10 text-red-300 hover:bg-red-400/20"
         >
           {switching ? "Switching…" : `Switch to ${ACTIVE_CHAIN.name}`}
         </button>
@@ -43,7 +50,7 @@ export function ConnectButton() {
       <div className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.08]"
+          className="flex min-h-[2rem] items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-1.5 text-sm font-semibold text-slate-200 transition hover:border-white/30 hover:bg-white/10"
         >
           <span
             className={`h-2 w-2 rounded-full ${
