@@ -7,6 +7,9 @@
  *   GET  /api/bounties            – List bounties (filterable by status, bbox, worker)
  *   GET  /api/bounties/:id        – Full bounty detail with pledges, panel, votes
  *   GET  /api/reviewers/:address/assignments – Bounties assigned to a reviewer
+ *   POST /api/arkiv/reports       – Verified problem-report upload (Arkiv)
+ *   GET  /api/bounties/:id/report – Problem-report photo + description
+ *   GET  /api/config              – Public deployment settings
  *   GET  /api/health              – Health check
  */
 
@@ -18,6 +21,9 @@ import { getAttesterAddress, getVerifyingContract, isAttestationSignerReady, set
 import { startIndexer, stopIndexer } from "./indexer.js";
 import type { Address } from "viem";
 import { isArkivRelayConfigured, registerArkivRoutes } from "./arkiv-relay.js";
+import { registerReportRoutes } from "./report-relay.js";
+import { registerConfigRoute } from "./config.js";
+import { areWorldActionsConfigured } from "./worldid.js";
 import { isWorldIdConfigured, registerWorldIdRoutes, worldIdConfig } from "./worldid-v4.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -141,6 +147,7 @@ app.get<{ Params: { id: string } }>("/api/bounties/:id", async (request, reply) 
     assignedReviewers,
     reviewRound: panel?.review_round ?? 0,
     voteStatus,
+    problemVotes: dbAccess.getProblemVotes(id).map((v) => ({ voter: v.voter, isReal: !!v.is_real })),
     settlement: settlement ?? null,
   });
 });
@@ -186,6 +193,8 @@ app.get<{ Params: { address: string } }>("/api/reviewers/:address/assignments", 
 // ═══════════════════════════════════════════════════════════════════════════════
 
 registerArkivRoutes(app);
+registerReportRoutes(app);
+registerConfigRoute(app);
 
 app.get("/api/health", async (_request, reply) => {
   let escrowConfigured = true;
@@ -196,10 +205,11 @@ app.get("/api/health", async (_request, reply) => {
   }
   const worldIdConfigured = isWorldIdConfigured();
   const signerConfigured = isAttestationSignerReady();
+  const worldActions = areWorldActionsConfigured();
   return reply.send({
     status: "ok",
-    ready: worldIdConfigured && signerConfigured && escrowConfigured && isArkivRelayConfigured(),
-    readiness: { worldId: worldIdConfigured, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
+    ready: worldIdConfigured && worldActions && signerConfigured && escrowConfigured && isArkivRelayConfigured(),
+    readiness: { worldId: worldIdConfigured, worldActions, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
     chainId: CHAIN_ID,
     attester: getAttesterAddress() ?? "",
     worldAppId: worldIdConfig().appId,
@@ -225,6 +235,7 @@ async function main() {
   if (process.env.ESCROW_CONTRACT_ADDRESS) {
     try {
       setVerifyingContract(process.env.ESCROW_CONTRACT_ADDRESS as Address);
+      dbAccess.ensureDeploymentScope(CHAIN_ID, process.env.ESCROW_CONTRACT_ADDRESS);
       console.log(`Escrow contract:  ${process.env.ESCROW_CONTRACT_ADDRESS}`);
     } catch {
       console.warn("Ignoring invalid ESCROW_CONTRACT_ADDRESS; attestation signing will remain unavailable.");
@@ -256,6 +267,9 @@ async function main() {
     console.log("  GET  /api/bounties/:id");
     console.log("  GET  /api/reviewers/:address/assignments");
     console.log("  POST /api/arkiv/entities");
+    console.log("  POST /api/arkiv/reports");
+    console.log("  GET  /api/bounties/:id/report");
+    console.log("  GET  /api/config");
     console.log("  GET  /api/arkiv/entities/:key");
     console.log("  GET  /api/health");
   } catch (err) {
