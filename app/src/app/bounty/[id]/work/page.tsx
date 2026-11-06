@@ -618,8 +618,9 @@ export default function WorkerPage() {
           {phase === "done" && (
             <div className="space-y-3">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                Evidence published. The panel is selected 2 blocks after this transaction
-                (Rule 4), then commit-reveal voting runs.
+                Evidence published. Next, three reviewers are drawn at random: open the bounty page
+                and tap <strong>Draw review panel</strong> (anyone can). Reviewers then vote, and you are
+                paid when they approve.
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Link
