@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { IDKitWidget } from "@worldcoin/idkit";
 import type { ISuccessResult } from "@worldcoin/idkit";
-import { useAccount, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { decodeEventLog, type Hash } from "viem";
 
@@ -38,14 +38,14 @@ type Phase =
   | "submitting"
   | "done";
 
-const APP_VERSION = "1.0.0";
-
 export default function WorkerPage() {
   const params = useParams<{ id: string }>();
   const bountyId = params.id;
   const router = useRouter();
   const config = useConfig();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
 
@@ -70,6 +70,7 @@ export default function WorkerPage() {
   }, [bountyId]);
 
   const { data: bounty, refetch: refetchBounty } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getBounty",
@@ -78,6 +79,7 @@ export default function WorkerPage() {
   });
 
   const { data: usdcBalance } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (USDC_ADDRESS as `0x${string}`) : undefined,
     abi: USDC_ABI,
     functionName: "balanceOf",
@@ -92,18 +94,14 @@ export default function WorkerPage() {
   const isWorker = !!address && !!worker && worker.toLowerCase() === address.toLowerCase();
   const evidenceHash = raw && typeof raw[12] === "string" ? (raw[12] as string) : null;
 
-  const deviceSummary = useMemo(() => {
-    if (typeof window === "undefined" || typeof navigator === "undefined") return "unknown";
-    const ua = navigator.userAgent;
-    const mobile = /Android|iPhone|iPad|Mobile/i.test(ua) ? "mobile" : "desktop";
-    return `${navigator.platform || "unknown"} · ${mobile} · ${window.innerWidth}x${window.innerHeight}`;
-  }, []);
-
   // ─── Step 1: World ID verify → attestation → claim() ───────────────────────
 
   const runClaim = useCallback(
     async (attestation: Attestation) => {
-      if (!address || !bountyIdBig) return;
+      if (!canWrite || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+        setError("Connect a wallet on the configured contract network to claim this bounty.");
+        return;
+      }
       setPhase("claiming");
       setError(null);
       try {
@@ -121,7 +119,7 @@ export default function WorkerPage() {
           account: address
         });
         setTxHash(hash);
-        await waitForTransactionReceipt(config, { hash });
+        await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
         await refetchBounty();
         setPhase("work");
       } catch (err) {
@@ -129,12 +127,12 @@ export default function WorkerPage() {
         setPhase("verify");
       }
     },
-    [address, bountyIdBig, config, refetchBounty, writeContractAsync]
+    [address, bountyIdBig, canWrite, config, refetchBounty, writeContractAsync]
   );
 
   const handleWorldIdVerify = useCallback(
     async (result: ISuccessResult) => {
-      if (!address) throw new Error("Connect a wallet first");
+      if (!canWrite || !address) throw new Error("Connect a wallet on the configured contract network first");
       const proof: WorldIdSuccessResult = {
         nullifier_hash: result.nullifier_hash,
         merkle_root: result.merkle_root,
@@ -151,7 +149,7 @@ export default function WorkerPage() {
       attestationRef.current = attestation;
       await runClaim(attestation);
     },
-    [address, bountyId, runClaim, WORLD_ACTION_WORKER]
+    [address, bountyId, canWrite, runClaim, WORLD_ACTION_WORKER]
   );
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
@@ -166,29 +164,33 @@ export default function WorkerPage() {
     try {
       const beforeRes = await resizeAndEncodePhoto(beforeCapture.bytes);
       const afterRes = await resizeAndEncodePhoto(afterCapture.bytes);
+      const gps = afterCapture.telemetry.lat !== null && afterCapture.telemetry.lng !== null
+        ? afterCapture.telemetry
+        : beforeCapture.telemetry;
+      const orientation = (window as Window & { lastDeviceOrientation?: DeviceOrientationEvent })
+        .lastDeviceOrientation;
 
       const metadata: EvidenceMetadata = {
         v: 1,
         bountyId,
         workerAddress: address,
-        visualChallengeCode: challengeCode,
-        beforeTimestamp: beforeCapture.telemetry.timestampMs,
-        afterTimestamp: afterCapture.telemetry.timestampMs,
-        gpsLatE5:
-          afterCapture.telemetry.lat !== null
-            ? Math.round(afterCapture.telemetry.lat * 1e5)
-            : Math.round(beforeCapture.telemetry.lat !== null ? beforeCapture.telemetry.lat * 1e5 : 0),
-        gpsLngE5:
-          afterCapture.telemetry.lng !== null
-            ? Math.round(afterCapture.telemetry.lng * 1e5)
-            : Math.round(beforeCapture.telemetry.lng !== null ? beforeCapture.telemetry.lng * 1e5 : 0),
-        gpsAccuracyM:
-          afterCapture.telemetry.accuracyM ?? beforeCapture.telemetry.accuracyM ?? 0,
-        compassHeadingDeg: afterCapture.telemetry.headingDeg ?? beforeCapture.telemetry.headingDeg,
-        deviceSummary,
-        beforeImageSha256: beforeRes.sha256Hex,
-        afterImageSha256: afterRes.sha256Hex,
-        appVersion: APP_VERSION
+        challengeCode,
+        beforeTimestampMs: beforeCapture.telemetry.timestampMs,
+        afterTimestampMs: afterCapture.telemetry.timestampMs,
+        gps: {
+          lat: gps.lat ?? 0,
+          lng: gps.lng ?? 0,
+          accuracyMeters: gps.accuracyM ?? 0
+        },
+        orientation: {
+          alpha: orientation?.alpha ?? null,
+          beta: orientation?.beta ?? null,
+          gamma: orientation?.gamma ?? null
+        },
+        beforeSha256: beforeRes.sha256Hex,
+        afterSha256: afterRes.sha256Hex,
+        userAgent: navigator.userAgent,
+        notes: ""
       };
 
       const built = await buildSignedBundle({
@@ -225,7 +227,10 @@ export default function WorkerPage() {
   // ─── Step 3: Write to Arkiv → submitEvidence() ─────────────────────────────
 
   const publishAndSubmit = useCallback(async () => {
-    if (!bundleResult || !address || !bountyIdBig) return;
+    if (!canWrite || !bundleResult || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+      setError("Connect a wallet on the configured contract network before submitting evidence.");
+      return;
+    }
     setPhase("publishing");
     setError(null);
     try {
@@ -266,14 +271,14 @@ export default function WorkerPage() {
         account: address
       });
       setTxHash(hash);
-      await waitForTransactionReceipt(config, { hash });
+      await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
       await refetchBounty();
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setPhase("work");
     }
-  }, [address, bountyId, bountyIdBig, bundleResult, config, refetchBounty, writeContractAsync]);
+  }, [address, bountyId, bountyIdBig, bundleResult, canWrite, config, refetchBounty, writeContractAsync]);
 
   const resetCaptures = useCallback(() => {
     setBeforeCapture(null);
@@ -352,6 +357,7 @@ export default function WorkerPage() {
                   <button
                     type="button"
                     onClick={open}
+                    disabled={!canWrite}
                     className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99]"
                   >
                     Verify with World ID &amp; claim
@@ -480,7 +486,7 @@ export default function WorkerPage() {
             <button
               type="button"
               onClick={publishAndSubmit}
-              disabled={phase === "done"}
+              disabled={phase === "done" || !canWrite}
               className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-gray-300"
             >
               {phase === "done"
