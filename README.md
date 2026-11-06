@@ -123,7 +123,7 @@ streetsync/
 ## 5. Quickstart & Local Testing
 
 ### Prerequisites
-- Node.js `>= 18` (v20+ recommended)
+- Node.js `>= 22.13` (the backend uses the built-in `node:sqlite`; Node 24 recommended)
 - `npm`
 
 ### Installation

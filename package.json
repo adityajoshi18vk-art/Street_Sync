@@ -17,11 +17,15 @@
     "dev": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
     "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",
     "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts",
-    "abi:sync": "npm run abi:sync --workspace=streetsync-contracts"
+    "abi:sync": "npm run abi:sync --workspace=streetsync-contracts",
+    "start": "node scripts/start-production.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }
