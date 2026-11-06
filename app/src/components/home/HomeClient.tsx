@@ -23,6 +23,7 @@ import { HomeHero, type HeroGlyphs } from "@/components/home/HomeHero";
 import { HowItWorks } from "@/components/home/HowItWorks";
 import { MapPinPlus, ListFilter, RefreshCw } from "lucide-react";
 import { listBounties } from "@/lib/api";
+import { reverseGeocode } from "@/lib/geocode";
 import {
   normalizeBounty,
   STATUS_COLORS,
@@ -36,7 +37,7 @@ import type { MapViewProps } from "@/components/MapView";
 
 const MapView = dynamic<MapViewProps>(
   () => import("@/components/MapView").then((m) => m.default),
-  { ssr: false, loading: () => <div className="skeleton h-[420px] w-full" /> }
+  { ssr: false, loading: () => <div className="skeleton h-[460px] w-full sm:h-[540px]" /> }
 );
 
 const EXPIRY_OPTIONS = [
@@ -59,6 +60,8 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
 
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [draftPin, setDraftPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [draftLabel, setDraftLabel] = useState<string | null>(null);
+  const [draftLabelLoading, setDraftLabelLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const [description, setDescription] = useState("");
@@ -100,6 +103,23 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
     () => bounties.find((b) => b.bountyId === selectedId) ?? null,
     [bounties, selectedId]
   );
+
+  // Street address for the picked spot (search picks already carry one).
+  useEffect(() => {
+    if (!draftPin || draftLabel) return;
+    const ctrl = new AbortController();
+    setDraftLabelLoading(true);
+    const t = setTimeout(() => {
+      reverseGeocode(draftPin.lat, draftPin.lng, ctrl.signal)
+        .then((label) => !ctrl.signal.aborted && setDraftLabel(label))
+        .catch(() => undefined)
+        .finally(() => !ctrl.signal.aborted && setDraftLabelLoading(false));
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [draftPin, draftLabel]);
 
   const handleCreateBounty = async () => {
     if (!draftPin || !address || !ESCROW_ADDRESS) return;
@@ -165,6 +185,7 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
       setDescription("");
       setAmount("");
       setDraftPin(null);
+      setDraftLabel(null);
       void loadBounties();
       if (newId) router.push(`/bounty/${newId}`);
     } catch (e) {
@@ -248,15 +269,16 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
             if (b) setMapCenter({ lat: b.lat, lng: b.lng });
           }}
           draftPin={draftPin}
-          onMapClick={(lat, lng) => {
+          onMapClick={(lat, lng, label) => {
             setDraftPin({ lat, lng });
+            setDraftLabel(label ?? null);
             setSelectedId(null);
           }}
           center={mapCenter}
-          className="h-[420px] w-full overflow-hidden rounded-xl sm:h-[480px]"
+          className="h-[460px] w-full overflow-hidden rounded-xl sm:h-[540px]"
         />
         <p className="px-2 pb-1 pt-2 text-center text-[11px] text-zinc-500">
-          Tap the map to drop a new bounty pin · pins are colored by lifecycle status
+          Search, use your location or tap the map to drop a pin · drag the pin to fine-tune
         </p>
       </div>
 
@@ -297,7 +319,7 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
             <div>
               <h2 className="heading text-lg">Create a bounty</h2>
               <p className="mt-0.5 text-xs text-zinc-400">
-                Fund a repair escrow in USDC. Tap the map first to set the location.
+                Fund a repair escrow in USDC. Search or tap the map to set the location.
               </p>
             </div>
           </div>
@@ -306,11 +328,16 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
             <div className="card-inset px-3.5 py-2.5 text-xs">
               <p className="label-micro">Location</p>
               {draftPin ? (
-                <p className="mt-0.5 font-mono text-zinc-200">
-                  {draftPin.lat.toFixed(5)}, {draftPin.lng.toFixed(5)}
-                </p>
+                <>
+                  <p className="mt-1 text-[13px] font-semibold text-zinc-100">
+                    {draftLabel ?? (draftLabelLoading ? <span className="skeleton inline-block h-4 w-40 align-middle" /> : "Pinned location")}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+                    {draftPin.lat.toFixed(5)}, {draftPin.lng.toFixed(5)}
+                  </p>
+                </>
               ) : (
-                <p className="mt-0.5 text-zinc-500">Tap the map to drop a pin</p>
+                <p className="mt-0.5 text-zinc-500">Search or tap the map to drop a pin</p>
               )}
             </div>
 

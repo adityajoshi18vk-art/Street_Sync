@@ -199,10 +199,6 @@ input[type="number"]::-webkit-inner-spin-button {
 .leaflet-container {
   @apply bg-ink-900 font-sans;
 }
-/* keyless OSM tiles inverted into a dark basemap */
-.map-tiles-dark {
-  filter: invert(1) hue-rotate(180deg) brightness(0.72) contrast(0.95) saturate(0.35);
-}
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
   background: rgb(19 19 24 / 0.97);
@@ -216,19 +212,85 @@ input[type="number"]::-webkit-inner-spin-button {
 .leaflet-container a.leaflet-popup-close-button {
   color: #71717a;
 }
+.ss-map .leaflet-bar a,
 .leaflet-bar a {
   background: rgb(19 19 24 / 0.95);
   color: #d4d4d8;
   border-bottom-color: rgb(255 255 255 / 0.1);
 }
+.ss-map .leaflet-bar a:hover,
 .leaflet-bar a:hover {
   background: rgb(42 42 51 / 0.95);
   color: #fff;
 }
 .leaflet-control-attribution {
-  background: rgb(0 0 0 / 0.7) !important;
+  background: rgb(5 5 6 / 0.75) !important;
   color: #52525b !important;
 }
 .leaflet-control-attribution a {
   color: #71717a !important;
+}
+
+/* Location picking: crosshair instead of the grab hand */
+.ss-map .leaflet-grab {
+  cursor: crosshair;
+}
+.ss-map .leaflet-dragging .leaflet-grab {
+  cursor: grabbing;
+}
+.ss-map .leaflet-control-zoom {
+  border: 1px solid rgb(255 255 255 / 0.1) !important;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ss-map .leaflet-control-zoom a {
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+}
+
+/* Draft bounty pin (Leaflet divIcon) */
+.ss-pin {
+  position: relative;
+  width: 36px;
+  height: 46px;
+  cursor: grab;
+}
+.ss-pin-head {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #bef264;
+  border: 3px solid #050506;
+  box-shadow: 0 6px 18px -4px rgb(163 230 53 / 0.7);
+}
+.ss-pin-head::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 9999px;
+  background: #050506;
+}
+.ss-pin-pulse {
+  position: absolute;
+  left: 8px;
+  bottom: 0;
+  width: 20px;
+  height: 8px;
+  border-radius: 9999px;
+  background: rgb(190 242 100 / 0.55);
+  animation: ss-pin-pulse 1.8s ease-out infinite;
+}
+@keyframes ss-pin-pulse {
+  from { transform: scale(0.6); opacity: 0.9; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+
+/* OpenFreeMap's dark style is very dim; lift it so streets and labels read clearly */
+.ss-map .leaflet-gl-layer canvas {
+  filter: brightness(1.45) contrast(1.08) saturate(1.1);
 }
