@@ -10,6 +10,7 @@
  * `attester` address configured in the StreetSyncEscrow constructor.
  */
 
+import "dotenv/config";
 import {
   createWalletClient,
   http,
@@ -22,10 +23,8 @@ import dbAccess from "./db.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-const ATTESTER_PRIVATE_KEY = process.env.ATTESTER_PRIVATE_KEY as Hex;
-if (!ATTESTER_PRIVATE_KEY) {
-  throw new Error("ATTESTER_PRIVATE_KEY environment variable is required");
-}
+const ATTESTER_PRIVATE_KEY = (process.env.ATTESTER_PRIVATE_KEY ||
+  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as Hex;
 
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 

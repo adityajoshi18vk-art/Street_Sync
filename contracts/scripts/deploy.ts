@@ -106,7 +106,7 @@ async function main() {
     parameters: {
       reviewerStakeUsdc: "10.00",
       reviewerStakeRaw: "10000000",
-      reviewerCutBps: 5,
+      reviewerCutBps: 500,
       panelSize: 3,
       quorum: 2,
       commitWindowSeconds: Number(commitWindow),
