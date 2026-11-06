@@ -52,6 +52,23 @@ const hardhatLocal = defineChain({
 
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 const POLL_INTERVAL_MS = 3_000; // 3 seconds between polls
+const CATCH_UP_DELAY_MS = 250;
+// Arc's public RPC rejects eth_getLogs spans of 1000+ blocks ("requested range too large").
+const INITIAL_BATCH_BLOCKS = BigInt(process.env.INDEXER_BATCH_BLOCKS ?? "500");
+const MIN_BATCH_BLOCKS = 10n;
+
+/** Shrinks the log window on range errors and backs off on rate limits. */
+export function nextIndexerStep(message: string, batchSize: bigint): { batchSize: bigint; delayMs: number } {
+  const lower = message.toLowerCase();
+  if (lower.includes("range too large") || lower.includes("block range") || lower.includes("too many results")) {
+    const halved = batchSize / 2n;
+    return { batchSize: halved < MIN_BATCH_BLOCKS ? MIN_BATCH_BLOCKS : halved, delayMs: CATCH_UP_DELAY_MS };
+  }
+  if (lower.includes("rate limit") || lower.includes("429")) {
+    return { batchSize, delayMs: POLL_INTERVAL_MS * 3 };
+  }
+  return { batchSize, delayMs: POLL_INTERVAL_MS };
+}
 
 // ─── Resolve contract address from deployment artifacts or env ────────────────
 
@@ -439,6 +456,9 @@ export async function startIndexer(): Promise<void> {
     console.log(`[indexer] Resuming from block ${lastBlock}`);
   }
 
+  let batchSize = INITIAL_BATCH_BLOCKS;
+  let delayMs = POLL_INTERVAL_MS;
+
   async function poll() {
     if (!isRunning) return;
 
@@ -451,11 +471,9 @@ export async function startIndexer(): Promise<void> {
         return;
       }
 
-      // Fetch logs in batches of up to 2000 blocks
-      const batchSize = 2000n;
       const fromBlock = lastBlock + 1n;
-      const toBlock = currentBlock - fromBlock > batchSize
-        ? fromBlock + batchSize
+      const toBlock = currentBlock - fromBlock + 1n > batchSize
+        ? fromBlock + batchSize - 1n
         : currentBlock;
 
       const logs = await client.getLogs({
@@ -485,11 +503,17 @@ export async function startIndexer(): Promise<void> {
       if (logs.length > 0) {
         console.log(`[indexer] Processed ${logs.length} events up to block ${toBlock}`);
       }
+      // Keep catching up without waiting while behind the chain head.
+      delayMs = toBlock < currentBlock ? CATCH_UP_DELAY_MS : POLL_INTERVAL_MS;
     } catch (e) {
-      console.error("[indexer] Poll error:", (e as Error).message);
+      const message = (e as Error).message ?? String(e);
+      const next = nextIndexerStep(message, batchSize);
+      batchSize = next.batchSize;
+      delayMs = next.delayMs;
+      console.error(`[indexer] Poll error (batch ${batchSize} blocks, retry in ${delayMs}ms):`, message.split("\n").find((l) => l.startsWith("Details:")) ?? message.split("\n")[0]);
     }
 
-    pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
+    pollTimer = setTimeout(poll, delayMs);
   }
 
   // Start polling
