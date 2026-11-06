@@ -7,11 +7,13 @@ import type { ISuccessResult } from "@worldcoin/idkit";
 import {
   useAccount,
   useBlockNumber,
+  useChainId,
   useConfig,
   useReadContract,
   useWriteContract
 } from "wagmi";
 import type { Hash } from "viem";
+import { waitForTransactionReceipt } from "wagmi/actions";
 
 import {
   ACTIVE_CHAIN,
@@ -39,11 +41,14 @@ import { HashBadge } from "@/components/StatusBadge";
 
 function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   const { address } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const config = useConfig();
   const { writeContractAsync } = useWriteContract();
   const attestationRef = useRef<Attestation | null>(null);
 
   const { data: reviewerTuple } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "reviewers",
@@ -52,6 +57,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   });
 
   const { data: stakeRaw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "REVIEWER_STAKE",
@@ -72,8 +78,9 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
 
   const register = useCallback(
     async (attestation: Attestation) => {
-      if (!address) throw new Error("Connect a wallet first");
-      if (!ESCROW_ADDRESS) throw new Error("Escrow contract is not deployed on this network");
+      if (!canWrite || !address || !ESCROW_ADDRESS || !USDC_ADDRESS) {
+        throw new Error("Connect a wallet on the configured contract network first");
+      }
       setBusy(true);
       setError(null);
       try {
@@ -99,6 +106,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
           account: address
         });
         setTxHash(hash);
+        await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
         onRegistered();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -106,7 +114,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         setBusy(false);
       }
     },
-    [address, config, gps, onRegistered, stake, writeContractAsync]
+    [address, canWrite, config, gps, onRegistered, stake, writeContractAsync]
   );
 
   const requestGps = useCallback(() => {
@@ -199,7 +207,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                   <button
                     type="button"
                     onClick={open}
-                    disabled={busy}
+                    disabled={busy || !canWrite}
                     className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-gray-300"
                   >
                     {busy ? "Registering…" : "Verify & stake to become a reviewer"}
@@ -347,18 +355,18 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
               <dt>Challenge code</dt>
               <dd className="font-mono font-semibold text-gray-800">
-                {String(verification.metadata.visualChallengeCode).padStart(4, "0")}
+                {String(verification.metadata.challengeCode).padStart(4, "0")}
               </dd>
               <dt>GPS accuracy</dt>
-              <dd>±{Math.round(verification.metadata.gpsAccuracyM)} m</dd>
-              <dt>Heading</dt>
+              <dd>±{Math.round(verification.metadata.gps.accuracyMeters)} m</dd>
+              <dt>Orientation α</dt>
               <dd>
-                {verification.metadata.compassHeadingDeg !== null
-                  ? `${Math.round(verification.metadata.compassHeadingDeg)}°`
+                {verification.metadata.orientation.alpha !== null
+                  ? `${Math.round(verification.metadata.orientation.alpha)}°`
                   : "n/a"}
               </dd>
               <dt>Captured</dt>
-              <dd>{new Date(verification.metadata.beforeTimestamp).toLocaleString()}</dd>
+              <dd>{new Date(verification.metadata.beforeTimestampMs).toLocaleString()}</dd>
               <dt>Worker</dt>
               <dd>{shortAddress(verification.recoveredWorker ?? worker, 4)}</dd>
             </dl>
@@ -389,6 +397,8 @@ function AssignmentCard({
   onTx: () => void;
 }) {
   const { address } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const config = useConfig();
   const { writeContractAsync } = useWriteContract();
 
@@ -399,6 +409,7 @@ function AssignmentCard({
   const [justSettled, setJustSettled] = useState(false);
 
   const { data: raw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getBounty",
@@ -406,9 +417,10 @@ function AssignmentCard({
     query: { enabled: contractsDeployed, refetchInterval: 15_000 }
   });
 
-  const { data: blockNumber } = useBlockNumber({ watch: true });
+  const { data: blockNumber } = useBlockNumber({ chainId: ACTIVE_CHAIN.id, watch: true });
 
   const { data: panel } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getPanel",
@@ -417,6 +429,7 @@ function AssignmentCard({
   });
 
   const { data: myVoteTuple } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getVote",
@@ -425,6 +438,7 @@ function AssignmentCard({
   });
 
   const { data: commitDeadlineRaw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "commitDeadline",
@@ -432,6 +446,7 @@ function AssignmentCard({
     query: { enabled: contractsDeployed }
   });
   const { data: revealDeadlineRaw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "revealDeadline",
@@ -463,6 +478,10 @@ function AssignmentCard({
 
   const runTx = useCallback(
     async (fn: "assignPanel" | "settle" | "pokeOrReplace") => {
+      if (!canWrite || !ESCROW_ADDRESS) {
+        setError("Connect a wallet on the configured contract network before taking this action.");
+        return;
+      }
       setBusy(true);
       setError(null);
       try {
@@ -475,6 +494,7 @@ function AssignmentCard({
           account: address
         });
         setTxHash(hash);
+        await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
         if (fn === "settle") setJustSettled(true);
         onTx();
       } catch (err) {
@@ -483,7 +503,7 @@ function AssignmentCard({
         setBusy(false);
       }
     },
-    [address, bountyIdBig, onTx, writeContractAsync]
+    [address, bountyIdBig, canWrite, config, onTx, writeContractAsync]
   );
 
   const revealExpired =
@@ -519,7 +539,7 @@ function AssignmentCard({
           </p>
           <button
             type="button"
-            disabled={!panelReady || busy}
+            disabled={!panelReady || busy || !canWrite}
             onClick={() => void runTx("assignPanel")}
             className="mt-2 w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:bg-gray-300"
           >
@@ -558,7 +578,7 @@ function AssignmentCard({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              disabled={!revealExpired || busy}
+              disabled={!revealExpired || busy || !canWrite}
               onClick={() => void runTx("pokeOrReplace")}
               className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40"
               title="Slash & replace reviewers who missed the reveal window"
@@ -567,7 +587,7 @@ function AssignmentCard({
             </button>
             <button
               type="button"
-              disabled={!revealExpired || busy || justSettled}
+              disabled={!revealExpired || busy || justSettled || !canWrite}
               onClick={() => void runTx("settle")}
               className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
             >
