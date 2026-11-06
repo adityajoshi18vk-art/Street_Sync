@@ -82,6 +82,8 @@ async function main() {
   await escrow.waitForDeployment();
   const escrowAddress = await escrow.getAddress();
   const escrowDeployTx = escrow.deploymentTransaction()?.hash ?? null;
+  const escrowReceipt = escrowDeployTx ? await ethers.provider.getTransactionReceipt(escrowDeployTx) : null;
+  const deployBlock = escrowReceipt?.blockNumber ?? null;
 
   // ── 5. Sanity checks ────────────────────────────────────────────────────
   const usdcOnChain    = await escrow.USDC();
@@ -110,6 +112,7 @@ async function main() {
     network: networkName,
     chainId,
     deployedAt: new Date().toISOString(),
+    deployBlock,
     note: `Deployed by contracts/scripts/deploy.ts. Attester: ${attesterAddress}.`,
     parameters: {
       reviewerStakeUsdc: "2.00",
