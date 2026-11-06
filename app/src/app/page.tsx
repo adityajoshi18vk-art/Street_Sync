@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAccount, useChainId, useConfig, useWriteContract } from "wagmi";
-import { decodeEventLog, keccak256, toHex } from "viem";
-import { waitForTransactionReceipt } from "wagmi/actions";
+import { useAccount, useChainId, useConfig, useReadContract, useWriteContract } from "wagmi";
+import { decodeEventLog } from "viem";
+import { REPORT_MAX_DESCRIPTION, REPORT_MIN_DESCRIPTION, normalizeDescription, packReport } from "@streetsync/evidence";
 import {
   ESCROW_ABI,
   ESCROW_ADDRESS,
@@ -17,12 +17,19 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { listBounties } from "@/lib/api";
+import { listBounties, uploadBountyReport } from "@/lib/api";
+import { friendlyError } from "@/lib/errors";
+import { availableExpiryChoices, canPledge, formatDuration } from "@/lib/lifecycle";
+import { bountyDisplayStatus } from "@/lib/map-utils";
+import { encodeReportPhoto } from "@/lib/photo";
+import { MAX_PHOTO_INPUT_BYTES, browserStorage, deletePendingReport, savePendingReport } from "@/lib/report";
+import { useNowSeconds } from "@/lib/useNow";
 import {
+  formatBytes,
   normalizeBounty,
   STATUS_COLORS,
   STATUS_NAMES,
-  statusName,
+  STATUS_LABELS,
   shortAddress,
   formatUsdcDisplaySafe,
   type BountyMapItem
@@ -34,13 +41,6 @@ const MapView = dynamic<MapViewProps>(
   { ssr: false, loading: () => <div className="h-[420px] w-full animate-pulse rounded-xl bg-gray-200" /> }
 );
 
-const EXPIRY_OPTIONS = [
-  { label: "1 day", seconds: 86_400 },
-  { label: "3 days", seconds: 3 * 86_400 },
-  { label: "7 days", seconds: 7 * 86_400 },
-  { label: "30 days", seconds: 30 * 86_400 }
-];
-
 export default function HomePage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
@@ -48,6 +48,19 @@ export default function HomePage() {
   const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id;
   const config = useConfig();
   const { writeContractAsync, isPending: writing } = useWriteContract();
+  const now = useNowSeconds();
+
+  const validationWindowQuery = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: ESCROW_ADDRESS ?? undefined,
+    abi: ESCROW_ABI,
+    functionName: "validationWindow",
+    query: { enabled: !!ESCROW_ADDRESS && contractsDeployed }
+  });
+  const validationWindow =
+    typeof validationWindowQuery.data === "bigint" ? Number(validationWindowQuery.data) : null;
+  const windowReady = validationWindowQuery.isSuccess || validationWindowQuery.isError;
+  const expiryChoices = useMemo(() => availableExpiryChoices(validationWindow), [validationWindow]);
 
   const [bounties, setBounties] = useState<BountyMapItem[]>([]);
   const [listError, setListError] = useState<string | null>(null);
@@ -60,9 +73,18 @@ export default function HomePage() {
 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [expiryIdx, setExpiryIdx] = useState(2);
+  const [expirySeconds, setExpirySeconds] = useState(7 * 86_400);
   const [txStatus, setTxStatus] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
+  const [txNotice, setTxNotice] = useState<string | null>(null);
+
+  const [photo, setPhoto] = useState<{
+    bytes: Uint8Array;
+    previewUrl: string;
+    capturedAtMs: number;
+  } | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const [pledgeAmount, setPledgeAmount] = useState("");
   const [pledgeStatus, setPledgeStatus] = useState<string | null>(null);
@@ -98,12 +120,51 @@ export default function HomePage() {
     [bounties, selectedId]
   );
 
+  const selectedExpiry = expiryChoices.find((c) => c.seconds === expirySeconds) ?? expiryChoices[0];
+  const normalizedDescription = normalizeDescription(description);
+  const descriptionLength = [...normalizedDescription].length;
+  const descriptionValid =
+    descriptionLength >= REPORT_MIN_DESCRIPTION && descriptionLength <= REPORT_MAX_DESCRIPTION;
+
+  const handlePhotoChange = async (file: File | undefined) => {
+    setPhotoError(null);
+    if (photo) URL.revokeObjectURL(photo.previewUrl);
+    setPhoto(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Choose an image file.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_INPUT_BYTES) {
+      setPhotoError("That photo is too large. Choose one under 25 MB.");
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const bytes = await encodeReportPhoto(new Uint8Array(await file.arrayBuffer()));
+      const capturedAtMs = file.lastModified > 0 && file.lastModified <= Date.now() ? file.lastModified : Date.now();
+      setPhoto({ bytes, previewUrl: URL.createObjectURL(file), capturedAtMs });
+    } catch (e) {
+      setPhotoError(friendlyError(e));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const handleCreateBounty = async () => {
     if (!canWrite || !draftPin || !address || !ESCROW_ADDRESS) return;
     setTxError(null);
-    const trimmed = description.trim();
-    if (trimmed.length < 8) {
-      setTxError("Description must be at least 8 characters.");
+    setTxNotice(null);
+    if (!photo) {
+      setTxError("Add a photo of the problem first.");
+      return;
+    }
+    if (!descriptionValid) {
+      setTxError(`Describe the problem in ${REPORT_MIN_DESCRIPTION}–${REPORT_MAX_DESCRIPTION} characters.`);
+      return;
+    }
+    if (!selectedExpiry) {
+      setTxError("The neighbour-validation window is too long for any expiry option. Ask the operator to shorten it.");
       return;
     }
     let amountUsdc: string;
@@ -115,11 +176,29 @@ export default function HomePage() {
       return;
     }
 
+    let newId: string | null = null;
+    let bundle: Uint8Array;
+    let reportHash: `0x${string}`;
     try {
       const { latE5, lngE5 } = latLngToE5(draftPin.lat, draftPin.lng);
       const regionCell = regionCellFromLatLng(draftPin.lat, draftPin.lng);
-      const descHash = keccak256(toHex(trimmed));
-      const claimDeadline = BigInt(Math.floor(Date.now() / 1000) + EXPIRY_OPTIONS[expiryIdx].seconds);
+      const packed = await packReport({
+        creator: address,
+        description: normalizedDescription,
+        latE5,
+        lngE5,
+        capturedAtMs: photo.capturedAtMs,
+        photo: photo.bytes
+      });
+      bundle = packed.bundle;
+      reportHash = packed.reportHash;
+
+      // Persist before any transaction so a failed upload can be retried from the bounty page.
+      const storage = browserStorage();
+      if (!storage) throw new Error("Your browser blocks local storage, which is needed to keep your photo safe until it uploads.");
+      savePendingReport(storage, reportHash, bundle);
+
+      const claimDeadline = BigInt(Math.floor(Date.now() / 1000) + selectedExpiry.seconds);
       const initialAmount = parseUsdc(amountUsdc);
 
       setTxStatus("Approving exactly " + amountUsdc + " USDC…");
@@ -136,23 +215,17 @@ export default function HomePage() {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "createBounty",
-        args: [descHash, latE5, lngE5, regionCell, initialAmount, claimDeadline],
+        args: [packed.descriptionHash, reportHash, latE5, lngE5, regionCell, initialAmount, claimDeadline],
         chain: ACTIVE_CHAIN,
         chainId: ACTIVE_CHAIN.id,
         account: address
       });
       setTxStatus("Waiting for confirmation…");
-      const receipt = await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
-      if (receipt.status !== "success") throw new Error("Transaction reverted. No bounty was created.");
+      const receipt = await waitTx(config, hash);
 
-      let newId: string | null = null;
       for (const log of receipt.logs) {
         try {
-          const decoded = decodeEventLog({
-            abi: ESCROW_ABI,
-            data: log.data,
-            topics: log.topics
-          });
+          const decoded = decodeEventLog({ abi: ESCROW_ABI, data: log.data, topics: log.topics });
           if (decoded.eventName === "BountyCreated") {
             newId = (decoded.args as unknown as { bountyId: bigint }).bountyId.toString();
             break;
@@ -161,18 +234,44 @@ export default function HomePage() {
           // not an escrow event
         }
       }
-
+    } catch (e) {
       setTxStatus(null);
+      setTxError(friendlyError(e));
+      return;
+    }
+
+    // The bounty exists on-chain from here on; only the photo upload can still fail.
+    let uploaded = false;
+    if (newId) {
+      try {
+        setTxStatus("Uploading your photo…");
+        await uploadBountyReport(newId, bundle);
+        deletePendingReport(browserStorage()!, reportHash);
+        uploaded = true;
+      } catch (e) {
+        setTxNotice(
+          `Your bounty is created, but the photo upload failed (${friendlyError(e)}). Open the bounty page to retry the upload.`
+        );
+      }
+    } else {
+      setTxNotice(
+        "Your bounty is created, but its id couldn't be read from the receipt. Find it on the map; your photo is saved on this device and can be uploaded from the bounty page."
+      );
+    }
+
+    setTxStatus(null);
+    if (uploaded || newId) {
+      if (photo) URL.revokeObjectURL(photo.previewUrl);
+      setPhoto(null);
       setDescription("");
       setAmount("");
       setDraftPin(null);
-      void loadBounties();
-      if (newId) router.push(`/bounty/${newId}`);
-    } catch (e) {
-      setTxStatus(null);
-      setTxError(e instanceof Error ? e.message : String(e));
     }
+    void loadBounties();
+    if (newId) router.push(`/bounty/${newId}`);
   };
+
+  const selectedDisplay = selectedBounty ? bountyDisplayStatus(selectedBounty, now) : null;
 
   const handlePledge = async () => {
     if (!canWrite || !selectedBounty || !address || !ESCROW_ADDRESS) return;
@@ -206,7 +305,7 @@ export default function HomePage() {
       void loadBounties();
     } catch (e) {
       setPledgeStatus(null);
-      setTxError(e instanceof Error ? e.message : String(e));
+      setTxError(friendlyError(e));
     }
   };
 
@@ -275,7 +374,7 @@ export default function HomePage() {
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: STATUS_COLORS[name] }}
               />
-              {name} ({count})
+              {STATUS_LABELS[name]} ({count})
             </button>
           );
         })}
@@ -284,9 +383,10 @@ export default function HomePage() {
       <div className="grid gap-5 lg:grid-cols-5">
         {/* Create bounty panel */}
         <section className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200 lg:col-span-2">
-          <h2 className="text-sm font-bold text-gray-900">Create a bounty</h2>
+          <h2 className="text-sm font-bold text-gray-900">Report a problem &amp; fund its repair</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Fund a repair escrow in USDC. Tap the map first to set the location.
+            Tap the map to set the location, add a photo, and fund the escrow in USDC. Verified
+            neighbours confirm the problem is real before work can start.
           </p>
 
           <div className="mt-4 space-y-3">
@@ -301,13 +401,51 @@ export default function HomePage() {
               )}
             </div>
 
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Repave the broken sidewalk section near the north crosswalk"
-              rows={3}
-              className="w-full rounded-lg border-gray-300 text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-gray-700" htmlFor="problem-photo">
+                Photo of the problem
+              </label>
+              <input
+                id="problem-photo"
+                type="file"
+                accept="image/*"
+                disabled={photoBusy}
+                onChange={(e) => {
+                  void handlePhotoChange(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+                className="block w-full text-xs text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+              />
+              {photoBusy && <p className="text-[11px] text-gray-500">Optimising photo…</p>}
+              {photoError && <p className="text-[11px] text-red-600">{photoError}</p>}
+              {photo && (
+                <div className="overflow-hidden rounded-lg ring-1 ring-gray-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.previewUrl} alt="Problem preview" className="h-40 w-full object-cover" />
+                  <p className="bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                    Ready to upload · WebP {formatBytes(photo.bytes.length)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's wrong? e.g. Broken sidewalk slab near the north crosswalk"
+                rows={3}
+                maxLength={REPORT_MAX_DESCRIPTION * 2}
+                className="w-full rounded-lg border-gray-300 text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+              <p
+                className={`mt-1 text-right text-[11px] ${
+                  descriptionLength === 0 || descriptionValid ? "text-gray-400" : "text-red-600"
+                }`}
+              >
+                {descriptionLength} / {REPORT_MAX_DESCRIPTION} (min {REPORT_MIN_DESCRIPTION})
+              </p>
+            </div>
 
             <div className="flex gap-2">
               <input
@@ -318,21 +456,32 @@ export default function HomePage() {
                 className="w-full rounded-lg text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               />
               <select
-                value={expiryIdx}
-                onChange={(e) => setExpiryIdx(Number(e.target.value))}
+                value={selectedExpiry?.seconds ?? ""}
+                onChange={(e) => setExpirySeconds(Number(e.target.value))}
+                aria-label="Bounty expiry"
                 className="rounded-lg bg-white text-sm ring-1 ring-gray-300 focus:outline-none"
               >
-                {EXPIRY_OPTIONS.map((opt, i) => (
-                  <option key={opt.label} value={i}>
+                {expiryChoices.map((opt) => (
+                  <option key={opt.label} value={opt.seconds}>
                     {opt.label}
                   </option>
                 ))}
               </select>
             </div>
+            <p className="text-[11px] text-gray-400">
+              Expiry counts from now.{" "}
+              {validationWindow !== null &&
+                `Neighbours get ${formatDuration(validationWindow)} to confirm the problem first.`}
+            </p>
 
             {txStatus && (
               <p className="rounded-lg bg-brand-50 p-2.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                 {txStatus}
+              </p>
+            )}
+            {txNotice && (
+              <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800 ring-1 ring-amber-200">
+                {txNotice}
               </p>
             )}
             {txError && (
@@ -343,10 +492,13 @@ export default function HomePage() {
 
             <button
               onClick={handleCreateBounty}
-              disabled={!draftPin || !isConnected || !canWrite || writing}
+              disabled={
+                !draftPin || !isConnected || !canWrite || writing || !!txStatus || photoBusy ||
+                !photo || !descriptionValid || !windowReady || !selectedExpiry
+              }
               className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.99] disabled:opacity-40"
             >
-              {writing ? "Confirm in wallet…" : "Approve USDC & Create Bounty"}
+              {writing ? "Confirm in wallet…" : txStatus ? "Working…" : "Approve USDC & Report Problem"}
             </button>
             {isConnected && !canWrite && (
               <p className="text-center text-[11px] text-amber-700">
@@ -371,7 +523,7 @@ export default function HomePage() {
                     Bounty #{selectedBounty.bountyId}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {statusName(selectedBounty.status)} · escrow{" "}
+                    {selectedDisplay?.label} · escrow{" "}
                     <strong>{formatUsdcDisplaySafe(selectedBounty.totalPledged)} USDC</strong>
                   </p>
                 </div>
@@ -382,7 +534,19 @@ export default function HomePage() {
                   Details
                 </Link>
               </div>
-              {selectedBounty.status === 0 && (
+              {selectedBounty.description && (
+                <p className="mt-2 text-xs text-gray-600">{selectedBounty.description}</p>
+              )}
+              {canPledge(
+                {
+                  status: selectedBounty.status,
+                  validationDeadline: selectedBounty.validationDeadline,
+                  claimDeadline: selectedBounty.claimDeadline,
+                  workDeadline: selectedBounty.workDeadline,
+                  reworkCount: 0
+                },
+                now
+              ) && (
                 <div className="mt-3 flex gap-2">
                   <input
                     value={pledgeAmount}
@@ -434,18 +598,16 @@ export default function HomePage() {
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-gray-900">
                     Bounty #{b.bountyId}
-                    {b.description && (
-                      <span className="ml-2 truncate text-xs font-normal text-gray-500">
-                        {b.description}
-                      </span>
-                    )}
                   </p>
+                  {b.description && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{b.description}</p>
+                  )}
                   <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: STATUS_COLORS[statusName(b.status)] }}
+                      style={{ backgroundColor: bountyDisplayStatus(b, now).color }}
                     />
-                    {statusName(b.status)}
+                    {bountyDisplayStatus(b, now).label}
                     {b.worker && <span>· worker {shortAddress(b.worker)}</span>}
                     {b.creator && !b.worker && <span>· by {shortAddress(b.creator)}</span>}
                   </p>

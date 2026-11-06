@@ -2,7 +2,7 @@
 
 import { waitTx } from "@/lib/tx";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import WorldIdButton from "@/components/WorldIdButton";
@@ -23,6 +23,11 @@ import type { Attestation } from "@/lib/api";
 import { getArkivClient, rememberEntityMapping } from "@/lib/arkiv";
 import { buildSignedBundle, type CompressionStats, type EvidenceMetadata } from "@/lib/evidence";
 import { statusName } from "@/lib/types";
+import { friendlyError } from "@/lib/errors";
+import { STATUS, canRework, countdownLabel, isClaimable, toLifecycleBounty, willReopenAfterRejection } from "@/lib/lifecycle";
+import { useBountyReport } from "@/lib/useBountyReport";
+import { useNow } from "@/lib/useNow";
+import ReportCard from "@/components/ReportCard";
 import CameraCapture, { type CaptureResult } from "@/components/CameraCapture";
 import CompressionStatsPanel from "@/components/CompressionStatsPanel";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -64,8 +69,7 @@ export default function WorkerPage() {
   } | null>(null);
 
   const bountyIdBig = useMemo(() => {
-    const n = Number(bountyId);
-    return Number.isFinite(n) && n >= 0 ? BigInt(n) : null;
+    return typeof bountyId === "string" && /^\d+$/.test(bountyId) ? BigInt(bountyId) : null;
   }, [bountyId]);
 
   const { data: bounty, refetch: refetchBounty } = useReadContract({
@@ -73,7 +77,7 @@ export default function WorkerPage() {
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getBounty",
-    args: bountyIdBig ? [bountyIdBig] : undefined,
+    args: bountyIdBig !== null ? [bountyIdBig] : undefined,
     query: { enabled: contractsDeployed && bountyIdBig !== null, refetchInterval: 15_000 }
   });
 
@@ -86,18 +90,82 @@ export default function WorkerPage() {
     query: { enabled: contractsDeployed && !!address }
   });
 
-  const raw = bounty as unknown[] | undefined;
-  const status = raw ? Number(raw[16]) : -1;
-  const worker = raw && typeof raw[9] === "string" ? (raw[9] as string) : undefined;
-  const challengeCode = raw ? Number(raw[10]) : 0;
+  const b = bounty as
+    | {
+        creator: string;
+        worker: string;
+        status: number;
+        visualChallengeCode: number;
+        evidenceHash: string;
+        validationDeadline: bigint;
+        claimDeadline: bigint;
+        workDeadline: bigint;
+        reworkCount: number;
+      }
+    | undefined;
+  const now = useNow();
+  const lc = b ? toLifecycleBounty(b) : null;
+  const status = b ? Number(b.status) : -1;
+  const worker = b?.worker;
+  const challengeCode = b ? Number(b.visualChallengeCode) : 0;
   const isWorker = !!address && !!worker && worker.toLowerCase() === address.toLowerCase();
-  const evidenceHash = raw && typeof raw[12] === "string" ? (raw[12] as string) : null;
+  const isCreator = !!address && !!b && b.creator.toLowerCase() === address.toLowerCase();
+  const evidenceHash = b?.evidenceHash ?? null;
+  const { report } = useBountyReport(bountyId);
+
+  const myPledge = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "pledges",
+    args: bountyIdBig !== null && address ? [bountyIdBig, address] : undefined,
+    query: { enabled: contractsDeployed && bountyIdBig !== null && !!address }
+  }).data as bigint | undefined;
+  const myProblemVote = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "problemVote",
+    args: bountyIdBig !== null && address ? [bountyIdBig, address] : undefined,
+    query: { enabled: contractsDeployed && bountyIdBig !== null && !!address }
+  }).data as number | undefined;
+  const blocked = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "blockedWorker",
+    args: bountyIdBig !== null && address ? [bountyIdBig, address] : undefined,
+    query: { enabled: contractsDeployed && bountyIdBig !== null && !!address }
+  }).data as boolean | undefined;
+
+  // Mirrors the contract's claim() checks so ineligible wallets get a reason, not a revert.
+  const claimBlockReason = !lc
+    ? null
+    : !isClaimable(lc, now)
+      ? status === STATUS.Open
+        ? "This bounty's claim deadline has passed."
+        : `This bounty is not open for claims (status ${statusName(status)}).`
+      : isCreator
+        ? "You created this bounty, so you can't claim it."
+        : (myPledge ?? 0n) > 0n
+          ? "You pledged to this bounty, so you can't claim it."
+          : (myProblemVote ?? 0) !== 0
+            ? "You voted on this problem as a neighbour, so you can't claim it."
+            : blocked
+              ? "You were removed from this bounty after missing a deadline, so you can't claim it again."
+              : null;
+  const workDeadline = lc?.workDeadline ?? 0;
+  const [reworkBusy, setReworkBusy] = useState(false);
+
+  useEffect(() => {
+    if (isWorker && status === STATUS.Claimed && phase === "verify") setPhase("work");
+  }, [isWorker, status, phase]);
 
   // ─── Step 1: World ID verify → attestation → claim() ───────────────────────
 
   const runClaim = useCallback(
     async (attestation: Attestation) => {
-      if (!canWrite || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+      if (!canWrite || !address || bountyIdBig === null || !ESCROW_ADDRESS) {
         setError("Connect a wallet on the configured contract network to claim this bounty.");
         return;
       }
@@ -123,7 +191,7 @@ export default function WorkerPage() {
         await refetchBounty();
         setPhase("work");
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(friendlyError(err));
         setPhase("verify");
       }
     },
@@ -197,7 +265,7 @@ export default function WorkerPage() {
         entityKeyBytes32: ""
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
       setPhase("work");
     }
   }, [
@@ -213,35 +281,33 @@ export default function WorkerPage() {
   // ─── Step 3: Write to Arkiv → submitEvidence() ─────────────────────────────
 
   const publishAndSubmit = useCallback(async () => {
-    if (!canWrite || !bundleResult || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+    if (!canWrite || !bundleResult || !address || bountyIdBig === null || !ESCROW_ADDRESS) {
       setError("Connect a wallet on the configured contract network before submitting evidence.");
       return;
     }
-    setPhase("publishing");
     setError(null);
     try {
-      const client = getArkivClient();
-      const writeRes = await import("@streetsync/arkiv-client").then((m) =>
-        m.writeEvidenceBundle(
-          client,
-          bundleResult.bundle,
-          address,
-          bountyId,
-          bundleResult.evidenceHash
-        )
-      );
-
-      rememberEntityMapping(bountyId, writeRes.entityKey);
-      localStorage.setItem(
-        `streetsync:arkivkey:${writeRes.entityKeyBytes32.toLowerCase()}`,
-        writeRes.entityKey
-      );
-
-      setBundleResult({
-        ...bundleResult,
-        entityKey: writeRes.entityKey,
-        entityKeyBytes32: writeRes.entityKeyBytes32
-      });
+      // A retry after a failed submitEvidence reuses the entity already written to Arkiv.
+      let writeRes: { entityKey: string; entityKeyBytes32: string };
+      if (bundleResult.entityKeyBytes32) {
+        writeRes = { entityKey: bundleResult.entityKey, entityKeyBytes32: bundleResult.entityKeyBytes32 };
+      } else {
+        setPhase("publishing");
+        const client = getArkivClient();
+        writeRes = await import("@streetsync/arkiv-client").then((m) =>
+          m.writeEvidenceBundle(client, bundleResult.bundle, address, bountyId, bundleResult.evidenceHash)
+        );
+        rememberEntityMapping(bountyId, writeRes.entityKey);
+        localStorage.setItem(
+          `streetsync:arkivkey:${writeRes.entityKeyBytes32.toLowerCase()}`,
+          writeRes.entityKey
+        );
+        setBundleResult({
+          ...bundleResult,
+          entityKey: writeRes.entityKey,
+          entityKeyBytes32: writeRes.entityKeyBytes32
+        });
+      }
 
       setPhase("submitting");
       const hash = await writeContractAsync({
@@ -262,10 +328,39 @@ export default function WorkerPage() {
       await refetchBounty();
       setPhase("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(friendlyError(err));
       setPhase("work");
     }
   }, [address, bountyId, bountyIdBig, bundleResult, canWrite, config, refetchBounty, writeContractAsync]);
+
+  const runRework = useCallback(async () => {
+    if (!canWrite || !address || bountyIdBig === null || !ESCROW_ADDRESS) return;
+    setReworkBusy(true);
+    setError(null);
+    try {
+      const hash = await writeContractAsync({
+        address: ESCROW_ADDRESS as `0x${string}`,
+        abi: ESCROW_ABI,
+        functionName: "rework",
+        args: [bountyIdBig],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
+      });
+      setTxHash(hash);
+      await waitTx(config, hash);
+      setBeforeCapture(null);
+      setAfterCapture(null);
+      setStats(null);
+      setBundleResult(null);
+      await refetchBounty();
+      setPhase("work");
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setReworkBusy(false);
+    }
+  }, [address, bountyIdBig, canWrite, config, refetchBounty, writeContractAsync]);
 
   const resetCaptures = useCallback(() => {
     setBeforeCapture(null);
@@ -281,7 +376,7 @@ export default function WorkerPage() {
   const pendingSlot: "before" | "after" | null =
     beforeCapture === null ? "before" : afterCapture === null ? "after" : null;
 
-  if (!bountyIdBig) {
+  if (bountyIdBig === null) {
     return (
       <main className="mx-auto max-w-xl px-4 py-10">
         <p className="text-sm text-red-600">Invalid bounty id: {bountyId}</p>
@@ -303,6 +398,46 @@ export default function WorkerPage() {
           Verify → claim → before/after photos → Arkiv → submitEvidence
         </p>
       </header>
+
+      {report && (
+        <div className="mb-4">
+          <ReportCard report={report} compact title="Problem to fix" />
+        </div>
+      )}
+
+      {isWorker && status === STATUS.Claimed && workDeadline > 0 && (
+        <div className={`mb-4 rounded-xl border p-3 text-xs ${now > workDeadline ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+          {now > workDeadline
+            ? "Your work deadline has passed. Anyone can now reopen this bounty for other workers; submit immediately if you can."
+            : `Submit your evidence within ${countdownLabel(workDeadline, now)}. After that the bounty can be reopened for other workers.`}
+        </div>
+      )}
+
+      {isWorker && status === STATUS.Rejected && lc && (
+        <section className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <h2 className="font-semibold">Reviewers rejected the work</h2>
+          {canRework(lc, now, true) ? (
+            <>
+              <p className="mt-1 text-xs">
+                You have one chance to redo it. Rework within {countdownLabel(lc.workDeadline, now)}, then take new
+                before/after photos and submit again.
+              </p>
+              <button
+                type="button"
+                onClick={() => void runRework()}
+                disabled={reworkBusy || !canWrite}
+                className="mt-3 w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-gray-300"
+              >
+                {reworkBusy ? "Confirm in your wallet…" : "Rework this bounty"}
+              </button>
+            </>
+          ) : willReopenAfterRejection(lc, now) ? (
+            <p className="mt-1 text-xs">
+              The rework window is over, so this bounty will reopen for other workers.
+            </p>
+          ) : null}
+        </section>
+      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -328,8 +463,15 @@ export default function WorkerPage() {
               Connect your wallet (header) before verifying.
             </p>
           )}
-          {status === 0 && isConnected && (
+          {isConnected && claimBlockReason && !isWorker && (
+            <p className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">{claimBlockReason}</p>
+          )}
+          {isConnected && lc && !claimBlockReason && (
             <div className="mt-4">
+              <p className="mb-2 text-xs text-gray-500">
+                Claim before {new Date(lc.claimDeadline * 1000).toLocaleString()}. After claiming you will have a
+                limited time to submit before/after photos.
+              </p>
               <WorldIdButton
                 role="worker"
                 bountyId={bountyId}
@@ -341,11 +483,7 @@ export default function WorkerPage() {
               />
             </div>
           )}
-          {status !== 0 && (
-            <p className="mt-3 text-xs text-gray-500">
-              This bounty is no longer open for claims (status {statusName(status)}).
-            </p>
-          )}
+
         </section>
       )}
 
@@ -356,8 +494,7 @@ export default function WorkerPage() {
       )}
 
       {/* Step 2 — camera + challenge code */}
-      {(["work", "building", "publishing", "submitting", "done"].includes(phase) ||
-        isWorker) && (
+      {((isWorker && status === STATUS.Claimed) || phase === "done") && (
         <section className="mt-4 space-y-4">
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-900">
