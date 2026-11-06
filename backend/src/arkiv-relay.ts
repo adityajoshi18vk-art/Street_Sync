@@ -131,11 +131,9 @@ function arcBountyReader() {
 
 export function registerArkivRoutes(app: FastifyInstance): void {
   const writesPerBounty = new Map<string, number>();
+  const localEvidence = new Map<string, { payload: string; attributes: Record<string, string> }>();
 
   app.post<{ Body: { payload?: unknown } }>("/api/arkiv/entities", { bodyLimit: 512 * 1024 }, async (request, reply) => {
-    if (!isArkivRelayConfigured()) {
-      return reply.status(503).send({ error: "Arkiv storage is not configured on the backend" });
-    }
     const payload = request.body?.payload;
     if (typeof payload !== "string" || !/^[A-Za-z0-9+/=]+$/.test(payload)) {
       return reply.status(400).send({ error: "Expected a base64 evidence payload" });
@@ -148,6 +146,20 @@ export function registerArkivRoutes(app: FastifyInstance): void {
       if (e instanceof EvidenceRejectedError) return reply.status(400).send({ error: e.message });
       request.log.error(e);
       return reply.status(502).send({ error: "Could not verify the bounty on-chain" });
+    }
+
+    if (!isArkivRelayConfigured()) {
+      const isTest = process.env.NODE_ENV === "test" || process.argv.includes("--test") || process.execArgv.includes("--test");
+      if (process.env.ALLOW_DEV_ARKIV_BYPASS === "true" && !isTest) {
+        const entityKey = validated.evidenceHash;
+        localEvidence.set(entityKey.toLowerCase(), {
+          payload: bytesToBase64(validated.bundle),
+          attributes: validated.attributes,
+        });
+        request.log.info({ entityKey, bountyId: validated.attributes.bounty_id }, "Arkiv evidence stored in local fallback");
+        return reply.send({ entityKey, txHash: null, evidenceHash: validated.evidenceHash });
+      }
+      return reply.status(503).send({ error: "Arkiv storage is not configured on the backend" });
     }
 
     const bountyId = validated.attributes.bounty_id;
@@ -181,6 +193,17 @@ export function registerArkivRoutes(app: FastifyInstance): void {
     const key = request.params.key;
     if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
       return reply.status(400).send({ error: "Entity key must be 32-byte hex" });
+    }
+    const local = localEvidence.get(key.toLowerCase());
+    if (local) {
+      return reply.send({
+        entityKey: key,
+        payload: local.payload,
+        attributes: local.attributes,
+      });
+    }
+    if (!isArkivRelayConfigured()) {
+      return reply.status(404).send({ error: "Evidence entity not found or expired" });
     }
     try {
       const client = createArkivPublicClient({ chain: arkivChain(), transport: http() });

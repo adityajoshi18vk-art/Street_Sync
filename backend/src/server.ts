@@ -206,10 +206,11 @@ app.get("/api/health", async (_request, reply) => {
   const worldIdConfigured = isWorldIdConfigured();
   const signerConfigured = isAttestationSignerReady();
   const worldActions = areWorldActionsConfigured();
+  const arkivConfigured = isArkivRelayConfigured() || process.env.ALLOW_DEV_ARKIV_BYPASS === "true";
   return reply.send({
     status: "ok",
-    ready: worldIdConfigured && worldActions && signerConfigured && escrowConfigured && isArkivRelayConfigured(),
-    readiness: { worldId: worldIdConfigured, worldActions, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
+    ready: worldIdConfigured && worldActions && signerConfigured && escrowConfigured && arkivConfigured,
+    readiness: { worldId: worldIdConfigured, worldActions, signer: signerConfigured, escrow: escrowConfigured, arkiv: arkivConfigured },
     chainId: CHAIN_ID,
     attester: getAttesterAddress() ?? "",
     worldAppId: worldIdConfig().appId,

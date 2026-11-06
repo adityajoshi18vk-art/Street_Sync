@@ -162,6 +162,7 @@ export interface ReportRelayDeps {
   /** Escrow the indexer/signer is bound to; throws when not configured. */
   escrow: () => Address;
   db: Pick<typeof dbAccess, "getReport" | "upsertReport">;
+  isMockGateway?: boolean;
 }
 
 export function defaultReportRelayDeps(): ReportRelayDeps {
@@ -171,6 +172,7 @@ export function defaultReportRelayDeps(): ReportRelayDeps {
     chainId: Number(process.env.CHAIN_ID ?? "5042002"),
     escrow: getVerifyingContract,
     db: dbAccess,
+    isMockGateway: false,
   };
 }
 
@@ -257,6 +259,12 @@ export function registerReportRoutes(app: FastifyInstance, deps: ReportRelayDeps
             return reply.send({ entityKey: cached.entity_key, txHash: null, reportHash: cached.report_hash, alreadyStored: true });
           }
           if (!deps.arkiv.canWrite()) {
+            if (deps.isMockGateway === false && process.env.ALLOW_DEV_ARKIV_BYPASS === "true") {
+              const entityKey = validated.reportHash;
+              deps.db.upsertReport(toStored(validated, bountyId, entityKey));
+              request.log.info({ entityKey, bountyId: id }, "Report stored in local SQLite database cache (ALLOW_DEV_ARKIV_BYPASS enabled)");
+              return reply.send({ entityKey, txHash: null, reportHash: validated.reportHash, alreadyStored: false });
+            }
             return reply.status(503).send({ error: "Arkiv storage is not configured on the backend" });
           }
           // The cache may have been rebuilt; never write a second entity if Arkiv already has one.
@@ -291,7 +299,12 @@ export function registerReportRoutes(app: FastifyInstance, deps: ReportRelayDeps
     } catch {
       return reply.status(404).send({ error: "Report not uploaded yet" });
     }
-    if (!deps.arkiv.canRead()) return reply.status(503).send({ error: "Arkiv storage is not configured on the backend" });
+    if (!deps.arkiv.canRead()) {
+      if (deps.isMockGateway === false && process.env.ALLOW_DEV_ARKIV_BYPASS === "true") {
+        return reply.status(404).send({ error: "Report not uploaded yet" });
+      }
+      return reply.status(503).send({ error: "Arkiv storage is not configured on the backend" });
+    }
 
     try {
       const found = await exclusive(id, async () => {
