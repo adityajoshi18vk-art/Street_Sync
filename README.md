@@ -123,7 +123,7 @@ streetsync/
 ## 5. Quickstart & Local Testing
 
 ### Prerequisites
-- Node.js `>= 18` (v20+ recommended)
+- Node.js `>= 22.13` (the backend uses the built-in `node:sqlite`; Node 24 recommended)
 - `npm`
 
 ### Installation
@@ -275,3 +275,35 @@ Backend variables: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`,
    let every pledger withdraw. Reviewers withdraw their rewards, and re-stake after each settled review.
 
 Operator settings: `setValidationQuorum(0..10)` (0 disables neighbour validation) and `setValidationWindow`.
+
+## Run locally (against the live Arc Testnet contract)
+
+Requirements: Node.js 22.13+ (Node 24 recommended), a browser wallet (e.g. MetaMask) on Arc Testnet,
+and World App on your phone for World ID.
+
+```bash
+git clone https://github.com/adityajoshi18vk-art/Street_Sync.git && cd Street_Sync
+git checkout hoplite/eresos-5a722ded
+npm install
+cp backend/.env.example backend/.env   # fill in the values below
+npm run build && npm run build --workspace=streetsync-app
+npm start                               # http://localhost:3000
+```
+
+`npm start` runs the backend on 127.0.0.1:3001 and the app on `PORT` (default 3000). Use `npm run dev`
+for hot reload during development. The app finds the deployed contract in
+`contracts/deployments/arcTestnet.json`.
+
+`backend/.env` must contain:
+
+| Variable | Value |
+| :--- | :--- |
+| `ATTESTER_PRIVATE_KEY` / `ATTESTER_SIGNER_ADDRESS` | Key and address of the escrow's `attester` (owner can change it with `setAttester`) |
+| `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY` | From developer.world.org (World ID 4.0) |
+| `WORLD_ACTION_WORKER`, `WORLD_ACTION_REVIEWER`, `WORLD_ACTION_NEIGHBOUR` | `claim-bounty`, `register-reviewer`, `vote-problem` |
+| `ARKIV_ACCESS_KEY`, `ARKIV_PRIVATE_KEY` | Arkiv (Rabdi) access key and a tGLM-funded writer key |
+| `CHAIN_ID`, `ARC_RPC_URL` | `5042002`, `https://rpc.testnet.arc.io` |
+
+`GET http://localhost:3000/api/health` reports `ready: true` when everything is configured.
+Camera and GPS need `http://localhost` or HTTPS; to test on a phone, tunnel port 3000
+(e.g. `npx ngrok http 3000`).
