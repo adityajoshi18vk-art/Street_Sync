@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import L from "leaflet";
 import {
@@ -52,7 +52,50 @@ function ClickAndFocusHandler({
 
 const DEFAULT_CENTER: [number, number] = [40.7128, -74.006];
 
-export default function MapView({
+/**
+ * react-leaflet can try to initialise a map twice on the same element when part of the tree
+ * suspends during the first mount ("Map container is already initialized"). Remount on a fresh
+ * element instead of letting the whole page fall into the error boundary.
+ */
+class MapRecoveryBoundary extends Component<{ children: (key: number) => ReactNode }, { key: number; failed: boolean }> {
+  state = { key: 0, failed: false };
+
+  static getDerivedStateFromError() {
+    return null;
+  }
+
+  componentDidCatch(error: Error) {
+    if (this.state.key < 3 && /already initialized/i.test(error.message)) {
+      this.setState((s) => ({ key: s.key + 1 }));
+    } else {
+      this.setState({ failed: true });
+    }
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-xl bg-gray-100 text-sm text-gray-600">
+          The map failed to load.{" "}
+          <button type="button" onClick={() => window.location.reload()} className="ml-1 font-semibold text-brand-700 underline">
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children(this.state.key);
+  }
+}
+
+export default function MapView(props: MapViewProps) {
+  return (
+    <div className={`relative ${props.className ?? "h-[420px] w-full"}`}>
+      <MapRecoveryBoundary>{(key) => <MapViewInner key={key} {...props} />}</MapRecoveryBoundary>
+    </div>
+  );
+}
+
+function MapViewInner({
   bounties,
   selectedId,
   onSelect,
@@ -62,7 +105,7 @@ export default function MapView({
   className
 }: MapViewProps) {
   return (
-    <div className={`relative ${className ?? "h-[420px] w-full"}`}>
+    <div className="relative h-full w-full">
       <MapContainer
         center={DEFAULT_CENTER}
         zoom={13}
@@ -109,7 +152,7 @@ export default function MapView({
                   )}
                   <Link
                     href={`/bounty/${b.bountyId}`}
-                    className="mt-1 inline-block rounded bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                    className="popup-cta mt-1 inline-block rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
                   >
                     Open bounty
                   </Link>

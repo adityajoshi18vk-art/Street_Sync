@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import WorldIdButton from "@/components/WorldIdButton";
 import {
@@ -9,9 +9,10 @@ import {
   useChainId,
   useConfig,
   useReadContract,
+  useSwitchChain,
   useWriteContract
 } from "wagmi";
-import type { Hash } from "viem";
+import { erc20Abi, type Hash } from "viem";
 import { waitForTransactionReceipt } from "wagmi/actions";
 
 import {
@@ -26,9 +27,9 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { getReviewerAssignments, type Attestation } from "@/lib/api";
+import { getReviewerAssignments, listBounties, type Attestation } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
-import { shortAddress, statusName, type OnChainBounty, type ReviewerAssignment } from "@/lib/types";
+import { normalizeBounty, shortAddress, statusName, type OnChainBounty, type ReviewerAssignment } from "@/lib/types";
 import { friendlyError } from "@/lib/errors";
 import { useBountyReport } from "@/lib/useBountyReport";
 import ReportCard from "@/components/ReportCard";
@@ -72,6 +73,19 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState<string | null>(null);
   const stake = typeof stakeRaw === "bigint" ? stakeRaw : 2_000_000n;
+  const { switchChain, isPending: switching } = useSwitchChain();
+  const { data: balanceRaw } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
+    address: USDC_ADDRESS ?? undefined,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!USDC_ADDRESS && !!address, refetchInterval: 20_000 }
+  });
+  const usdcBalance = typeof balanceRaw === "bigint" ? balanceRaw : null;
+  const onArc = chainId === ACTIVE_CHAIN.id;
+  // Unknown balance (still loading) must not be shown as a failure.
+  const enoughUsdc = usdcBalance === null ? null : usdcBalance >= stake;
 
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -204,6 +218,39 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
             register. Stakes are slashed if you sit on a panel and fail to reveal. After each review
             you settle, your stake comes back and you re-stake to take the next one.
           </p>
+          <ul className="mt-3 space-y-1.5 rounded-lg bg-gray-50 p-3 text-xs text-gray-700" aria-label="Staking requirements">
+            <Requirement ok={!!address} label="Wallet connected" hint="Use Connect Wallet in the header." />
+            <Requirement
+              ok={!!address && onArc}
+              label={`Wallet on ${ACTIVE_CHAIN.name}`}
+              action={
+                address && !onArc ? (
+                  <button
+                    type="button"
+                    onClick={() => switchChain({ chainId: ACTIVE_CHAIN.id })}
+                    disabled={switching}
+                    className="rounded-md border border-brand-200 bg-white px-2 py-0.5 font-semibold text-brand-700 hover:bg-brand-50"
+                  >
+                    {switching ? "Switching…" : "Switch"}
+                  </button>
+                ) : null
+              }
+            />
+            <Requirement
+              ok={address ? enoughUsdc : false}
+              label={`At least ${formatUsdcDisplay(stake)} USDC`}
+              hint={
+                address
+                  ? `Balance: ${usdcBalance === null ? "…" : `${formatUsdcDisplay(usdcBalance)} USDC`}. Keep a little extra for gas — Arc fees are paid in USDC.`
+                  : "Arc fees are paid in USDC, so keep a little extra for gas."
+              }
+            />
+            <Requirement ok={null} label="World App for the World ID check" hint="One verified human = one reviewer." />
+          </ul>
+          <p className="mt-2 text-xs text-gray-500">
+            Two wallet prompts: approve, then register. Once staked, you&apos;re only drawn for
+            bounties you didn&apos;t create, fund, work on, or vote on as a neighbour.
+          </p>
           {!address ? (
             <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
               Connect your wallet (header) to register.
@@ -246,6 +293,30 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         </>
       )}
     </section>
+  );
+}
+
+function Requirement({
+  ok,
+  label,
+  hint,
+  action
+}: {
+  ok: boolean | null;
+  label: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  const dot = ok === true ? "bg-emerald-500" : ok === false ? "bg-amber-500" : "bg-gray-300";
+  return (
+    <li className="flex items-start gap-2">
+      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
+      <span className="flex-1">
+        <span className={ok === true ? "text-gray-500 line-through" : "font-medium"}>{label}</span>
+        {hint && <span className="block text-[11px] text-gray-500">{hint}</span>}
+      </span>
+      {action}
+    </li>
   );
 }
 
@@ -674,8 +745,27 @@ export default function ReviewPage() {
       <header className="mb-6">
         <h1 className="text-xl font-bold text-gray-900">Reviewer dashboard</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Stake, inspect evidence, commit-reveal your vote, and keep panels honest.
+          Reviewers decide whether the work was really done. You earn a share of the escrow when you vote with the
+          majority.
         </p>
+        <ol className="mt-3 grid gap-2 text-xs sm:grid-cols-4">
+          {[
+            ["1", "Stake 2 USDC", "Verify with World ID and stake."],
+            ["2", "Get drawn", "3 reviewers are picked per job."],
+            ["3", "Vote", "Compare photos, commit, then reveal."],
+            ["4", "Earn", "Majority shares 10% of the escrow."]
+          ].map(([n, t, d]) => (
+            <li key={n} className="flex gap-2 rounded-lg bg-white p-2.5 ring-1 ring-gray-200">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
+                {n}
+              </span>
+              <span>
+                <span className="block font-semibold text-gray-800">{t}</span>
+                <span className="text-gray-500">{d}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       </header>
 
       <div className="space-y-4">
@@ -686,6 +776,8 @@ export default function ReviewPage() {
             {loadError} — the backend may be offline. Registration still works on-chain.
           </div>
         )}
+
+        <AwaitingPanel />
 
         {assignments && assignments.length === 0 && (
           <p className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-sm text-gray-500">
@@ -704,11 +796,50 @@ export default function ReviewPage() {
 
         <p className="pt-4 text-center text-xs text-gray-400">
           Escrow {shortAddress(ESCROW_ADDRESS, 4)} ·{" "}
-          <Link href="/audit/1" className="text-gray-400 underline">
+          <Link href="/audit/0" className="text-gray-400 underline">
             try the public audit
           </Link>
         </p>
       </div>
     </main>
+  );
+}
+
+/** Submitted bounties that still need their review panel drawn (anyone may trigger it). */
+function AwaitingPanel() {
+  const [items, setItems] = useState<{ bountyId: string; description: string | null }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    listBounties({ status: 2, limit: 50 })
+      .then((rows) => {
+        if (!cancelled) setItems(rows.map(normalizeBounty).map((b) => ({ bountyId: b.bountyId, description: b.description ?? null })));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (items.length === 0) return null;
+  return (
+    <section className="rounded-xl bg-white p-5 shadow-card ring-1 ring-violet-200">
+      <h2 className="text-sm font-semibold text-gray-900">Waiting for a review panel</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Workers submitted evidence for these. Open one and tap <strong>Draw review panel</strong>; if you are
+        registered you may be picked.
+      </p>
+      <ul className="mt-3 divide-y divide-gray-100">
+        {items.map((b) => (
+          <li key={b.bountyId} className="flex items-center justify-between gap-3 py-2">
+            <span className="min-w-0 text-sm text-gray-700">
+              <span className="font-semibold">#{b.bountyId}</span>{" "}
+              <span className="line-clamp-1 text-gray-500">{b.description}</span>
+            </span>
+            <Link href={`/bounty/${b.bountyId}`} className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700">
+              Open
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
