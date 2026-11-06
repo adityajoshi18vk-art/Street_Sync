@@ -1,4 +1,4 @@
-import { defineChain, parseUnits, formatUnits, type Abi, type Address } from "viem";
+import { defineChain, parseUnits, formatUnits, isAddress, zeroAddress, type Abi, type Address } from "viem";
 import arcTestnetDeployment from "../../../contracts/deployments/arcTestnet.json";
 import localhostDeployment from "../../../contracts/deployments/localhost.json";
 
@@ -52,7 +52,7 @@ const deployments: Record<number, DeploymentFile> = {
 };
 
 export const ARC_RPC_URL =
-  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz";
+  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.io";
 
 export const ARC_TESTNET = defineChain({
   id: ARC_CHAIN_ID,
@@ -68,7 +68,7 @@ export const ARC_TESTNET = defineChain({
   blockExplorers: {
     default: {
       name: "Arc Explorer",
-      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.arc-testnet.circlelabs.xyz"
+      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.testnet.arc.io"
     }
   },
   testnet: true
@@ -88,6 +88,10 @@ const envChainId = process.env.NEXT_PUBLIC_CHAIN_ID
   ? Number(process.env.NEXT_PUBLIC_CHAIN_ID)
   : ARC_CHAIN_ID;
 
+if (![ARC_CHAIN_ID, LOCALHOST_CHAIN_ID].includes(envChainId)) {
+  throw new Error("NEXT_PUBLIC_CHAIN_ID must be 5042002 (Arc Testnet) or 31337 (local).");
+}
+
 export const ACTIVE_CHAIN =
   envChainId === LOCALHOST_CHAIN_ID ? HARDHAT_LOCAL : ARC_TESTNET;
 
@@ -97,27 +101,38 @@ const deploymentForChain =
   deployments[ACTIVE_CHAIN.id] ?? arcDeployment;
 export const deployment = deploymentForChain;
 
-function resolveAddress(value: string | undefined): Address | null {
-  return value && /^0x[0-9a-fA-F]{40}$/.test(value) ? (value as Address) : null;
+export function resolveAddress(value: string | undefined): Address | null {
+  return value && isAddress(value, { strict: false }) && value.toLowerCase() !== zeroAddress
+    ? (value as Address) : null;
 }
 
-const envEscrow = resolveAddress(process.env.NEXT_PUBLIC_ESCROW_ADDRESS);
-const envUsdc = resolveAddress(process.env.NEXT_PUBLIC_USDC_ADDRESS);
+export function resolveDeploymentAddress(override: string | undefined, fallback: string | undefined): Address | null {
+  // An explicitly invalid override must not silently select a different contract.
+  return resolveAddress(override === undefined ? fallback : override);
+}
 
-export const ESCROW_ADDRESS: Address | null =
-  envEscrow ?? deploymentForChain.contracts.StreetSyncEscrow?.address ?? null;
+export const ARC_USDC_ADDRESS: Address = "0x3600000000000000000000000000000000000000";
 
-export const USDC_ADDRESS: Address | null =
-  envUsdc ??
-  deploymentForChain.contracts.MockUSDC?.address ??
-  deploymentForChain.contracts.USDC?.address ??
-  null;
+export const ESCROW_ADDRESS = resolveDeploymentAddress(
+  process.env.NEXT_PUBLIC_ESCROW_ADDRESS,
+  deploymentForChain.contracts.StreetSyncEscrow?.address
+);
 
-export const contractsDeployed =
-  ESCROW_ADDRESS !== null &&
-  USDC_ADDRESS !== null &&
-  ESCROW_ADDRESS !== "0x0000000000000000000000000000000000000000" &&
-  USDC_ADDRESS !== "0x0000000000000000000000000000000000000000";
+export const USDC_ADDRESS = resolveDeploymentAddress(
+  process.env.NEXT_PUBLIC_USDC_ADDRESS,
+  isLocalNetwork
+    ? deploymentForChain.contracts.MockUSDC?.address ?? deploymentForChain.contracts.USDC?.address
+    : ARC_USDC_ADDRESS
+);
+
+export const contractsDeployed = ESCROW_ADDRESS !== null && USDC_ADDRESS !== null;
+export const DEPLOYMENT_ERROR =
+  "StreetSync contracts are not configured for " + ACTIVE_CHAIN.name +
+  ". Deploy StreetSyncEscrow and configure its address before sending transactions.";
+
+export function assertContractsConfigured(): void {
+  if (!contractsDeployed) throw new Error(DEPLOYMENT_ERROR);
+}
 
 export const ESCROW_ABI: Abi = (deploymentForChain.contracts.StreetSyncEscrow?.abi ??
   []) as Abi;
@@ -131,7 +146,7 @@ export const PANEL_SIZE = deploymentForChain.parameters.panelSize;
 export const QUORUM = deploymentForChain.parameters.quorum;
 
 export const BACKEND_API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ??
   "app_staging_streetsync") as `app_${string}`;
@@ -145,6 +160,9 @@ export const WORLD_ACTION_REVIEWER =
  * into a contract value (createBounty, pledge, registerReviewer stakes).
  */
 export function parseUsdc(amount: string): bigint {
+  if (!/^\d+(\.\d{1,6})?$/.test(amount) || parseUnits(amount, USDC_DECIMALS) <= 0n) {
+    throw new Error("Enter a positive USDC amount with at most 6 decimal places.");
+  }
   return parseUnits(amount, USDC_DECIMALS);
 }
 
