@@ -5,8 +5,7 @@ import { waitTx } from "@/lib/tx";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { IDKitWidget } from "@worldcoin/idkit";
-import type { ISuccessResult } from "@worldcoin/idkit";
+import WorldIdButton from "@/components/WorldIdButton";
 import { useAccount, useChainId, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { decodeEventLog, type Hash } from "viem";
@@ -17,12 +16,10 @@ import {
   ESCROW_ADDRESS,
   USDC_ADDRESS,
   USDC_ABI,
-  WORLD_APP_ID,
-  WORLD_ACTION_WORKER,
   contractsDeployed,
   formatUsdcDisplay
 } from "@/config/contracts";
-import { requestAttestation, type Attestation, type WorldIdSuccessResult } from "@/lib/api";
+import type { Attestation } from "@/lib/api";
 import { getArkivClient, rememberEntityMapping } from "@/lib/arkiv";
 import { buildSignedBundle, type CompressionStats, type EvidenceMetadata } from "@/lib/evidence";
 import { statusName } from "@/lib/types";
@@ -133,26 +130,13 @@ export default function WorkerPage() {
     [address, bountyIdBig, canWrite, config, refetchBounty, writeContractAsync]
   );
 
-  const handleWorldIdVerify = useCallback(
-    async (result: ISuccessResult) => {
-      if (!canWrite || !address) throw new Error("Connect a wallet on the configured contract network first");
-      const proof: WorldIdSuccessResult = {
-        nullifier_hash: result.nullifier_hash,
-        merkle_root: result.merkle_root,
-        proof: result.proof,
-        verification_level: result.verification_level
-      };
-      const attestation = await requestAttestation({
-        wallet: address,
-        role: "worker",
-        bountyId,
-        action: WORLD_ACTION_WORKER,
-        worldIdProof: proof
-      });
+  const handleAttestation = useCallback(
+    async (attestation: Attestation) => {
+      setError(null);
       attestationRef.current = attestation;
       await runClaim(attestation);
     },
-    [address, bountyId, canWrite, runClaim, WORLD_ACTION_WORKER]
+    [runClaim]
   );
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
@@ -346,27 +330,15 @@ export default function WorkerPage() {
           )}
           {status === 0 && isConnected && (
             <div className="mt-4">
-              <IDKitWidget
-                app_id={WORLD_APP_ID}
-                action={WORLD_ACTION_WORKER}
-                signal={address}
-                handleVerify={handleWorldIdVerify}
-                onSuccess={() => {
-                  /* claim already ran inside handleVerify */
-                }}
-                onError={(err) => setError(`World ID error: ${err.code} — ${err.message}`)}
-              >
-                {({ open }) => (
-                  <button
-                    type="button"
-                    onClick={open}
-                    disabled={!canWrite}
-                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99]"
-                  >
-                    Verify with World ID &amp; claim
-                  </button>
-                )}
-              </IDKitWidget>
+              <WorldIdButton
+                role="worker"
+                bountyId={bountyId}
+                wallet={address}
+                disabled={!canWrite}
+                label="Verify with World ID & claim"
+                onAttestation={handleAttestation}
+                onError={setError}
+              />
             </div>
           )}
           {status !== 0 && (
