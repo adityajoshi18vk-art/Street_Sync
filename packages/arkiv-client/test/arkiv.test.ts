@@ -81,19 +81,18 @@ describe("Arkiv Client SDK Integration & Audit Engine", () => {
     const mockPhoto2 = new Uint8Array(2000).fill(0x22);
 
     const metadata: EvidenceMetadata = {
+      v: 1,
       bountyId: "42",
-      visualChallengeCode: 7890,
-      beforeTimestamp: 1718000000000,
-      afterTimestamp: 1718003600000,
-      gpsLatE5: 3777490,
-      gpsLngE5: -12241940,
-      gpsAccuracyM: 2.5,
-      compassHeadingDeg: 90.0,
-      deviceSummary: "Pixel 8 Pro, Android 14, Chrome Mobile",
-      beforeImageSha256: "0x1111111111111111111111111111111111111111111111111111111111111111",
-      afterImageSha256: "0x2222222222222222222222222222222222222222222222222222222222222222",
-      appVersion: "1.0.0",
       workerAddress: TEST_WORKER,
+      challengeCode: 7890,
+      beforeTimestampMs: 1718000000000,
+      afterTimestampMs: 1718003600000,
+      gps: { lat: 37.7749, lng: -122.4194, accuracyMeters: 2.5 },
+      orientation: { alpha: 90, beta: null, gamma: null },
+      beforeSha256: "0x1111111111111111111111111111111111111111111111111111111111111111",
+      afterSha256: "0x2222222222222222222222222222222222222222222222222222222222222222",
+      userAgent: "Pixel 8 Pro, Android 14, Chrome Mobile",
+      notes: "",
     };
 
     const { bundle, evidenceHash } = await packBundle({
@@ -123,9 +122,11 @@ describe("Arkiv Client SDK Integration & Audit Engine", () => {
     expect(stored?.attributes.entity_type).toBe("evidence");
     expect(stored?.attributes.bounty_id).toBe("42");
     expect(stored?.attributes.worker).toBe(TEST_WORKER.toLowerCase());
-    expect(stored?.attributes.kind).toBe("bundle");
-    // Strict requirement: sha256_prefix is evidenceHash.slice(0, 18)
-    expect(stored?.attributes.sha256_prefix).toBe(evidenceHash.slice(0, 18));
+    expect(Object.keys(stored!.attributes).sort()).toEqual([
+      "bounty_id", "entity_type", "project", "sha256_prefix", "worker",
+    ]);
+    expect(stored?.attributes.sha256_prefix).toBe(evidenceHash.slice(0, 32));
+    expect(mockClient.entities.get(writeResult.entityKey)?.ttl).toBe(604_800);
 
     // 3. Read back from Arkiv using either raw key or bytes32 key
     const readFromRaw = await readEvidenceBundle(mockClient, writeResult.entityKey);
@@ -147,33 +148,24 @@ describe("Arkiv Client SDK Integration & Audit Engine", () => {
     expect(audit.evidenceHashMatch).toBe(true);
     expect(audit.signatureValid).toBe(true);
     expect(audit.recoveredWorker?.toLowerCase()).toBe(TEST_WORKER.toLowerCase());
-    expect(audit.metadata?.visualChallengeCode).toBe(7890);
+    expect(audit.metadata?.challengeCode).toBe(7890);
     expect(audit.metadata?.bountyId).toBe("42");
   });
 
-  it("handles automatic chunking fallback for bundles exceeding 120,000 bytes", async () => {
+  it("rejects oversized bundles instead of splitting one evidence item across entities", async () => {
     // Create an artificial oversized bundle
     const bigBundle = new Uint8Array(180_000);
     bigBundle.fill(0xcc);
 
     const evidenceHash = await computeEvidenceHash(bigBundle);
 
-    const writeResult = await writeEvidenceBundle(
+    await expect(writeEvidenceBundle(
       mockClient,
       bigBundle,
       TEST_WORKER,
       99,
       evidenceHash
-    );
-
-    expect(writeResult.chunked).toBe(true);
-    expect(writeResult.chunkKeys).toBeDefined();
-    expect(writeResult.chunkKeys!.length).toBe(2);
-
-    // Read back and verify transparent reassembly
-    const readResult = await readEvidenceBundle(mockClient, writeResult.entityKey);
-    expect(readResult.bundle.length).toBe(bigBundle.length);
-    expect(Buffer.from(readResult.bundle).equals(Buffer.from(bigBundle))).toBe(true);
+    )).rejects.toThrow(/120,000-byte Arkiv safe budget/);
   });
 });
 
