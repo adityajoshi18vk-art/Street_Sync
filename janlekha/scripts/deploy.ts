@@ -6,11 +6,12 @@
  *
  * Idempotent: if the artifact already points at deployed code, nothing is sent.
  * Set JANLEKHA_FORCE_REDEPLOY=true to deploy a fresh instance (the old artifact is replaced).
+ * Set JANLEKHA_DEPLOY_TX=<hash> to adopt a deployment that was sent but not recorded.
  */
 import { readFile } from "node:fs/promises";
 
 import { network } from "hardhat";
-import { formatEther, keccak256 } from "viem";
+import { formatEther, keccak256, type Hex } from "viem";
 
 import {
   ABI_PATH,
@@ -64,15 +65,35 @@ const balance = await publicClient.getBalance({ address: deployer.account.addres
 console.log(`Balance:  ${formatEther(balance)} ${isHedera(chainId) ? "HBAR" : "ETH"}`);
 if (balance === 0n) throw new Error("Deployer account has no balance; fund it from the Hedera testnet faucet.");
 
-console.log(`Deploying ${CONTRACT_NAME}(admin = deployer)…`);
-const { deploymentTransaction } = await viem.sendDeploymentTransaction(CONTRACT_NAME, [
-  deployer.account.address,
-]);
-console.log(`  tx ${deploymentTransaction.hash}`);
+// hardhat-viem's sendDeploymentTransaction calls getTransaction right after sending; Hashio
+// often hasn't indexed the tx yet ("could not be found") even though it lands. Send with the
+// wallet client and poll for the receipt instead.
+const adoptHash = process.env.JANLEKHA_DEPLOY_TX?.trim() as Hex | undefined;
+let deployHash: Hex;
+if (adoptHash) {
+  console.log(`Adopting existing deployment tx ${adoptHash}…`);
+  deployHash = adoptHash;
+} else {
+  console.log(`Deploying ${CONTRACT_NAME}(admin = deployer)…`);
+  const full = JSON.parse(
+    await readFile(`artifacts/contracts/${CONTRACT_NAME}.sol/${CONTRACT_NAME}.json`, "utf8"),
+  ) as { bytecode: Hex };
+  deployHash = await deployer.deployContract({
+    abi: compiled.abi as never,
+    bytecode: full.bytecode,
+    args: [deployer.account.address],
+  } as never);
+}
+console.log(`  tx ${deployHash}`);
 const receipt = await publicClient.waitForTransactionReceipt({
-  hash: deploymentTransaction.hash,
+  hash: deployHash,
   timeout: RECEIPT_TIMEOUT_MS,
+  pollingInterval: 2_000,
+  retryCount: 10,
 });
+if (adoptHash && receipt.from.toLowerCase() !== deployer.account.address.toLowerCase()) {
+  throw new Error(`Tx ${adoptHash} was sent by ${receipt.from}, not the configured deployer.`);
+}
 if (receipt.status !== "success" || !receipt.contractAddress) {
   throw new Error(`Deployment transaction failed (status ${receipt.status}).`);
 }
@@ -90,7 +111,7 @@ if (!(await contract.read.hasRole([adminRole, deployer.account.address]))) {
   throw new Error("Deployer does not hold DEFAULT_ADMIN_ROLE after deployment.");
 }
 
-const { transactionId, contractId } = await lookupHederaIds(chainId, deploymentTransaction.hash);
+const { transactionId, contractId } = await lookupHederaIds(chainId, deployHash);
 await writeAbi(compiled.abi);
 
 const artifact: DeploymentArtifact = {
@@ -109,7 +130,7 @@ const artifact: DeploymentArtifact = {
   deployer: deployer.account.address,
   admin: deployer.account.address,
   deployment: {
-    hash: deploymentTransaction.hash,
+    hash: deployHash,
     hederaTransactionId: transactionId,
     blockNumber: receipt.blockNumber.toString(),
     explorerUrl: explorerContractUrl(chainId, address),
