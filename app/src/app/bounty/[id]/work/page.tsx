@@ -301,8 +301,8 @@ export default function WorkerPage() {
   if (!bountyIdBig) {
     return (
       <main className="mx-auto max-w-xl px-4 py-10">
-        <p className="text-sm text-red-600">Invalid bounty id: {bountyId}</p>
-        <Link href="/" className="mt-4 inline-block text-sm font-semibold text-indigo-600">
+        <p className="text-sm text-red-300">Invalid bounty id: {bountyId}</p>
+        <Link href="/" className="mt-4 inline-block text-sm font-semibold text-brand-300 hover:text-brand-200">
           ← Back to the map
         </Link>
       </main>
@@ -311,37 +311,37 @@ export default function WorkerPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-6">
-      <header className="mb-6">
+      <header className="animate-rise mb-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Work bounty #{bountyId}</h1>
+          <h1 className="heading text-2xl">Work bounty #{bountyId}</h1>
           <StatusBadge status={status} />
         </div>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm text-slate-400">
           Verify → claim → before/after photos → Arkiv → submitEvidence
         </p>
       </header>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="alert-error mb-4">
           {error}
         </div>
       )}
       {txHash && (
-        <div className="mb-4 break-all rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+        <div className="alert-success mb-4 break-all !p-3 text-xs">
           Last tx: {txHash}
         </div>
       )}
 
       {/* Step 1 — World ID + claim */}
       {phase === "verify" && (
-        <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-gray-900">1 · Verify with World ID</h2>
-          <p className="mt-1 text-xs text-gray-500">
+        <section className="card animate-rise stagger-1 p-6">
+          <h2 className="heading text-base">1 · Verify with World ID</h2>
+          <p className="mt-1 text-xs text-slate-400">
             Prove humanity once with World ID v4. The backend countersigns an EIP-712
             attestation which this page submits to <code>claim()</code>.
           </p>
           {!isConnected && (
-            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="alert-warn mt-3 !p-3 text-xs">
               Connect your wallet (header) before verifying.
             </p>
           )}
@@ -361,7 +361,7 @@ export default function WorkerPage() {
                   <button
                     type="button"
                     onClick={open}
-                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99]"
+                    className="btn-primary w-full py-3"
                   >
                     Verify with World ID &amp; claim
                   </button>
@@ -370,7 +370,7 @@ export default function WorkerPage() {
             </div>
           )}
           {status !== 0 && (
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs text-slate-400">
               This bounty is no longer open for claims (status {statusName(status)}).
             </p>
           )}
@@ -378,7 +378,7 @@ export default function WorkerPage() {
       )}
 
       {phase === "claiming" && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 text-sm text-indigo-700">
+        <div className="alert-info animate-rise p-5">
           Submitting claim() — confirm the transaction in your wallet…
         </div>
       )}
@@ -387,13 +387,13 @@ export default function WorkerPage() {
       {(["work", "building", "publishing", "submitting", "done"].includes(phase) ||
         isWorker) && (
         <section className="mt-4 space-y-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900">
+          <div className="card animate-rise stagger-1 p-6">
+            <h2 className="heading text-base">
               2 · Visual Challenge Code
             </h2>
             {challengeCode > 0 ? (
               <>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-slate-400">
                   Emitted deterministically by the contract on claim. It is burned into
                   every photo frame by the camera HUD — keep it visible while shooting.
                 </p>
@@ -404,7 +404,7 @@ export default function WorkerPage() {
                     .map((digit, i) => (
                       <span
                         key={i}
-                        className="rounded-lg border-2 border-indigo-500 bg-indigo-50 px-3 py-2 font-mono text-2xl font-bold text-indigo-700"
+                        className="rounded-xl border border-brand-400/40 bg-brand-500/10 px-3.5 py-2.5 font-mono text-2xl font-bold text-brand-200 shadow-glow-sm"
                       >
                         {digit}
                       </span>
@@ -412,7 +412,7 @@ export default function WorkerPage() {
                 </div>
               </>
             ) : (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-400">
                 No challenge code yet — it appears after claim().
               </p>
             )}
@@ -436,11 +436,11 @@ export default function WorkerPage() {
             <div className="grid grid-cols-2 gap-3">
               {[beforeCapture, afterCapture].map((cap, i) =>
                 cap ? (
-                  <div key={i} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div key={i} className="card overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={cap.previewUrl} alt={`${cap.slot} capture`} className="h-40 w-full object-cover" />
-                    <div className="p-2 text-[11px] text-gray-500">
-                      <span className="font-semibold capitalize text-gray-700">{cap.slot}</span>
+                    <div className="p-2.5 text-[11px] text-slate-400">
+                      <span className="font-semibold capitalize text-slate-200">{cap.slot}</span>
                       {cap.telemetry.lat !== null && (
                         <>
                           {" · "}
@@ -457,7 +457,7 @@ export default function WorkerPage() {
                     </div>
                   </div>
                 ) : (
-                  <div key={i} className="flex h-40 items-center justify-center rounded-xl border border-dashed border-gray-300 text-xs text-gray-400">
+                  <div key={i} className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02] text-xs text-slate-500">
                     {i === 0 ? "Before photo" : "After photo"}
                   </div>
                 )
@@ -466,20 +466,20 @@ export default function WorkerPage() {
           )}
 
           {videoWalkthrough && (
-            <div className="overflow-hidden rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <div className="alert-warn overflow-hidden">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="rounded bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-900">
+                  <span className="rounded-md bg-amber-400/10 px-2 py-0.5 text-xs font-bold text-amber-300 ring-1 ring-amber-400/30">
                     Swarm Video Walkthrough
                   </span>
-                  <span className="text-xs text-amber-800">
+                  <span className="text-xs text-amber-200">
                     {videoWalkthrough.durationSeconds}s · {(videoWalkthrough.sizeBytes / 1024).toFixed(0)} KB
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setVideoWalkthrough(null)}
-                  className="text-xs font-medium text-amber-700 hover:text-amber-900 underline"
+                  className="text-xs font-medium text-amber-300 underline transition hover:text-amber-200"
                 >
                   Remove
                 </button>
@@ -488,9 +488,9 @@ export default function WorkerPage() {
                 src={getVideoPlaybackUrl(videoWalkthrough.swarmReference)}
                 controls
                 playsInline
-                className="w-full max-h-56 rounded-lg bg-black"
+                className="w-full max-h-56 rounded-xl bg-black ring-1 ring-white/10"
               />
-              <p className="mt-2 text-[11px] font-mono text-amber-700 truncate">
+              <p className="mt-2 text-[11px] font-mono text-amber-300/80 truncate">
                 Bzz reference: {videoWalkthrough.swarmReference}
               </p>
             </div>
@@ -501,7 +501,7 @@ export default function WorkerPage() {
               type="button"
               disabled={phase === "building" || !canBuild}
               onClick={buildBundle}
-              className="flex-1 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="btn-primary flex-1 py-3"
             >
               {phase === "building" ? "Building bundle…" : "Build evidence bundle"}
             </button>
@@ -509,7 +509,7 @@ export default function WorkerPage() {
               <button
                 type="button"
                 onClick={resetCaptures}
-                className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+                className="btn-ghost py-3"
               >
                 Retake
               </button>
@@ -523,7 +523,7 @@ export default function WorkerPage() {
               type="button"
               onClick={publishAndSubmit}
               disabled={phase === "done"}
-              className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-gray-300"
+              className="btn-success w-full py-3"
             >
               {phase === "done"
                 ? "Evidence submitted ✓"
@@ -532,7 +532,7 @@ export default function WorkerPage() {
           )}
 
           {(phase === "publishing" || phase === "submitting") && (
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-700">
+            <div className="alert-info">
               {phase === "publishing"
                 ? "Writing the SSYN bundle to Arkiv…"
                 : "Calling submitEvidence(bountyId, arkivKey, evidenceHash) — confirm in your wallet…"}
@@ -541,20 +541,20 @@ export default function WorkerPage() {
 
           {phase === "done" && (
             <div className="space-y-3">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+              <div className="alert-success">
                 Evidence published. The panel is selected 2 blocks after this transaction
                 (Rule 4), then commit-reveal voting runs.
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Link
                   href={`/bounty/${bountyId}`}
-                  className="rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="btn-ghost py-3"
                 >
                   Bounty detail
                 </Link>
                 <Link
                   href={`/audit/${bountyId}`}
-                  className="rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  className="btn-ghost py-3"
                 >
                   Public audit
                 </Link>
@@ -562,7 +562,7 @@ export default function WorkerPage() {
               <button
                 type="button"
                 onClick={() => router.push("/")}
-                className="w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-800"
+                className="btn-ghost w-full py-3"
               >
                 Back to the map
               </button>
@@ -572,12 +572,12 @@ export default function WorkerPage() {
       )}
 
       {evidenceHash && evidenceHash !== "0x" + "0".repeat(64) && (
-        <p className="mt-6 break-all rounded-xl bg-gray-50 p-3 text-[11px] text-gray-500">
+        <p className="card-inset mt-6 break-all p-3 font-mono text-[11px] text-slate-400">
           On-chain evidence hash: {evidenceHash}
         </p>
       )}
 
-      <p className="mt-8 text-center text-xs text-gray-400">
+      <p className="mt-8 text-center text-xs text-slate-500">
         Escrow {(ESCROW_ADDRESS ?? "").slice(0, 10)}… · USDC{" "}
         {(typeof usdcBalance === "bigint" ? formatUsdcDisplay(usdcBalance) : "—")} available
       </p>

@@ -71,12 +71,12 @@ export function DocumentInput({
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 p-3" data-testid={testId}>
-      <label htmlFor={id} className="text-sm font-medium text-neutral-800">
+    <div className="rounded-lg border border-white/[0.08] p-3" data-testid={testId}>
+      <label htmlFor={id} className="text-sm font-medium text-slate-100">
         {label}
       </label>
       {purpose === "public" ? (
-        <label className="mt-2 flex items-start gap-2 text-xs text-neutral-700">
+        <label className="mt-2 flex items-start gap-2 text-xs text-slate-200">
           <input type="checkbox" checked={attested} onChange={(e) => setAttested(e.target.checked)} className="mt-0.5" />
           <span>
             This is a synthetic or public demo document. It contains no personal data (no Aadhaar, PAN, bank details or
@@ -84,7 +84,7 @@ export function DocumentInput({
           </span>
         </label>
       ) : (
-        <p className="mt-1 text-xs text-neutral-600">
+        <p className="mt-1 text-xs text-slate-300">
           Confidential until the reveal: hashed in your browser only and never uploaded. Keep the original file.
         </p>
       )}
@@ -94,18 +94,18 @@ export function DocumentInput({
         accept="application/pdf,.pdf"
         disabled={!canPick}
         onChange={(e) => void handle(e.target.files?.[0])}
-        className="mt-2 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-800 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white disabled:opacity-50"
+        className="mt-2 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:text-slate-100 hover:file:bg-white/20 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-slate-100 disabled:opacity-50"
       />
-      <p className="mt-1 text-[11px] text-neutral-500">PDF only, up to {formatBytes(MAX_DOCUMENT_BYTES)}.</p>
-      {state.status === "working" && <p className="mt-2 text-xs text-neutral-600">{state.step}</p>}
-      {state.status === "error" && <p role="alert" className="mt-2 text-xs text-red-700">{state.message}</p>}
+      <p className="mt-1 text-[11px] text-slate-400">PDF only, up to {formatBytes(MAX_DOCUMENT_BYTES)}.</p>
+      {state.status === "working" && <p className="mt-2 text-xs text-slate-300">{state.step}</p>}
+      {state.status === "error" && <p role="alert" className="mt-2 text-xs text-red-300">{state.message}</p>}
       {state.status === "ready" && (
-        <div className="mt-2 text-xs text-neutral-700">
+        <div className="mt-2 text-xs text-slate-200">
           <p>
             {state.name} ({formatBytes(state.size)}) · SHA-256 <code data-testid={`${testId}-hash`} className="break-all font-mono">{state.hash}</code>
           </p>
           {state.url && (
-            <p className="mt-1 text-neutral-500">
+            <p className="mt-1 text-slate-400">
               {state.existing ? "Already stored" : "Stored"} off-chain at{" "}
               <a href={state.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                 a content-addressed copy

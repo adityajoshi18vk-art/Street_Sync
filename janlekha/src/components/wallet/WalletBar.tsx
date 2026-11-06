@@ -26,13 +26,13 @@ export function WalletBar() {
             type="button"
             onClick={() => connect.mutate({ connector: c, chainId: appChain.id })}
             disabled={connect.isPending}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50"
+            className="btn-ghost !px-3 !py-1.5 !text-xs"
           >
             {connect.isPending ? "Connecting…" : `Connect ${c.name === "Injected" ? "wallet" : c.name}`}
           </button>
         ))}
         {connect.error && (
-          <span role="alert" className="text-xs text-red-700">
+          <span role="alert" className="text-xs text-red-300">
             {(connect.error as Error).name === "ProviderNotFoundError"
               ? "No browser wallet found. Install an EVM wallet such as MetaMask or HashPack."
               : describeTxError(connect.error).message}
@@ -47,12 +47,12 @@ export function WalletBar() {
       <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
         <span
           data-testid="wallet-network"
-          className={`rounded-full px-2 py-0.5 font-semibold ring-1 ring-inset ${wrongNetwork ? "bg-red-50 text-red-800 ring-red-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200"}`}
+          className={`rounded-full px-2 py-0.5 font-semibold ring-1 ring-inset ${wrongNetwork ? "bg-red-400/10 text-red-300 ring-red-400/30" : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"}`}
         >
           {wrongNetwork ? `Wrong network (chain ${connection.chainId})` : appChain.name}
         </span>
         <code data-testid="wallet-address" title={account} className="font-mono">{shortHex(account)}</code>
-        <span data-testid="wallet-roles" className="text-neutral-600">
+        <span data-testid="wallet-roles" className="text-slate-300">
           {roles.status === "ready"
             ? roles.roles.size > 0
               ? [...roles.roles].map((r) => ROLE_LABELS[r]).join(", ")
@@ -61,18 +61,18 @@ export function WalletBar() {
               ? "Roles unavailable"
               : CONTRACT_ADDRESS ? "Checking roles…" : ""}
         </span>
-        <button type="button" onClick={() => disconnect.mutate()} className="text-neutral-500 underline underline-offset-2">
+        <button type="button" onClick={() => disconnect.mutate()} className="text-slate-400 underline underline-offset-2">
           Disconnect
         </button>
       </div>
       {wrongNetwork && (
-        <div role="alert" className="flex flex-wrap items-center justify-end gap-2 text-xs text-red-800">
+        <div role="alert" className="flex flex-wrap items-center justify-end gap-2 text-xs text-red-300">
           <span>Transactions are disabled until your wallet is on {appChain.name}.</span>
           <button
             type="button"
             onClick={() => switchChain.mutate({ chainId: appChain.id })}
             disabled={switchChain.isPending}
-            className="rounded-md bg-red-700 px-2 py-1 font-medium text-white disabled:opacity-50"
+            className="rounded-md bg-gradient-to-b from-red-500 to-red-700 px-2 py-1 font-medium text-white disabled:opacity-50"
           >
             {switchChain.isPending ? "Switching…" : `Switch to ${appChain.name}`}
           </button>

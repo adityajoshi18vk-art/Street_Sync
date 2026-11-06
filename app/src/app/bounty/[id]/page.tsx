@@ -78,14 +78,14 @@ export default function BountyDetailPage() {
 
   if (!contractsDeployed) {
     return (
-      <div className="rounded-xl bg-amber-50 p-6 text-sm text-amber-800 ring-1 ring-amber-200">
+      <div className="alert-warn p-6">
         Escrow contracts are not configured on this network. See the home page banner for setup.
       </div>
     );
   }
 
   if (isLoading || !bounty) {
-    return <div className="h-40 animate-pulse rounded-xl bg-gray-200" />;
+    return <div className="skeleton h-40" />;
   }
 
   const b = bounty as unknown as {
@@ -180,16 +180,16 @@ export default function BountyDetailPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <Link href="/" className="text-sm font-medium text-brand-700 hover:underline">
+      <div className="animate-rise flex items-center justify-between">
+        <Link href="/" className="text-sm font-medium text-brand-300 transition hover:text-brand-200">
           ← Map
         </Link>
         <StatusBadge status={b.status} />
       </div>
 
-      <div className="rounded-xl bg-white p-6 shadow-card ring-1 ring-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Bounty #{b.id.toString()}</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="card animate-rise stagger-1 p-6">
+        <h1 className="heading text-2xl">Bounty #{b.id.toString()}</h1>
+        <p className="mt-1 text-sm text-slate-400">
           {lat.toFixed(5)}, {lng.toFixed(5)} · region cell {b.regionCell}
         </p>
 
@@ -208,16 +208,16 @@ export default function BountyDetailPage() {
         </div>
 
         {b.status === 1 && b.visualChallengeCode > 0 && (
-          <div className="mt-4 flex items-center gap-3 rounded-lg bg-brand-50 p-4 ring-1 ring-brand-200">
+          <div className="alert-info mt-4 flex items-center gap-4 p-5">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+              <p className="label-micro !text-brand-300">
                 Visual Challenge Code
               </p>
-              <p className="text-3xl font-black tracking-widest text-brand-800">
+              <p className="text-gradient font-mono text-4xl font-black tracking-[0.3em]">
                 {String(b.visualChallengeCode).padStart(4, "0")}
               </p>
             </div>
-            <p className="text-[11px] text-brand-700">
+            <p className="text-xs text-slate-400">
               Anti-spoofing code burned into evidence photos by the worker&apos;s camera.
             </p>
           </div>
@@ -231,13 +231,13 @@ export default function BountyDetailPage() {
         )}
 
         {videoEvidence && (
-          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="alert-warn mt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-1.5">
-                <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                <span className="rounded-md bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-400/30">
                   Ethereum Swarm (BZZ)
                 </span>
-                <span className="text-xs font-semibold text-amber-800">
+                <span className="text-xs font-semibold text-amber-200">
                   Walkthrough Video Attached ({videoEvidence.durationSeconds}s)
                 </span>
               </div>
@@ -245,7 +245,7 @@ export default function BountyDetailPage() {
                 href={getVideoUrl(videoEvidence.swarmReference)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                className="text-xs font-semibold text-amber-300 underline transition hover:text-amber-200"
               >
                 Verify on Swarm Gateway ↗
               </a>
@@ -254,9 +254,9 @@ export default function BountyDetailPage() {
               src={getVideoPlaybackUrl(videoEvidence.swarmReference)}
               controls
               playsInline
-              className="w-full max-h-64 rounded-lg bg-black object-contain"
+              className="w-full max-h-64 rounded-xl bg-black object-contain ring-1 ring-white/10"
             />
-            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-800">
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-300/80">
               <span>Swarm Ref: {videoEvidence.swarmReference.slice(0, 20)}…</span>
               <span>SHA: {videoEvidence.videoSha256.slice(0, 16)}…</span>
             </div>
@@ -272,7 +272,7 @@ export default function BountyDetailPage() {
               value={revealDeadline ? formatUtc(revealDeadline as bigint) : "—"}
             />
             {commitDeadline ? (
-              <p className="col-span-3 text-[11px] text-gray-400">
+              <p className="col-span-3 text-[11px] text-slate-500">
                 Commit window ends {formatUtc(commitDeadline as bigint)} · reveal{" "}
                 {revealDeadline ? formatUtc(revealDeadline as bigint) : "—"}
                 {nowSeconds > Number(revealDeadline ?? 0n) && " (expired — pokeOrReplace available)"}
@@ -283,29 +283,29 @@ export default function BountyDetailPage() {
       </div>
 
       {/* Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="animate-rise stagger-2 grid gap-4 md:grid-cols-3">
         {b.status === 0 && (
-          <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200 md:col-span-2">
-            <p className="text-sm font-bold text-gray-900">Fund this bounty</p>
+          <div className="card p-5 md:col-span-2">
+            <p className="heading text-base">Fund this bounty</p>
             <div className="mt-3 flex gap-2">
               <input
                 value={pledgeAmount}
                 onChange={(e) => setPledgeAmount(e.target.value)}
                 inputMode="decimal"
                 placeholder="USDC amount"
-                className="w-full rounded-lg text-sm ring-1 ring-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="field"
               />
               <button
                 onClick={handlePledge}
                 disabled={!isConnected || !pledgeAmount}
-                className="shrink-0 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                className="btn-success shrink-0 px-5"
               >
                 Pledge
               </button>
             </div>
-            {pledgeStatus && <p className="mt-2 text-xs font-medium text-brand-700">{pledgeStatus}</p>}
+            {pledgeStatus && <p className="mt-2 text-xs font-medium text-brand-300">{pledgeStatus}</p>}
             {pledgeError && (
-              <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700 ring-1 ring-red-200">
+              <p className="alert-error mt-2 !p-2 text-xs">
                 {pledgeError}
               </p>
             )}
@@ -353,9 +353,9 @@ export default function BountyDetailPage() {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
-      <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
-      <p className="font-mono text-xs font-semibold text-gray-800">{value}</p>
+    <div className="card-inset px-3 py-2.5">
+      <p className="label-micro">{label}</p>
+      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-200">{value}</p>
     </div>
   );
 }
@@ -372,12 +372,12 @@ function ActionCard({
   cta: string;
 }) {
   return (
-    <div className="flex flex-col rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
-      <p className="text-sm font-bold text-gray-900">{title}</p>
-      <p className="mt-1 flex-1 text-xs text-gray-500">{description}</p>
+    <div className="card card-hover flex flex-col p-5">
+      <p className="heading text-base">{title}</p>
+      <p className="mt-1 flex-1 text-xs text-slate-400">{description}</p>
       <Link
         href={href}
-        className="mt-3 rounded-lg bg-brand-600 py-2 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+        className="btn-primary mt-4"
       >
         {cta}
       </Link>

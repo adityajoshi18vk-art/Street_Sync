@@ -40,10 +40,10 @@ export default function StickersPage() {
 
   if (!target) {
     return (
-      <div className="mx-auto max-w-md rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+      <div className="mx-auto max-w-md card animate-rise border-dashed p-10 text-center">
         <p className="text-4xl">🏅</p>
-        <h1 className="mt-3 text-lg font-bold text-gray-900">Your Sticker Book</h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <h1 className="heading mt-3 text-xl">Your Sticker Book</h1>
+        <p className="mt-2 text-sm text-slate-400">
           Connect your wallet to see the stickers you&apos;ve collected by funding,
           fixing, and reviewing civic repairs.
         </p>
@@ -61,33 +61,33 @@ export default function StickersPage() {
   return (
     <div className="space-y-6">
       {/* Level header */}
-      <section className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white shadow-card">
+      <section className="card animate-rise relative overflow-hidden bg-gradient-to-br from-brand-600/40 via-ink-900/60 to-accent-500/20 p-6 text-white">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-brand-200">
+            <p className="label-micro text-brand-300">
               Level {profile ? profile.level.index + 1 : "–"}
             </p>
-            <h1 className="text-2xl font-black tracking-tight">
+            <h1 className="heading text-3xl">
               {profile?.level.title ?? "Sticker Book"}
             </h1>
-            <p className="mt-1 text-sm text-brand-100">
+            <p className="mt-1 text-sm text-slate-300">
               {profile
                 ? `${profile.earnedCount} of ${profile.totalCount} stickers collected · ${profile.xp} XP`
                 : "Loading your collection…"}
             </p>
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-xs">
-            <div className="flex justify-between text-[11px] font-semibold text-brand-100">
+            <div className="flex justify-between text-[11px] font-semibold text-slate-300">
               <span>{profile?.level.minXp ?? 0} XP</span>
               <span>{profile?.level.nextXp != null ? `${profile.level.nextXp} XP` : "MAX"}</span>
             </div>
-            <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-brand-900/50">
+            <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-black/40 ring-1 ring-white/10">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-300 to-yellow-400 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-brand-500 to-accent-400 transition-all"
                 style={{ width: `${levelPct}%` }}
               />
             </div>
-            <p className="mt-1 text-[11px] text-brand-200">
+            <p className="mt-1.5 text-[11px] text-brand-300">
               {profile?.level.nextXp != null
                 ? `${profile.level.nextXp - profile.xp} XP to next level`
                 : "Top level reached!"}
@@ -106,9 +106,9 @@ export default function StickersPage() {
               { label: "Approved fixes", value: String(profile.stats.approvedFixes) },
               { label: "Votes revealed", value: String(profile.stats.votesRevealed) }
             ].map((s) => (
-              <div key={s.label} className="rounded-xl bg-white/10 px-2 py-2.5">
-                <p className="text-lg font-black">{s.value}</p>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-brand-200">
+              <div key={s.label} className="card-inset px-2 py-3">
+                <p className="font-display text-xl font-bold text-gradient">{s.value}</p>
+                <p className="label-micro">
                   {s.label}
                 </p>
               </div>
@@ -118,11 +118,11 @@ export default function StickersPage() {
       </section>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="alert-error">
           {error}
           <button
             onClick={() => void loadProfile()}
-            className="ml-3 font-bold underline underline-offset-2"
+            className="ml-3 font-bold text-red-100 underline underline-offset-2"
           >
             Retry
           </button>
@@ -133,7 +133,7 @@ export default function StickersPage() {
       {loading && !profile ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {Array.from({ length: 10 }, (_, i) => (
-            <div key={i} className="h-56 animate-pulse rounded-2xl bg-gray-200" />
+            <div key={i} className="skeleton h-56 rounded-2xl" />
           ))}
         </div>
       ) : profile ? (
@@ -144,7 +144,7 @@ export default function StickersPage() {
         </div>
       ) : null}
 
-      <p className="text-center text-xs text-gray-400">
+      <p className="text-center text-xs text-slate-500">
         Stickers are earned automatically from your on-chain activity — fund a bounty,
         fix a street, or review a repair to grow your collection.
       </p>
