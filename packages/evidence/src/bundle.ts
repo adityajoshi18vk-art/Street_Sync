@@ -28,6 +28,7 @@ export const FLAG_ZSTD_DICT = 0x01; // Bit 0
 export const FLAG_WEBP = 0x02; // Bit 1
 export const HEADER_SIZE = 20;
 export const SIGNATURE_SIZE = 65;
+export const MAX_BUNDLE_BYTES = 100_000;
 export const MAX_SAFE_BUNDLE_BYTES = 120_000; // Arkiv safe budget
 export const MAX_ARKIV_PAYLOAD = 128_000; // Arkiv hard limit
 
@@ -149,6 +150,10 @@ export async function packBundle(
   const bundle = new Uint8Array(payloadLen + SIGNATURE_SIZE);
   bundle.set(payload, 0);
   bundle.set(signatureBytes, payloadLen);
+
+  if (bundle.length > MAX_BUNDLE_BYTES) {
+    throw new RangeError(`Evidence bundle is ${bundle.length} bytes; exceeds ${MAX_BUNDLE_BYTES}-byte target`);
+  }
 
   // 8. Compute on-chain evidenceHash (SHA-256 over complete bundle including signature)
   const evidenceHash = await sha256Bytes32(bundle);
