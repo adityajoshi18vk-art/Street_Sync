@@ -3,14 +3,14 @@
  *
  * Strict constraint:
  * Resize photos to max 1280px longest edge.
- * Encode to WebP (quality: 0.75, stepping down to 0.60 if needed)
- * so each photo is strictly <= 45 KiB (46,080 bytes).
+ * Encode to WebP (quality: 0.72, stepping down to 0.60 if needed)
+ * so each photo is strictly <= 48,000 bytes.
  */
 
 import { createHash } from "node:crypto";
 import type { ImageResizeOptions, ImageResizeResult } from "./types.js";
 
-export const MAX_IMAGE_BYTES = 45 * 1024; // 46,080 bytes (45 KiB)
+export const MAX_IMAGE_BYTES = 48_000;
 export const MAX_IMAGE_EDGE = 1280;
 
 /**
@@ -40,7 +40,7 @@ export async function resizeAndEncodePhoto(
   options: ImageResizeOptions = {}
 ): Promise<ImageResizeResult> {
   const maxEdge = options.maxEdge ?? MAX_IMAGE_EDGE;
-  const initialQuality = options.quality ?? 0.75;
+  const initialQuality = options.quality ?? 0.72;
   const minQuality = options.minQuality ?? 0.6;
   const maxSizeBytes = options.maxSizeBytes ?? MAX_IMAGE_BYTES;
 
