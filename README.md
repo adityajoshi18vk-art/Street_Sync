@@ -254,6 +254,11 @@ npm --prefix janlekha run test:e2e                                              
 ### Public testnet deployment
 
 - StreetSync: `npm run deploy:arc` (see section 6).
-- JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
+- JanLekha is deployed on Hedera Testnet at `0xb2e4942feac916fa6b8a94d9bd51adf73789fdab` (contract `0.0.11346873`,
+  [HashScan](https://hashscan.io/testnet/contract/0xb2e4942feac916fa6b8a94d9bd51adf73789fdab)); details in
+  `janlekha/deployments/hederaTestnet.json`. To point the app at it, put the `NEXT_PUBLIC_*` Hedera values from
+  `janlekha/.env.example` in `janlekha/.env` with that address and `NEXT_PUBLIC_JANLEKHA_DEPLOYMENT_BLOCK=42757755`,
+  delete `janlekha/.env.development.local`, and run `npm run dev` in `janlekha/`.
+- To redeploy JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
   `npm run deploy:janlekha:hedera` (deploy → grant roles → smoke test). Copy the printed address into
   `janlekha/.env` as `NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS`. See `janlekha/README.md` for details.
