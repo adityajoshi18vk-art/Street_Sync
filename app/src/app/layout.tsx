@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
+import { MobileRoleNav, RoleNav } from "@/components/RoleNav";
 import { ACTIVE_CHAIN, isLocalNetwork, contractsDeployed, DEPLOYMENT_ERROR } from "@/config/contracts";
 import "./globals.css";
 
@@ -52,14 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {ACTIVE_CHAIN.name}
                 </span>
               </Link>
-              <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 md:flex">
-                <Link href="/" className="hover:text-brand-700">
-                  Map
-                </Link>
-                <Link href="/review" className="hover:text-brand-700">
-                  Review
-                </Link>
-              </nav>
+              <RoleNav />
               <ConnectButton />
             </div>
           </header>
@@ -73,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             )}
             {children}
           </main>
+          <MobileRoleNav />
         </Providers>
       </body>
     </html>

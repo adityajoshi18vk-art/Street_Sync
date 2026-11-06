@@ -109,7 +109,7 @@ export default function MapView({
                   )}
                   <Link
                     href={`/bounty/${b.bountyId}`}
-                    className="mt-1 inline-block rounded bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                    className="popup-cta mt-1 inline-block rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
                   >
                     Open bounty
                   </Link>
