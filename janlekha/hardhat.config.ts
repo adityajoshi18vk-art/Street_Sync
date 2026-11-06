@@ -27,7 +27,8 @@ export default defineConfig({
     localhost: {
       type: "http",
       chainType: "generic",
-      url: "http://127.0.0.1:8545",
+      // The root `npm run dev` runs JanLekha's demo chain on 8547, leaving 8545 for StreetSync's Hardhat node.
+      url: process.env.JANLEKHA_LOCAL_RPC_URL || "http://127.0.0.1:8545",
     },
   },
 });

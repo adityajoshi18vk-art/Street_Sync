@@ -24,7 +24,8 @@
     "contracts:seed:local": "hardhat run scripts/seed-demo.ts --network localhost",
     "demo:documents": "hardhat run scripts/demo-documents.ts",
     "test:e2e": "hardhat build --quiet && playwright test",
-    "test:documents": "tsx --conditions=react-server --test tests/documents.test.ts"
+    "test:documents": "tsx --conditions=react-server --test tests/documents.test.ts",
+    "dev:demo": "node scripts/dev-demo.mjs"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",

@@ -161,7 +161,7 @@ npm run test:e2e
 npm run dev
 ```
 - **Frontend App**: `http://localhost:3000`
-- **Backend API**: `http://localhost:3001`
+- **Backend API**: `http://localhost:3001` (port set by `BACKEND_PORT`)
 - **Health Check**: `http://localhost:3001/api/health`
 
 ---
@@ -183,14 +183,62 @@ npm run dev
 
 ---
 
-## JanLekha (separate project)
+## Running the whole project (StreetSync + JanLekha)
 
-`janlekha/` is a self-contained Next.js + Hardhat + Prisma app with its own lockfile; it is not part of the npm workspaces above. Setup:
+This repository is one project with two features:
+
+| Feature | What it does | URL (local) |
+| :--- | :--- | :--- |
+| **StreetSync** | Neighbours fund civic repairs; verified humans fix and review them; USDC escrow on Arc | http://localhost:3000 |
+| **JanLekha** | Public, verifiable audit trail for government budgets, tenders, milestones and payment attestations on Hedera | http://localhost:3100 |
+
+Each app links to the other in its header. They run as two apps because they depend on incompatible
+framework versions (StreetSync: Next 14 + Hardhat 2; JanLekha: Next 16 + Hardhat 3), and `janlekha/` keeps its
+own lockfile. You still install and start everything from the root.
+
+### Install (once)
 
 ```bash
-cd janlekha && npm ci && cp .env.example .env
-npm run dev            # http://localhost:3000/health
-npm run contracts:test
+npm install          # installs StreetSync workspaces and, via postinstall, janlekha/
 ```
 
-See `janlekha/README.md` for all commands.
+Requires Node.js 22+ (JanLekha's Hardhat 3 needs it; StreetSync alone works on 18+).
+
+### Start everything
+
+```bash
+npm run dev
+```
+
+| Process | Port | Notes |
+| :--- | :--- | :--- |
+| StreetSync backend API | 3001 | `BACKEND_PORT`; reads Arc Testnet by default (`backend/.env`) |
+| StreetSync app | 3000 | |
+| JanLekha app | 3100 | Starts its own local demo chain on 8547, deploys `JanLekha.sol` and seeds three synthetic projects. Nothing to configure. |
+
+Press Ctrl+C once to stop all of them. Each JanLekha demo run starts from a fresh chain.
+
+Run one feature on its own with `npm run dev:streetsync` or `npm run dev:janlekha`.
+
+### Try the JanLekha demo
+
+1. Open http://localhost:3100/projects. Project #1 has the full lifecycle (tender, sealed bids, award, milestones, mock PFMS attestation).
+2. Open **Verify a document**, pick *Tender document*, then select `janlekha/public/demo-documents/drain-tender-notice.pdf` to get **MATCH**.
+   Edit one character of a copy and it shows **MISMATCH**.
+3. No wallet is needed for any of this. Department, vendor, inspector and PAO actions need a browser wallet on the demo chain
+   (chain ID 31337, RPC `http://127.0.0.1:8547`) using Hardhat's public test accounts.
+
+### Tests
+
+```bash
+npm run test:contracts && npm run test:pipeline && npm run test --workspace=streetsync-backend   # StreetSync
+npm run test:janlekha                                                                            # JanLekha contracts + upload API
+npm --prefix janlekha run test:e2e                                                               # JanLekha Playwright (needs `npx playwright install chromium`)
+```
+
+### Public testnet deployment
+
+- StreetSync: `npm run deploy:arc` (see section 6).
+- JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
+  `npm run deploy:janlekha:hedera` (deploy → grant roles → smoke test). Copy the printed address into
+  `janlekha/.env` as `NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS`. See `janlekha/README.md` for details.

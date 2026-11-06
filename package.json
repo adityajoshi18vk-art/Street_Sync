@@ -10,13 +10,18 @@
     "app"
   ],
   "scripts": {
+    "postinstall": "npm --prefix janlekha install --no-audit --no-fund",
+    "dev": "concurrently -n backend,streetsync,janlekha -c blue,green,magenta \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\" \"npm --prefix janlekha run dev:demo\"",
+    "dev:streetsync": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
+    "dev:janlekha": "npm --prefix janlekha run dev:demo",
     "build": "npm run build --workspace=@streetsync/swarm-client && npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client && npm run build --workspace=streetsync-backend",
     "test:contracts": "npm run test --workspace=streetsync-contracts",
     "test:pipeline": "npm run test --workspace=@streetsync/swarm-client && npm run test --workspace=@streetsync/evidence && npm run test --workspace=@streetsync/arkiv-client",
     "test:e2e": "npm run build && tsx scripts/e2e-verify.ts",
-    "dev": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
     "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",
-    "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts"
+    "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts",
+    "test:janlekha": "npm --prefix janlekha run contracts:test && npm --prefix janlekha run test:documents",
+    "deploy:janlekha:hedera": "npm --prefix janlekha run contracts:release:hedera"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

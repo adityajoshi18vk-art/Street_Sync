@@ -52,7 +52,10 @@ Public pages read contract state directly over JSON-RPC, with no wallet and no d
 (computes a PDF's SHA-256 in the browser and compares it with the on-chain hash). On Hedera, the timeline
 comes from the mirror node, because the relay limits `eth_getLogs` ranges.
 
-Synthetic local demo with three projects at different stages:
+Quickest path: `npm run dev:demo` (or `npm run dev` from the repository root) starts a fresh local chain on 8547,
+deploys, seeds and serves the app on http://localhost:3100.
+
+Manual equivalent, synthetic local demo with three projects at different stages:
 
 ```bash
 npm run contracts:node                                       # terminal 1

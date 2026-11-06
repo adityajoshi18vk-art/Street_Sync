@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
-import { ACTIVE_CHAIN, isLocalNetwork } from "@/config/contracts";
+import { ACTIVE_CHAIN, isLocalNetwork, JANLEKHA_URL } from "@/config/contracts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -62,6 +62,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/stickers" className="hover:text-brand-700">
                   Stickers
                 </Link>
+                <a href={JANLEKHA_URL} className="border-l border-gray-200 pl-4 hover:text-brand-700">
+                  JanLekha · Spending
+                </a>
               </nav>
               <ConnectButton />
             </div>
