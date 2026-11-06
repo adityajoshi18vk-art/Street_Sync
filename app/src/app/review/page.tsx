@@ -1,0 +1,664 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { IDKitWidget } from "@worldcoin/idkit";
+import type { ISuccessResult } from "@worldcoin/idkit";
+import {
+  useAccount,
+  useBlockNumber,
+  useConfig,
+  useReadContract,
+  useWriteContract
+} from "wagmi";
+import type { Hash } from "viem";
+
+import {
+  ACTIVE_CHAIN,
+  ESCROW_ABI,
+  ESCROW_ADDRESS,
+  USDC_ADDRESS,
+  USDC_ABI,
+  WORLD_APP_ID,
+  WORLD_ACTION_REVIEWER,
+  contractsDeployed,
+  formatUsdc,
+  formatUsdcDisplay,
+  regionCellFromLatLng
+} from "@/config/contracts";
+import { approveUsdcExact } from "@/lib/tx";
+import { getReviewerAssignments, requestAttestation, type Attestation } from "@/lib/api";
+import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
+import { shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
+import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
+import BeforeAfterSlider from "@/components/BeforeAfterSlider";
+import CommitRevealCard from "@/components/CommitRevealCard";
+import { HashBadge } from "@/components/StatusBadge";
+
+// ─── Registration card ───────────────────────────────────────────────────────
+
+function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
+  const { address } = useAccount();
+  const config = useConfig();
+  const { writeContractAsync } = useWriteContract();
+  const attestationRef = useRef<Attestation | null>(null);
+
+  const { data: reviewerTuple } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "reviewers",
+    args: address ? [address] : undefined,
+    query: { enabled: contractsDeployed && !!address }
+  });
+
+  const { data: stakeRaw } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "REVIEWER_STAKE",
+    query: { enabled: contractsDeployed }
+  });
+
+  const reviewer = reviewerTuple as
+    | { wallet: string; regionCell: number; stakedAmount: bigint; active: boolean; rewardBalance: bigint }
+    | undefined;
+  const registered = !!reviewer && reviewer.active;
+  const stake = typeof stakeRaw === "bigint" ? stakeRaw : 2_000_000n;
+
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<Hash | null>(null);
+
+  const register = useCallback(
+    async (attestation: Attestation) => {
+      if (!address) throw new Error("Connect a wallet first");
+      if (!ESCROW_ADDRESS) throw new Error("Escrow contract is not deployed on this network");
+      setBusy(true);
+      setError(null);
+      try {
+        await approveUsdcExact({
+          config,
+          owner: address,
+          spender: ESCROW_ADDRESS,
+          amountUsdc: formatUsdc(stake),
+          writeContractAsync
+        });
+
+        const hash = await writeContractAsync({
+          address: ESCROW_ADDRESS as `0x${string}`,
+          abi: ESCROW_ABI,
+          functionName: "registerReviewer",
+          args: [
+            gps ? regionCellFromLatLng(gps.lat, gps.lng) : 0,
+            BigInt(attestation.nonce),
+            BigInt(attestation.expiry),
+            attestation.signature
+          ],
+          chain: ACTIVE_CHAIN,
+          account: address
+        });
+        setTxHash(hash);
+        onRegistered();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [address, config, gps, onRegistered, stake, writeContractAsync]
+  );
+
+  const requestGps = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsError("Geolocation unavailable — registering with region 0");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsError(null);
+      },
+      () => setGpsError("Location denied — registering with region 0"),
+      { enableHighAccuracy: true, timeout: 10_000 }
+    );
+  }, []);
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-gray-900">Reviewer registration</h2>
+      {registered ? (
+        <div className="mt-3 space-y-1 text-sm text-gray-700">
+          <p className="font-semibold text-emerald-700">Active reviewer ✓</p>
+          <p className="text-xs text-gray-500">
+            Region cell {reviewer?.regionCell} · stake{" "}
+            {reviewer ? formatUsdcDisplay(reviewer.stakedAmount) : "—"} USDC · rewards{" "}
+            {reviewer ? formatUsdcDisplay(reviewer.rewardBalance) : "—"} USDC
+          </p>
+        </div>
+      ) : (
+        <>
+          <p className="mt-1 text-xs text-gray-500">
+            Verify with World ID, approve exactly {formatUsdcDisplay(stake)} USDC of stake, and
+            register. Stakes are slashed if you sit on a panel and fail to reveal.
+          </p>
+          {!address ? (
+            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+              Connect your wallet (header) to register.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+                <span>
+                  Region: <span className="font-semibold">{gps ? regionCellFromLatLng(gps.lat, gps.lng) : "—"}</span>
+                  {gps && (
+                    <span className="ml-1 text-gray-400">
+                      ({gps.lat.toFixed(4)}, {gps.lng.toFixed(4)})
+                    </span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={requestGps}
+                  className="rounded-lg border border-gray-300 px-2 py-1 font-semibold text-gray-600 hover:bg-white"
+                >
+                  {gps ? "Refresh" : "Use my GPS"}
+                </button>
+              </div>
+              {gpsError && <p className="text-xs text-amber-600">{gpsError}</p>}
+              {error && <p className="text-xs text-red-600">{error}</p>}
+              {txHash && (
+                <p className="break-all text-[11px] text-emerald-600">Registration tx: {txHash}</p>
+              )}
+              <IDKitWidget
+                app_id={WORLD_APP_ID}
+                action={WORLD_ACTION_REVIEWER}
+                signal={address ?? undefined}
+                handleVerify={async (result: ISuccessResult) => {
+                  if (!address) throw new Error("Connect a wallet first");
+                  const attestation = await requestAttestation({
+                    wallet: address,
+                    role: "reviewer",
+                    bountyId: "0",
+                    action: WORLD_ACTION_REVIEWER,
+                    worldIdProof: {
+                      nullifier_hash: result.nullifier_hash,
+                      merkle_root: result.merkle_root,
+                      proof: result.proof,
+                      verification_level: result.verification_level
+                    }
+                  });
+                  attestationRef.current = attestation;
+                }}
+                onSuccess={() => {
+                  if (attestationRef.current) void register(attestationRef.current);
+                }}
+                onError={(err) => setError(`World ID error: ${err.code} — ${err.message}`)}
+              >
+                {({ open }) => (
+                  <button
+                    type="button"
+                    onClick={open}
+                    disabled={busy}
+                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-gray-300"
+                  >
+                    {busy ? "Registering…" : "Verify & stake to become a reviewer"}
+                  </button>
+                )}
+              </IDKitWidget>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ─── Evidence panel (Arkiv fetch + verification) ─────────────────────────────
+
+interface EvidencePanelProps {
+  bountyId: string;
+  arkivKey: string;
+  evidenceHash: string | null;
+  worker: string | null;
+}
+
+function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePanelProps) {
+  const [verification, setVerification] = useState<ArkivVerificationResult | null>(null);
+  const [bundleSize, setBundleSize] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!arkivKey || arkivKey === "0x" + "0".repeat(64)) {
+      setError("No evidence key on-chain yet.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const client = getArkivClient();
+      const candidates = [
+        lookupStoredEntityKey(arkivKey),
+        lookupBountyEntityKey(bountyId),
+        arkivKey
+      ]
+        .filter((k): k is string => !!k)
+        .filter((k, i, arr) => arr.indexOf(k) === i);
+
+      const mod = await import("@streetsync/arkiv-client");
+      let read: { bundle: Uint8Array } | null = null;
+      let usedKey: string | null = null;
+      for (const key of candidates) {
+        try {
+          read = await mod.readEvidenceBundle(client, key);
+          usedKey = key;
+          break;
+        } catch {
+          continue;
+        }
+      }
+      if (!read || !usedKey) {
+        throw new Error(
+          `Evidence not found in Arkiv storage (tried ${candidates.length} key candidate${candidates.length === 1 ? "" : "s"})`
+        );
+      }
+
+      setBundleSize(read.bundle.length);
+
+      const result = await mod.verifyEvidenceBundle(
+        client,
+        usedKey,
+        evidenceHash ?? "",
+        worker ?? ""
+      );
+      setVerification(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [arkivKey, bountyId, evidenceHash, worker]);
+
+  useEffect(() => {
+    if (arkivKey) void load();
+  }, [arkivKey, load]);
+
+  const toWebpBlob = (bytes: Uint8Array): Blob =>
+    new Blob([bytes.slice().buffer as ArrayBuffer], { type: "image/webp" });
+
+  const beforeUrl = useMemo(() => {
+    const img = verification?.beforeImage;
+    return img ? URL.createObjectURL(toWebpBlob(img)) : null;
+  }, [verification]);
+
+  const afterUrl = useMemo(() => {
+    const img = verification?.afterImage;
+    return img ? URL.createObjectURL(toWebpBlob(img)) : null;
+  }, [verification]);
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">Evidence (Arkiv)</h3>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+        >
+          {loading ? "Fetching…" : "Re-fetch"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+
+      {verification && (
+        <div className="mt-3 space-y-3">
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            <span
+              className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                verification.evidenceHashMatch
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-red-50 text-red-700 ring-red-200"
+              }`}
+            >
+              {verification.evidenceHashMatch ? "SHA-256 hash match" : "Hash mismatch"}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
+                verification.signatureValid
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-red-50 text-red-700 ring-red-200"
+              }`}
+            >
+              {verification.signatureValid ? "Worker signature valid" : "Signature invalid"}
+            </span>
+            <span className="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 ring-1 ring-gray-200">
+              {bundleSize ? `${(bundleSize / 1024).toFixed(1)} KiB bundle` : ""}
+            </span>
+          </div>
+
+          {beforeUrl && afterUrl ? (
+            <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
+          ) : (
+            <p className="text-xs text-gray-400">Photos unavailable in bundle.</p>
+          )}
+
+          {verification.metadata && (
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+              <dt>Challenge code</dt>
+              <dd className="font-mono font-semibold text-gray-800">
+                {String(verification.metadata.visualChallengeCode).padStart(4, "0")}
+              </dd>
+              <dt>GPS accuracy</dt>
+              <dd>±{Math.round(verification.metadata.gpsAccuracyM)} m</dd>
+              <dt>Heading</dt>
+              <dd>
+                {verification.metadata.compassHeadingDeg !== null
+                  ? `${Math.round(verification.metadata.compassHeadingDeg)}°`
+                  : "n/a"}
+              </dd>
+              <dt>Captured</dt>
+              <dd>{new Date(verification.metadata.beforeTimestamp).toLocaleString()}</dd>
+              <dt>Worker</dt>
+              <dd>{shortAddress(verification.recoveredWorker ?? worker, 4)}</dd>
+            </dl>
+          )}
+          {verification.errors.length > 0 && (
+            <ul className="list-disc pl-4 text-[11px] text-amber-600">
+              {verification.errors.map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {!verification && !loading && !error && (
+        <p className="mt-2 text-xs text-gray-400">Press Re-fetch to pull the bundle.</p>
+      )}
+    </section>
+  );
+}
+
+// ─── Per-bounty assignment card ──────────────────────────────────────────────
+
+function AssignmentCard({
+  assignment,
+  onTx
+}: {
+  assignment: ReviewerAssignment;
+  onTx: () => void;
+}) {
+  const { address } = useAccount();
+  const config = useConfig();
+  const { writeContractAsync } = useWriteContract();
+
+  const bountyIdBig = BigInt(assignment.bountyId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<Hash | null>(null);
+  const [justSettled, setJustSettled] = useState(false);
+
+  const { data: raw } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "getBounty",
+    args: [bountyIdBig],
+    query: { enabled: contractsDeployed, refetchInterval: 15_000 }
+  });
+
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+
+  const { data: panel } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "getPanel",
+    args: [bountyIdBig, assignment.reviewRound],
+    query: { enabled: contractsDeployed && !!address }
+  });
+
+  const { data: myVoteTuple } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "getVote",
+    args: address ? [bountyIdBig, assignment.reviewRound, address] : undefined,
+    query: { enabled: contractsDeployed && !!address }
+  });
+
+  const { data: commitDeadlineRaw } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "commitDeadline",
+    args: [bountyIdBig],
+    query: { enabled: contractsDeployed }
+  });
+  const { data: revealDeadlineRaw } = useReadContract({
+    address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
+    abi: ESCROW_ABI,
+    functionName: "revealDeadline",
+    args: [bountyIdBig],
+    query: { enabled: contractsDeployed }
+  });
+
+  const b = raw as unknown[] | undefined;
+  const status = b ? Number(b[16]) : (assignment.bountyStatus ?? -1);
+  const worker = b && typeof b[9] === "string" ? (b[9] as string) : assignment.worker;
+  const arkivKey = b && typeof b[11] === "string" ? (b[11] as string) : null;
+  const evidenceHash = b && typeof b[12] === "string" ? (b[12] as string) : null;
+  const selectionBlock = b ? BigInt(b[13] as bigint) : null;
+  const reviewRound = b ? Number(b[14]) : assignment.reviewRound;
+  const totalPledged = b ? (b[6] as bigint) : BigInt(assignment.totalPledged || "0");
+
+  const panelMembers = (panel as unknown as string[] | undefined) ?? [];
+  const onPanel = !!address && panelMembers.some((m) => m.toLowerCase() === address.toLowerCase());
+  const myVote = myVoteTuple as
+    | { commitHash: string; revealed: boolean; approve: boolean; committed: boolean }
+    | undefined;
+
+  const blocksRemaining =
+    selectionBlock !== null && typeof blockNumber === "bigint"
+      ? Number(selectionBlock) - Number(blockNumber)
+      : null;
+  const panelReady =
+    selectionBlock !== null && typeof blockNumber === "bigint" && blockNumber > selectionBlock;
+
+  const runTx = useCallback(
+    async (fn: "assignPanel" | "settle" | "pokeOrReplace") => {
+      setBusy(true);
+      setError(null);
+      try {
+        const hash = await writeContractAsync({
+          address: ESCROW_ADDRESS as `0x${string}`,
+          abi: ESCROW_ABI,
+          functionName: fn,
+          args: [bountyIdBig],
+          chain: ACTIVE_CHAIN,
+          account: address
+        });
+        setTxHash(hash);
+        if (fn === "settle") setJustSettled(true);
+        onTx();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [address, bountyIdBig, onTx, writeContractAsync]
+  );
+
+  const revealExpired =
+    typeof revealDeadlineRaw === "bigint" &&
+    Date.now() / 1000 > Number(revealDeadlineRaw) &&
+    status === 3;
+
+  return (
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <Link
+          href={`/bounty/${assignment.bountyId}`}
+          className="text-sm font-semibold text-indigo-600 hover:underline"
+        >
+          Bounty #{assignment.bountyId}
+        </Link>
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+          {statusName(status)} · round {reviewRound}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500">
+        Pool {formatUsdcDisplay(totalPledged)} USDC · panel{" "}
+        {panelMembers.filter((m) => m !== "0x0000000000000000000000000000000000000000").length}/3
+        {myVote?.committed ? ` · committed${myVote.revealed ? " & revealed" : ""}` : ""}
+      </p>
+
+      {status === 2 && (
+        <div className="rounded-lg bg-violet-50 p-3">
+          <p className="text-xs text-violet-700">
+            {panelReady
+              ? "Selection block reached — you can assign the panel now."
+              : `Waiting for randomness: ${blocksRemaining !== null && blocksRemaining > 0 ? `${blocksRemaining} more block${blocksRemaining === 1 ? "" : "s"}` : "confirming…"} (needs block > ${selectionBlock?.toString()})`}
+          </p>
+          <button
+            type="button"
+            disabled={!panelReady || busy}
+            onClick={() => void runTx("assignPanel")}
+            className="mt-2 w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:bg-gray-300"
+          >
+            Assign panel
+          </button>
+        </div>
+      )}
+
+      {status === 3 && (
+        <>
+          <EvidencePanel
+            bountyId={assignment.bountyId}
+            arkivKey={arkivKey ?? ""}
+            evidenceHash={evidenceHash}
+            worker={worker}
+          />
+          {onPanel ? (
+            typeof commitDeadlineRaw === "bigint" && typeof revealDeadlineRaw === "bigint" ? (
+              <CommitRevealCard
+                bountyId={bountyIdBig}
+                reviewRound={reviewRound}
+                commitDeadline={commitDeadlineRaw}
+                revealDeadline={revealDeadlineRaw}
+                totalPledged={totalPledged}
+                onTxSuccess={onTx}
+              />
+            ) : (
+              <p className="text-xs text-gray-400">Loading voting windows…</p>
+            )
+          ) : (
+            <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+              You are not on this panel (3 reviewers were drawn from your region pool). You can
+              still inspect the evidence above and settle once the window closes.
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={!revealExpired || busy}
+              onClick={() => void runTx("pokeOrReplace")}
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40"
+              title="Slash & replace reviewers who missed the reveal window"
+            >
+              Slash / replace inactive
+            </button>
+            <button
+              type="button"
+              disabled={!revealExpired || busy || justSettled}
+              onClick={() => void runTx("settle")}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+            >
+              {justSettled ? "Settling…" : "Settle bounty"}
+            </button>
+          </div>
+        </>
+      )}
+
+      {(status === 4 || status === 5) && (
+        <EvidencePanel
+          bountyId={assignment.bountyId}
+          arkivKey={arkivKey ?? ""}
+          evidenceHash={evidenceHash}
+          worker={worker}
+        />
+      )}
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {txHash && (
+        <HashBadge label="tx" hash={txHash} href={`${ACTIVE_CHAIN.blockExplorers?.default?.url}/tx/${txHash}`} />
+      )}
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function ReviewPage() {
+  const { address } = useAccount();
+  const [assignments, setAssignments] = useState<ReviewerAssignment[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadAssignments = useCallback(async () => {
+    if (!address) {
+      setAssignments(null);
+      return;
+    }
+    try {
+      const list = await getReviewerAssignments(address);
+      setAssignments(list);
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : String(err));
+    }
+  }, [address]);
+
+  useEffect(() => {
+    void loadAssignments();
+  }, [loadAssignments]);
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 pb-16 pt-6">
+      <header className="mb-6">
+        <h1 className="text-xl font-bold text-gray-900">Reviewer dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Stake, inspect evidence, commit-reveal your vote, and keep panels honest.
+        </p>
+      </header>
+
+      <div className="space-y-4">
+        <RegistrationCard onRegistered={() => void loadAssignments()} />
+
+        {loadError && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            {loadError} — the backend may be offline. Registration still works on-chain.
+          </div>
+        )}
+
+        {assignments && assignments.length === 0 && (
+          <p className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-sm text-gray-500">
+            No panel assignments yet. Once registered, panels are drawn from your region pool
+            after a worker submits evidence.
+          </p>
+        )}
+
+        {assignments?.map((a) => (
+          <AssignmentCard
+            key={`${a.bountyId}:${a.reviewRound}`}
+            assignment={a}
+            onTx={() => void loadAssignments()}
+          />
+        ))}
+
+        <p className="pt-4 text-center text-xs text-gray-400">
+          Escrow {shortAddress(ESCROW_ADDRESS, 4)} ·{" "}
+          <Link href="/audit/1" className="text-gray-400 underline">
+            try the public audit
+          </Link>
+        </p>
+      </div>
+    </main>
+  );
+}

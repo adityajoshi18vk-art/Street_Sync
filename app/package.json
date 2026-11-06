@@ -1,0 +1,38 @@
+{
+  "name": "streetsync-app",
+  "version": "1.0.0",
+  "description": "StreetSync – mobile-first Next.js PWA for Arc Testnet bounties, World ID v4 verification, and verifiable evidence bundles",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@streetsync/arkiv-client": "file:../packages/arkiv-client",
+    "@streetsync/evidence": "file:../packages/evidence",
+    "@tanstack/react-query": "^5.51.23",
+    "@worldcoin/idkit": "^2.2.0",
+    "leaflet": "^1.9.4",
+    "next": "^14.2.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "viem": "^2.21.0",
+    "wagmi": "^2.12.0"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.12",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}
