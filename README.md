@@ -217,3 +217,24 @@ it is not decentralized storage and cannot support cross-device review.
 The HTTP adapter requires a compatible entity gateway and is not evidence of
 a verified live Arkiv deployment. Do not use browser-local evidence for a live
 Arc bounty.
+
+## Live Arc Testnet deployment
+
+| Item | Value |
+| :--- | :--- |
+| StreetSyncEscrow | [`0x3Fd53ce0728BfBDbc5559C4a573f54294FfEa356`](https://testnet.arcscan.app/address/0x3Fd53ce0728BfBDbc5559C4a573f54294FfEa356) |
+| USDC (ERC-20, 6 decimals) | `0x3600000000000000000000000000000000000000` |
+| Owner | `0xAf1f2f642a44095Fb29eFF70760D0a5df3d8e354` |
+| Attester (backend signer) | `0xa445eD835991A70015CC12e000182E8Ff727e5CD` |
+| Deploy block | `70957147` |
+
+The owner can rotate the attester with `setAttester(address)`.
+
+### Arkiv evidence relay
+
+Evidence bundles are written to Arkiv (Rabdi testnet) by the backend
+(`POST /api/arkiv/entities`, `GET /api/arkiv/entities/:key`). The backend keeps the
+Arkiv access key and writer wallet. Workers do not need tGLM. The relay stores a
+bundle only when its EIP-191 signature recovers the on-chain worker of a `Claimed`
+bounty. Entities expire after 30 days. Fund the writer address
+(`ARKIV_PRIVATE_KEY`'s address) with tGLM at https://hub.arkiv.network/faucet.

@@ -55,6 +55,17 @@ const POLL_INTERVAL_MS = 3_000; // 3 seconds between polls
 
 // ─── Resolve contract address from deployment artifacts or env ────────────────
 
+function readDeployBlock(): bigint | null {
+  const networkName = CHAIN_ID === 31337 ? "localhost" : "arcTestnet";
+  const artifactPath = process.env.DEPLOYMENTS_PATH ?? `../contracts/deployments/${networkName}.json`;
+  try {
+    const deployment = JSON.parse(fs.readFileSync(path.resolve(artifactPath), "utf8"));
+    return typeof deployment.deployBlock === "number" ? BigInt(deployment.deployBlock) : null;
+  } catch {
+    return null;
+  }
+}
+
 function resolveContractAddress(): Address {
   // 1. Try env var first
   if (process.env.ESCROW_CONTRACT_ADDRESS && process.env.ESCROW_CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000") {
@@ -414,8 +425,12 @@ export async function startIndexer(): Promise<void> {
   if (lastBlock === 0n) {
     // Start from a recent block (avoid scanning from genesis on testnet)
     try {
+      const deployBlock = readDeployBlock();
       const currentBlock = await client.getBlockNumber();
-      lastBlock = currentBlock > 1000n ? currentBlock - 1000n : 0n;
+      // Index from the escrow deployment block so no early events are skipped.
+      lastBlock = deployBlock !== null && deployBlock > 0n
+        ? deployBlock - 1n
+        : currentBlock > 1000n ? currentBlock - 1000n : 0n;
       console.log(`[indexer] No cursor found, starting from block ${lastBlock}`);
     } catch {
       lastBlock = 0n;

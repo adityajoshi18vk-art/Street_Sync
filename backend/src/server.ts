@@ -17,6 +17,7 @@ import dbAccess from "./db.js";
 import { signAttestation, getAttesterAddress, getVerifyingContract, isAttestationSignerReady, RoleEnum, setVerifyingContract } from "./signer.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
 import { isAddress, type Address } from "viem";
+import { isArkivRelayConfigured, registerArkivRoutes } from "./arkiv-relay.js";
 import { isAllowedWorldIdAction, isLocalWorldIdBypassEnabled, recordWorldIdNullifier } from "./worldid.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -331,6 +332,8 @@ app.get<{ Params: { address: string } }>("/api/reviewers/:address/assignments", 
 //  GET /api/health
 // ═══════════════════════════════════════════════════════════════════════════════
 
+registerArkivRoutes(app);
+
 app.get("/api/health", async (_request, reply) => {
   let escrowConfigured = true;
   try {
@@ -342,8 +345,8 @@ app.get("/api/health", async (_request, reply) => {
   const signerConfigured = isAttestationSignerReady();
   return reply.send({
     status: "ok",
-    ready: worldIdConfigured && signerConfigured && escrowConfigured,
-    readiness: { worldId: worldIdConfigured, signer: signerConfigured, escrow: escrowConfigured },
+    ready: worldIdConfigured && signerConfigured && escrowConfigured && isArkivRelayConfigured(),
+    readiness: { worldId: worldIdConfigured, signer: signerConfigured, escrow: escrowConfigured, arkiv: isArkivRelayConfigured() },
     chainId: CHAIN_ID,
     attester: getAttesterAddress() ?? "",
     worldAppId: WORLD_APP_ID,
@@ -395,6 +398,8 @@ async function main() {
     console.log("  GET  /api/bounties");
     console.log("  GET  /api/bounties/:id");
     console.log("  GET  /api/reviewers/:address/assignments");
+    console.log("  POST /api/arkiv/entities");
+    console.log("  GET  /api/arkiv/entities/:key");
     console.log("  GET  /api/health");
   } catch (err) {
     app.log.error(err);
