@@ -21,7 +21,8 @@ import type { Address } from "viem";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-const PORT = Number(process.env.PORT ?? 3001);
+// Not PORT: hosts and the root dev runner set PORT for the web app, which would make both bind the same port.
+const PORT = Number(process.env.BACKEND_PORT ?? 3001);
 const HOST = process.env.HOST ?? "0.0.0.0";
 const WORLD_APP_ID = process.env.WORLD_APP_ID ?? "app_streetsync_dev";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");

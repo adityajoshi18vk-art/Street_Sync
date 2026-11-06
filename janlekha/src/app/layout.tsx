@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { WalletBar } from "@/components/wallet/WalletBar";
 import { Providers } from "./providers";
+import { publicEnv } from "@/env/public";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/" className="font-semibold text-neutral-900">JanLekha</Link>
             <Link href="/projects" className="text-neutral-600 hover:text-neutral-900">Projects</Link>
             <Link href="/verify" className="text-neutral-600 hover:text-neutral-900">Verify a document</Link>
+            <a href={publicEnv.NEXT_PUBLIC_STREETSYNC_URL} className="border-l border-neutral-200 pl-5 text-neutral-600 hover:text-neutral-900">
+              StreetSync · Repairs
+            </a>
             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
               Synthetic demo data
             </span>
