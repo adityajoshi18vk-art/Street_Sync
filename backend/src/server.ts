@@ -18,6 +18,8 @@ import { signAttestation, attesterAddress, RoleEnum, setVerifyingContract } from
 import { computeStickerProfile } from "./stickers.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
 import type { Address } from "viem";
+import { randomBytes } from "node:crypto";
+import { hashToField } from "@worldcoin/idkit-core/hashing";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -67,6 +69,74 @@ interface WorldIdVerifyBody {
 // AND the request carries an explicit dev_bypass flag. Never enabled by default.
 const DEV_BYPASS_ENABLED = process.env.ALLOW_DEV_WORLD_ID_BYPASS === "true";
 
+// World ID 4.0 verify API; accepts IDKit 2.x proofs as "legacy 3.0" responses.
+// The v2 endpoint answers "Action not found" for apps migrated to 4.0.
+const WORLD_VERIFY_URL =
+  process.env.WORLD_VERIFY_URL ??
+  `https://developer.world.org/api/v4/verify/${process.env.WORLD_RP_ID ?? WORLD_APP_ID}`;
+
+interface WorldVerifyResult {
+  success: boolean;
+  code?: string;
+  detail?: string;
+}
+
+async function verifyWorldIdProof(p: {
+  proof: string;
+  merkle_root: string;
+  nullifier_hash: string;
+  verification_level: string;
+  action: string;
+  signal: string;
+}): Promise<WorldVerifyResult> {
+  const res = await fetch(WORLD_VERIFY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      protocol_version: "3.0",
+      nonce: `0x${randomBytes(16).toString("hex")}`,
+      action: p.action,
+      responses: [
+        {
+          identifier: p.verification_level,
+          proof: p.proof,
+          merkle_root: p.merkle_root,
+          nullifier: p.nullifier_hash,
+          // Same hashing IDKit applies to the widget's `signal` (the wallet address).
+          signal_hash: hashToField(p.signal).digest,
+        },
+      ],
+    }),
+  });
+  const body = (await res.json().catch(() => ({}))) as {
+    success?: boolean;
+    code?: string;
+    detail?: string;
+    results?: { success?: boolean; code?: string; detail?: string }[];
+  };
+  if (res.ok && body.success) return { success: true };
+  const failed = body.results?.find((r) => r.success === false);
+  return {
+    success: false,
+    code: failed?.code ?? body.code ?? `http_${res.status}`,
+    detail: failed?.detail ?? body.detail ?? `HTTP ${res.status}`,
+  };
+}
+
+const WORLD_ACTION_WORKER = process.env.WORLD_ACTION_WORKER ?? "claim-bounty";
+const WORLD_ACTION_REVIEWER = process.env.WORLD_ACTION_REVIEWER ?? "register-reviewer";
+
+/**
+ * The action is derived here, never trusted from the client: otherwise one human could
+ * mint unlimited attestations by verifying against fresh action names. Worker claims are
+ * per bounty (one human, one claim per bounty); reviewer registration is once per human.
+ */
+function expectedAction(role: "worker" | "reviewer", bountyId: string | undefined): string | null {
+  if (role === "reviewer") return WORLD_ACTION_REVIEWER;
+  if (role === "worker" && bountyId && /^\d+$/.test(bountyId)) return `${WORLD_ACTION_WORKER}-${bountyId}`;
+  return null;
+}
+
 app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, reply) => {
   const {
     proof,
@@ -80,15 +150,18 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
   } = request.body;
 
   // Validate required fields
-  if (!proof || !merkle_root || !nullifier_hash || !action || !wallet || !role) {
+  if (!proof || !merkle_root || !nullifier_hash || !verification_level || !action || !wallet || !role) {
     return reply.status(400).send({
-      error: "Missing required fields: proof, merkle_root, nullifier_hash, action, wallet, role",
+      error: "Missing required fields: proof, merkle_root, nullifier_hash, verification_level, action, wallet, role",
     });
   }
 
-  // Derive the action ID for sybil tracking
-  // Actions: "register-worker", "register-reviewer", "review-bounty-<id>"
-  const actionId = action;
+  const actionId = expectedAction(role, bountyId);
+  if (!actionId || action !== actionId) {
+    return reply.status(400).send({
+      error: `World ID action mismatch: expected "${actionId ?? "(invalid role or bountyId)"}"`,
+    });
+  }
 
   // ── Step 1: Check nullifier hasn't been used by a DIFFERENT wallet for this action ──
   const existingNullifier = dbAccess.checkNullifierOtherWallet(
@@ -110,39 +183,17 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
     });
   }
 
-  // ── Step 2: Verify proof against World ID v4 API ────────────────────────────
+  // ── Step 2: Verify the proof with World's cloud API ─────────────────────────
+  let verified: WorldVerifyResult;
   try {
-    const verifyResponse = await fetch(
-      `https://developer.worldcoin.org/api/v2/verify/${WORLD_APP_ID}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          merkle_root,
-          nullifier_hash,
-          proof,
-          verification_level,
-          action: actionId,
-          signal: wallet,
-        }),
-      },
-    );
-
-    if (!verifyResponse.ok) {
-      const errBody = await verifyResponse.text();
-      request.log.error(`World ID verification failed: ${verifyResponse.status} ${errBody}`);
-      return reply.status(401).send({
-        error: "World ID verification failed",
-        detail: errBody,
-      });
-    }
-
-    const verifyData = await verifyResponse.json() as { success: boolean };
-    if (!verifyData.success) {
-      return reply.status(401).send({
-        error: "World ID proof is invalid",
-      });
-    }
+    verified = await verifyWorldIdProof({
+      proof,
+      merkle_root,
+      nullifier_hash,
+      verification_level,
+      action: actionId,
+      signal: wallet,
+    });
   } catch (e) {
     request.log.error(`World ID API error: ${(e as Error).message}`);
     // Hard failure unless the operator explicitly enabled the dev bypass
@@ -153,6 +204,18 @@ app.post<{ Body: WorldIdVerifyBody }>("/api/worldid/verify", async (request, rep
       });
     }
     request.log.warn("World ID API unreachable – proceeding via ALLOW_DEV_WORLD_ID_BYPASS");
+    verified = { success: true };
+  }
+
+  if (!verified.success) {
+    request.log.warn(`World ID verification rejected: ${verified.code} ${verified.detail}`);
+    const alreadyUsed = /max_verifications|already_verified|exceeded/i.test(verified.code ?? "");
+    return reply.status(alreadyUsed ? 409 : 401).send({
+      error: alreadyUsed
+        ? "This World ID has already been used for this action"
+        : `World ID verification failed: ${verified.detail ?? verified.code ?? "invalid proof"}`,
+      code: verified.code,
+    });
   }
 
   // ── Step 3: Record nullifier in DB ──────────────────────────────────────────

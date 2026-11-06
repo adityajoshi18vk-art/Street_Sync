@@ -17,14 +17,14 @@ import {
   USDC_ADDRESS,
   USDC_ABI,
   WORLD_APP_ID,
-  WORLD_ACTION_WORKER,
+  workerActionFor,
   contractsDeployed,
   formatUsdcDisplay
 } from "@/config/contracts";
 import { requestAttestation, type Attestation, type WorldIdSuccessResult } from "@/lib/api";
 import { getArkivClient, rememberEntityMapping } from "@/lib/arkiv";
 import { buildSignedBundle, type CompressionStats, type EvidenceMetadata } from "@/lib/evidence";
-import { statusName } from "@/lib/types";
+import { readBountyStruct, statusName } from "@/lib/types";
 import CameraCapture, { type CaptureResult } from "@/components/CameraCapture";
 import CompressionStatsPanel from "@/components/CompressionStatsPanel";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -92,12 +92,12 @@ export default function WorkerPage() {
     query: { enabled: contractsDeployed && !!address }
   });
 
-  const raw = bounty as unknown[] | undefined;
-  const status = raw ? Number(raw[16]) : -1;
-  const worker = raw && typeof raw[9] === "string" ? (raw[9] as string) : undefined;
-  const challengeCode = raw ? Number(raw[10]) : 0;
+  const onChain = readBountyStruct(bounty);
+  const status = onChain ? onChain.status : -1;
+  const worker = onChain?.worker;
+  const challengeCode = onChain ? onChain.visualChallengeCode : 0;
   const isWorker = !!address && !!worker && worker.toLowerCase() === address.toLowerCase();
-  const evidenceHash = raw && typeof raw[12] === "string" ? (raw[12] as string) : null;
+  const evidenceHash = onChain?.evidenceHash ?? null;
 
   const deviceSummary = useMemo(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return "unknown";
@@ -152,13 +152,13 @@ export default function WorkerPage() {
         wallet: address,
         role: "worker",
         bountyId,
-        action: WORLD_ACTION_WORKER,
+        action: workerActionFor(bountyId),
         worldIdProof: proof
       });
       attestationRef.current = attestation;
       await runClaim(attestation);
     },
-    [address, bountyId, runClaim, WORLD_ACTION_WORKER]
+    [address, bountyId, runClaim]
   );
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
@@ -351,7 +351,7 @@ export default function WorkerPage() {
             <div className="mt-4">
               <IDKitWidget
                 app_id={WORLD_APP_ID}
-                action={WORLD_ACTION_WORKER}
+                action={workerActionFor(bountyId)}
                 signal={address}
                 handleVerify={handleWorldIdVerify}
                 onSuccess={() => {

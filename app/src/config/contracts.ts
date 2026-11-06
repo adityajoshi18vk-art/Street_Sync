@@ -139,12 +139,18 @@ export const BACKEND_API_URL =
 /** JanLekha, the spending-transparency feature of this project (separate app, see README). */
 export const JANLEKHA_URL = process.env.NEXT_PUBLIC_JANLEKHA_URL ?? "http://localhost:3100";
 
+// StreetSync's production World ID app (public identifier; also in backend/.env).
 export const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ??
-  "app_staging_streetsync") as `app_${string}`;
+  "app_401e8c235a6b3bbd1bc62df14d5c021d") as `app_${string}`;
 export const WORLD_ACTION_WORKER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_WORKER ?? "claim-bounty";
 export const WORLD_ACTION_REVIEWER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_REVIEWER ?? "register-reviewer";
+
+/** Worker claims verify against a per-bounty action: one human, one claim per bounty. Must match the backend. */
+export function workerActionFor(bountyId: string | number): string {
+  return `${WORLD_ACTION_WORKER}-${bountyId}`;
+}
 
 /**
  * parseUnits(amount, 6) — the ONLY sanctioned way to turn a human USDC amount

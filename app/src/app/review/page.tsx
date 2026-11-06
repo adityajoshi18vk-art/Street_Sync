@@ -29,7 +29,7 @@ import {
 import { approveUsdcExact } from "@/lib/tx";
 import { getReviewerAssignments, requestAttestation, type Attestation } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
-import { shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
+import { readBountyStruct, shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
 import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import CommitRevealCard from "@/components/CommitRevealCard";
@@ -487,14 +487,14 @@ function AssignmentCard({
     query: { enabled: contractsDeployed }
   });
 
-  const b = raw as unknown[] | undefined;
-  const status = b ? Number(b[16]) : (assignment.bountyStatus ?? -1);
-  const worker = b && typeof b[9] === "string" ? (b[9] as string) : assignment.worker;
-  const arkivKey = b && typeof b[11] === "string" ? (b[11] as string) : null;
-  const evidenceHash = b && typeof b[12] === "string" ? (b[12] as string) : null;
-  const selectionBlock = b ? BigInt(b[13] as bigint) : null;
-  const reviewRound = b ? Number(b[14]) : assignment.reviewRound;
-  const totalPledged = b ? (b[6] as bigint) : BigInt(assignment.totalPledged || "0");
+  const b = readBountyStruct(raw);
+  const status = b ? b.status : (assignment.bountyStatus ?? -1);
+  const worker = b ? b.worker : assignment.worker;
+  const arkivKey = b ? b.arkivEntityKey : null;
+  const evidenceHash = b ? b.evidenceHash : null;
+  const selectionBlock = b ? BigInt(b.selectionBlock) : null;
+  const reviewRound = b ? b.reviewRound : assignment.reviewRound;
+  const totalPledged = b ? b.totalPledged : BigInt(assignment.totalPledged || "0");
 
   const panelMembers = (panel as unknown as string[] | undefined) ?? [];
   const onPanel = !!address && panelMembers.some((m) => m.toLowerCase() === address.toLowerCase());
