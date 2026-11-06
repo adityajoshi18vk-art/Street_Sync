@@ -11,8 +11,9 @@
   ],
   "scripts": {
     "postinstall": "npm --prefix janlekha install --no-audit --no-fund",
-    "predev": "npm run build:packages",
-    "predev:streetsync": "npm run build:packages",
+    "clean:ports": "node scripts/clean-ports.mjs",
+    "predev": "node scripts/clean-ports.mjs && npm run build:packages",
+    "predev:streetsync": "node scripts/clean-ports.mjs && npm run build:packages",
     "build:packages": "npm run build --workspace=@streetsync/swarm-client && npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client",
     "dev": "concurrently -n backend,streetsync,janlekha -c blue,green,magenta \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\" \"npm --prefix janlekha run dev\"",
     "dev:streetsync": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
