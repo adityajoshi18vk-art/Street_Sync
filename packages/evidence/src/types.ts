@@ -35,6 +35,23 @@ export interface EvidenceMetadata {
   workerAddress?: `0x${string}`;
   notes?: string;
   v?: number;
+
+  /** Optional Ethereum Swarm video walkthrough attachment */
+  video?: {
+    swarmReference: string;
+    videoSha256: string;
+    durationSeconds: number;
+    mimeType: string;
+    sizeBytes: number;
+  };
+}
+
+export interface VideoEvidence {
+  swarmReference: string;
+  videoSha256: string;
+  durationSeconds: number;
+  mimeType: string;
+  sizeBytes: number;
 }
 
 export interface BundleInput {

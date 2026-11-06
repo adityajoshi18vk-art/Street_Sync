@@ -10,9 +10,9 @@
     "app"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client && npm run build --workspace=streetsync-backend",
+    "build": "npm run build --workspace=@streetsync/swarm-client && npm run build --workspace=@streetsync/evidence && npm run build --workspace=@streetsync/arkiv-client && npm run build --workspace=streetsync-backend",
     "test:contracts": "npm run test --workspace=streetsync-contracts",
-    "test:pipeline": "npm run test --workspace=@streetsync/evidence && npm run test --workspace=@streetsync/arkiv-client",
+    "test:pipeline": "npm run test --workspace=@streetsync/swarm-client && npm run test --workspace=@streetsync/evidence && npm run test --workspace=@streetsync/arkiv-client",
     "test:e2e": "npm run build && tsx scripts/e2e-verify.ts",
     "dev": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
     "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",

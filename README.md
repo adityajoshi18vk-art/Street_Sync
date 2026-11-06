@@ -24,8 +24,14 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
    - Guaranteed immutable storage with minimum 7-day TTL (`604,800 seconds`), surviving all review, audit, and rework periods.
    - Converts Arkiv entity identifiers into EVM `bytes32` for transparent on-chain storage and auditability.
 
-4. **Hybrid Zstandard (Zstd) + WebP Compression Pipeline:**
-   - Compresses 4 MB of raw dual-camera photos (before + after repair), GPS accuracy telemetry, compass heading, and EIP-191 worker signature into a single **~81 KiB** binary package (**97.8% reduction**).
+4. **Ethereum Swarm (BZZ) Video Walkthrough Streaming:**
+   - High-throughput chunked distributed blob storage for 10-second on-site video walkthroughs.
+   - Uses 4 KiB Merkle chunk trees for zero-lag browser streaming without pre-downloading.
+   - **Dual-Tier Model**: The 64-char Swarm Bzz reference and video SHA-256 are cryptographically sealed inside the Arkiv bundle, anchoring heavy video blobs into Arc Layer 1 with zero on-chain gas overhead.
+   - Resilient multi-tier client with 4-second timeout and offline local fallback.
+
+5. **Hybrid Zstandard (Zstd) + WebP Compression Pipeline:**
+   - Compresses 4 MB of raw dual-camera photos (before + after repair), GPS accuracy telemetry, compass heading, Swarm video reference, and EIP-191 worker signature into a single **~81 KiB** binary package (**97.8% reduction**).
 
 ---
 
@@ -37,6 +43,7 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
 | :--- | :--- | :--- | :--- |
 | **Before Photo (WebP)** | ~2,000,000 bytes (2 MB) | **40.31 KiB** (41,277 B) | Quality: `0.55` (Cap: `<= 48 KiB`) |
 | **After Photo (WebP)** | ~2,000,000 bytes (2 MB) | **40.46 KiB** (41,431 B) | Quality: `0.55` (Cap: `<= 48 KiB`) |
+| **Video Walkthrough (Swarm)** | ~2.5 MB (10s 720p WebM) | **64-char Bzz ref + SHA-256** | Stored on Swarm; hash anchored in Arkiv |
 | **Telemetry & GPS Metadata** | 578 bytes (JSON) | **310 – 429 bytes** | CBOR (531 B) → Zstd Dictionary WASM |
 | **Worker Signature** | — | **65 bytes** | EIP-191 ECDSA `(r, s, v)` |
 | **Total Signed Bundle** | **3.72 MB** (3,896,551 B) | **81.27 KiB** (83,222 B) | **97.86% Savings** (**46.8x ratio**) |
@@ -102,7 +109,8 @@ streetsync/
 │       └── deploy.ts               # Hardhat deployment script
 ├── packages/
 │   ├── evidence/               # WebP + CBOR + Zstd WASM compression pipeline & binary packager
-│   └── arkiv-client/           # Arkiv SDK wrapper, bytes32 conversion, and cryptographic audit verifier
+│   ├── arkiv-client/           # Arkiv SDK wrapper, bytes32 conversion, and cryptographic audit verifier
+│   └── swarm-client/           # Ethereum Swarm Bee wrapper, video upload, streaming, and fallback
 ├── backend/                    # Fastify + TypeScript service
 │   ├── src/
 │   │   ├── db.ts               # SQLite schema for nullifiers, nonces, bounties, and assignments
@@ -115,7 +123,7 @@ streetsync/
 │   │   ├── components/         # MapView, CameraCapture, BeforeAfterSlider, CommitRevealCard, AuditVerifier
 │   │   └── config/             # Wagmi, Viem, and dynamic contract deployments
 └── scripts/
-    └── e2e-verify.ts           # Full 37-step end-to-end integration test
+    └── e2e-verify.ts           # Full 42-step end-to-end integration test (Swarm + Arkiv + Arc)
 ```
 
 ---
@@ -138,13 +146,13 @@ npm run build
 # 1. Smart Contract tests (14/14 passing)
 npm run test:contracts
 
-# 2. Evidence compression and Arkiv pipeline tests (5/5 passing)
+# 2. Evidence compression, Swarm client, and Arkiv pipeline tests (11/11 passing)
 npm run test:pipeline
 
 # 3. Backend API and EIP-712 attestation tests (4/4 passing)
 npm run test --workspace=streetsync-backend
 
-# 4. Full End-to-End lifecycle verification (37/37 passing)
+# 4. Full End-to-End lifecycle verification (42/42 passing)
 npm run test:e2e
 ```
 

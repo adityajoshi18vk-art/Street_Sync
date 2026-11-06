@@ -17,6 +17,7 @@ import type { OnChainBounty } from "@/lib/types";
 import { shortHash, formatUtc, isZeroHash } from "@/lib/types";
 import { StatusBadge, HashBadge } from "./StatusBadge";
 import BeforeAfterSlider from "./BeforeAfterSlider";
+import { getVideoPlaybackUrl, getVideoUrl } from "@streetsync/swarm-client";
 
 const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -264,6 +265,19 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
                 {bundleSize?.toLocaleString()} B / {MAX_ARKIV_PAYLOAD.toLocaleString()} B
               </span>
             </div>
+            {metadata?.video && (
+              <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs ring-1 ring-amber-200">
+                <div>
+                  <p className="font-semibold text-amber-900">Swarm Video Cryptographic Seal</p>
+                  <p className="font-mono text-[11px] text-amber-700">
+                    Ref: {metadata.video.swarmReference.slice(0, 16)}… · SHA-256: {metadata.video.videoSha256.slice(0, 12)}…
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                  SEALED IN ARKIV
+                </span>
+              </div>
+            )}
             {entityKeyUsed && (
               <p className="truncate text-[11px] text-gray-400">
                 Entity resolved via key: {entityKeyUsed}
@@ -307,6 +321,45 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
         <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
           <p className="mb-3 text-sm font-semibold text-gray-900">Evidence photos (from Arkiv)</p>
           <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
+        </div>
+      )}
+
+      {metadata?.video && (
+        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Video Walkthrough (Ethereum Swarm)</p>
+              <p className="text-xs text-gray-500">
+                Decentralized chunked streaming via Bzz protocol · {metadata.video.durationSeconds}s · {(metadata.video.sizeBytes / 1024).toFixed(0)} KB
+              </p>
+            </div>
+            <a
+              href={getVideoUrl(metadata.video.swarmReference)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/20 ring-1 ring-amber-500/30"
+            >
+              Verify on Swarm Gateway ↗
+            </a>
+          </div>
+
+          <video
+            src={getVideoPlaybackUrl(metadata.video.swarmReference)}
+            controls
+            playsInline
+            className="w-full max-h-80 rounded-lg bg-black object-contain"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-gray-600 bg-gray-50 p-2.5 rounded-lg ring-1 ring-gray-200">
+            <div className="truncate">
+              <span className="text-gray-400">Swarm Reference: </span>
+              <span className="font-semibold text-gray-800">{metadata.video.swarmReference}</span>
+            </div>
+            <div className="truncate">
+              <span className="text-gray-400">Video SHA-256: </span>
+              <span className="font-semibold text-gray-800">{metadata.video.videoSha256}</span>
+            </div>
+          </div>
         </div>
       )}
 

@@ -245,4 +245,53 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     }
     expect(Buffer.from(reassembled).equals(Buffer.from(oversizedPayload))).toBe(true);
   });
+
+  it("preserves Ethereum Swarm video metadata and cryptographic hashes in signed CBOR bundle", async () => {
+    const dummyImage = new Uint8Array(500);
+    dummyImage.fill(0x42);
+
+    const videoRef = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    const videoSha = `0x${videoRef}`;
+
+    const metadataWithVideo: EvidenceMetadata = {
+      bountyId: 99,
+      visualChallengeCode: 7788,
+      beforeTimestamp: 1710000000000,
+      afterTimestamp: 1710000010000,
+      gpsLatE5: 3777490,
+      gpsLngE5: -12241940,
+      gpsAccuracyM: 2.5,
+      compassHeadingDeg: 180,
+      deviceSummary: "Test Mobile Device",
+      beforeImageSha256: "0x1111",
+      afterImageSha256: "0x2222",
+      appVersion: "1.0.0",
+      video: {
+        swarmReference: videoRef,
+        videoSha256: videoSha,
+        durationSeconds: 10,
+        mimeType: "video/webm",
+        sizeBytes: 2_450_000,
+      },
+    };
+
+    const { bundle, evidenceHash } = await packBundle({
+      metadata: metadataWithVideo,
+      beforeImage: dummyImage,
+      afterImage: dummyImage,
+      signerPrivateKey: TEST_PRIVATE_KEY,
+    });
+
+    const unpacked = await unpackBundle(bundle);
+    expect(unpacked.metadata.video).toBeDefined();
+    expect(unpacked.metadata.video?.swarmReference).toBe(videoRef);
+    expect(unpacked.metadata.video?.videoSha256).toBe(videoSha);
+    expect(unpacked.metadata.video?.durationSeconds).toBe(10);
+    expect(unpacked.metadata.video?.mimeType).toBe("video/webm");
+    expect(unpacked.metadata.video?.sizeBytes).toBe(2_450_000);
+
+    const audit = await verifyBundleIntegrity(bundle, evidenceHash, TEST_WORKER_ADDRESS);
+    expect(audit.valid).toBe(true);
+    expect(audit.unpacked?.metadata?.video?.swarmReference).toBe(videoRef);
+  });
 });

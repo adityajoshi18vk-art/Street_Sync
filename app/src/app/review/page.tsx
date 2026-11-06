@@ -34,6 +34,7 @@ import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import CommitRevealCard from "@/components/CommitRevealCard";
 import { HashBadge } from "@/components/StatusBadge";
+import { getVideoPlaybackUrl, getVideoUrl } from "@streetsync/swarm-client";
 
 // ─── Registration card ───────────────────────────────────────────────────────
 
@@ -341,6 +342,39 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
           ) : (
             <p className="text-xs text-gray-400">Photos unavailable in bundle.</p>
+          )}
+
+          {verification.metadata?.video && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                    Ethereum Swarm (BZZ)
+                  </span>
+                  <span className="text-xs font-semibold text-amber-800">
+                    Video Walkthrough ({verification.metadata.video.durationSeconds}s)
+                  </span>
+                </div>
+                <a
+                  href={getVideoUrl(verification.metadata.video.swarmReference)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                >
+                  Verify on Swarm Gateway ↗
+                </a>
+              </div>
+              <video
+                src={getVideoPlaybackUrl(verification.metadata.video.swarmReference)}
+                controls
+                playsInline
+                className="w-full max-h-64 rounded-lg bg-black object-contain"
+              />
+              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-800">
+                <span>Ref: {verification.metadata.video.swarmReference.slice(0, 20)}…</span>
+                <span>SHA: {verification.metadata.video.videoSha256.slice(0, 16)}…</span>
+              </div>
+            </div>
           )}
 
           {verification.metadata && (

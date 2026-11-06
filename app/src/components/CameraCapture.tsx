@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { uploadVideo, type VideoEvidence } from "@streetsync/swarm-client";
 
 declare global {
   interface Window {
@@ -25,11 +26,14 @@ export interface CaptureResult {
   telemetry: CameraTelemetry;
 }
 
-interface CameraCaptureProps {
+export interface CameraCaptureProps {
   slot: "before" | "after";
   /** 4-digit anti-spoofing code emitted by claim(); burned into the photo frame. */
   challengeCode?: number | null;
   onCapture: (result: CaptureResult) => void;
+  /** Optional Ethereum Swarm video walkthrough */
+  videoWalkthrough?: VideoEvidence | null;
+  onVideoRecorded?: (result: VideoEvidence) => void;
 }
 
 type CameraState = "idle" | "starting" | "live" | "denied" | "unsupported";
@@ -45,12 +49,35 @@ function CompassHeading(): number | null {
   return null;
 }
 
-export default function CameraCapture({ slot, challengeCode, onCapture }: CameraCaptureProps) {
+function getSupportedMimeType(): string {
+  if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return "video/webm";
+  const types = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4"
+  ];
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return "video/webm";
+}
+
+export default function CameraCapture({
+  slot,
+  challengeCode,
+  onCapture,
+  videoWalkthrough,
+  onVideoRecorded
+}: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fixRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const headingRef = useRef<number | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const videoChunksRef = useRef<Blob[]>([]);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [cameraState, setCameraState] = useState<CameraState>("idle");
   const [gpsStatus, setGpsStatus] = useState<"acquiring" | "locked" | "denied">("acquiring");
@@ -58,6 +85,10 @@ export default function CameraCapture({ slot, challengeCode, onCapture }: Camera
   const [heading, setHeading] = useState<number | null>(null);
   const [compassDenied, setCompassDenied] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [recordingVideo, setRecordingVideo] = useState(false);
+  const [countdown, setCountdown] = useState(10);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   // ── Live GPS (Rule 6: telemetry recorded alongside capture) ───────────────
   useEffect(() => {
@@ -235,6 +266,91 @@ export default function CameraCapture({ slot, challengeCode, onCapture }: Camera
     }
   };
 
+  /** Record 10-second video walkthrough uploaded to Ethereum Swarm */
+  const startVideoRecording = async () => {
+    if (!streamRef.current) return;
+    setVideoError(null);
+    const mimeType = getSupportedMimeType();
+    videoChunksRef.current = [];
+    setCountdown(10);
+
+    try {
+      const recorder = new MediaRecorder(streamRef.current, {
+        mimeType,
+        videoBitsPerSecond: 800_000
+      });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          videoChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        setRecordingVideo(false);
+        setVideoUploading(true);
+
+        try {
+          const fullBlob = new Blob(videoChunksRef.current, { type: mimeType });
+          const result = await uploadVideo(fullBlob, {
+            filename: `walkthrough-${challengeCode ?? "bounty"}-${Date.now()}.webm`,
+            mimeType,
+            durationSeconds: 10 - countdown
+          });
+          onVideoRecorded?.(result);
+        } catch (err) {
+          setVideoError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setVideoUploading(false);
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(500);
+      setRecordingVideo(true);
+
+      const startTime = Date.now();
+      countdownTimerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(0, 10 - elapsed);
+        setCountdown(remaining);
+        if (remaining <= 0) {
+          if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+          if (recorder.state === "recording") {
+            recorder.stop();
+          }
+        }
+      }, 250);
+    } catch (err) {
+      setVideoError("MediaRecorder failed: " + String(err));
+    }
+  };
+
+  const stopVideoRecording = () => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleVideoFile = async (file: File) => {
+    setVideoUploading(true);
+    setVideoError(null);
+    try {
+      const result = await uploadVideo(file, {
+        filename: file.name,
+        mimeType: file.type || "video/webm",
+        durationSeconds: 10
+      });
+      onVideoRecorded?.(result);
+    } catch (err) {
+      setVideoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
   const captureFromFile = async (file: File) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
     onCapture({
@@ -321,21 +437,58 @@ export default function CameraCapture({ slot, challengeCode, onCapture }: Camera
 
       <canvas ref={canvasRef} className="hidden" />
 
+      {videoWalkthrough && (
+        <div className="mx-4 mt-3 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-xs ring-1 ring-amber-500/30">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-amber-400">Swarm Video:</span>
+            <span className="font-mono text-gray-300">{videoWalkthrough.swarmReference.slice(0, 14)}…</span>
+          </div>
+          <span className="text-[10px] font-semibold text-emerald-400">✓ Sealed for Arkiv</span>
+        </div>
+      )}
+
+      {videoError && (
+        <div className="mx-4 mt-2 rounded-lg bg-red-950/60 p-2 text-xs text-red-300 ring-1 ring-red-500/30">
+          {videoError}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 px-4 py-3">
         {cameraState === "live" ? (
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                onClick={captureFromVideo}
+                disabled={capturing || recordingVideo}
+                className="flex-1 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                {capturing ? "Capturing…" : `Capture ${slot} photo`}
+              </button>
+              <button
+                onClick={stopCamera}
+                disabled={recordingVideo}
+                className="rounded-lg bg-gray-800 px-3 py-2.5 text-sm font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700 disabled:opacity-50"
+              >
+                Stop
+              </button>
+            </div>
+
+            {/* Optional 10s Video Walkthrough Button */}
             <button
-              onClick={captureFromVideo}
-              disabled={capturing}
-              className="flex-1 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50"
+              type="button"
+              onClick={recordingVideo ? stopVideoRecording : startVideoRecording}
+              disabled={capturing || videoUploading}
+              className={`w-full rounded-lg py-2 text-xs font-semibold text-white transition ${
+                recordingVideo
+                  ? "bg-red-600 animate-pulse hover:bg-red-700"
+                  : "bg-amber-600 hover:bg-amber-700"
+              } disabled:opacity-50`}
             >
-              {capturing ? "Capturing…" : `Capture ${slot} photo`}
-            </button>
-            <button
-              onClick={stopCamera}
-              className="rounded-lg bg-gray-800 px-3 py-2.5 text-sm font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700"
-            >
-              Stop
+              {videoUploading
+                ? "Uploading Walkthrough to Swarm…"
+                : recordingVideo
+                ? `Recording Walkthrough (${countdown}s remaining — Stop)`
+                : "Record 10s Video Walkthrough (Swarm)"}
             </button>
           </div>
         ) : (
@@ -348,21 +501,38 @@ export default function CameraCapture({ slot, challengeCode, onCapture }: Camera
           </button>
         )}
 
-        {/* capture="environment" opens the camera directly — no gallery picker */}
-        <label className="w-full cursor-pointer rounded-lg bg-gray-800 py-2 text-center text-xs font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700">
-          or use system camera
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void captureFromFile(file);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {/* capture="environment" opens the camera directly — no gallery picker */}
+          <label className="cursor-pointer rounded-lg bg-gray-800 py-2 text-center text-xs font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700">
+            system camera
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void captureFromFile(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+
+          {/* upload video walkthrough */}
+          <label className="cursor-pointer rounded-lg bg-gray-800 py-2 text-center text-xs font-medium text-amber-300/90 ring-1 ring-amber-500/30 transition hover:bg-gray-700">
+            {videoUploading ? "uploading…" : "upload video"}
+            <input
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleVideoFile(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
 
         {(heading === null || gpsStatus !== "locked") && (
           <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-700 ring-1 ring-amber-200">

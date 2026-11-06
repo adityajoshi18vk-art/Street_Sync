@@ -33,6 +33,7 @@ import {
   entityKeyToBytes32,
   type IArkivClient,
 } from "@streetsync/arkiv-client";
+import { uploadVideo, getVideoUrl } from "@streetsync/swarm-client";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CONTRACTS_DIR = join(ROOT, "contracts");
@@ -291,6 +292,19 @@ async function main(): Promise<void> {
     check("before photo ≤ 45 KiB WebP", before.webpBytes.length <= 45 * 1024, `${before.webpBytes.length} bytes`);
     check("after photo ≤ 45 KiB WebP", after.webpBytes.length <= 45 * 1024, `${after.webpBytes.length} bytes`);
 
+    // Upload 10-second video walkthrough to Ethereum Swarm
+    const mockVideoBytes = new Uint8Array(250_000);
+    for (let i = 0; i < mockVideoBytes.length; i++) mockVideoBytes[i] = (i * 31) & 0xff;
+    const swarmUpload = await uploadVideo(mockVideoBytes, {
+      filename: "e2e-walkthrough.webm",
+      mimeType: "video/webm",
+      durationSeconds: 10,
+    });
+    check("Swarm video upload returns 64-char hex ref", /^[0-9a-f]{64}$/.test(swarmUpload.swarmReference));
+    check("Swarm videoSha256 is 0x-prefixed 32-byte hex", /^0x[0-9a-f]{64}$/.test(swarmUpload.videoSha256));
+    const swarmPlaybackUrl = getVideoUrl(swarmUpload.swarmReference);
+    check("Swarm gateway URL derived", swarmPlaybackUrl.includes(swarmUpload.swarmReference));
+
     const workerKey = worker.privateKey as `0x${string}`;
     const metadata = {
       bountyId: "0",
@@ -305,6 +319,13 @@ async function main(): Promise<void> {
       beforeImageSha256: before.sha256Hex,
       afterImageSha256: after.sha256Hex,
       appVersion: "1.0.0-e2e",
+      video: {
+        swarmReference: swarmUpload.swarmReference,
+        videoSha256: swarmUpload.videoSha256,
+        durationSeconds: 10,
+        mimeType: "video/webm",
+        sizeBytes: mockVideoBytes.length,
+      },
     };
 
     const { bundle, evidenceHash, stats } = await packBundle({
@@ -410,6 +431,14 @@ async function main(): Promise<void> {
 
     const audit = await verifyEvidenceBundle(arkiv, writeRes.entityKey, evidenceHash, worker.address);
     check("verifyEvidenceBundle: PASS", audit.valid === true, audit.errors.join("; "));
+    check(
+      "audit recovers Swarm video reference",
+      audit.unpacked?.metadata?.video?.swarmReference === swarmUpload.swarmReference
+    );
+    check(
+      "audit recovers Swarm video sha256",
+      audit.unpacked?.metadata?.video?.videoSha256 === swarmUpload.videoSha256
+    );
 
     arkiv.tamper(writeRes.entityKey, 40);
     const tampered = await verifyEvidenceBundle(arkiv, writeRes.entityKey, evidenceHash, worker.address);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -26,6 +26,10 @@ import {
   shortHash
 } from "@/lib/types";
 import { HashBadge, StatusBadge } from "@/components/StatusBadge";
+import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
+import { readEvidenceBundle } from "@streetsync/arkiv-client";
+import { unpackBundle } from "@streetsync/evidence";
+import { getVideoPlaybackUrl, getVideoUrl, type VideoEvidence } from "@streetsync/swarm-client";
 
 export default function BountyDetailPage() {
   const params = useParams<{ id: string }>();
@@ -37,6 +41,7 @@ export default function BountyDetailPage() {
   const [pledgeAmount, setPledgeAmount] = useState("");
   const [pledgeStatus, setPledgeStatus] = useState<string | null>(null);
   const [pledgeError, setPledgeError] = useState<string | null>(null);
+  const [videoEvidence, setVideoEvidence] = useState<VideoEvidence | null>(null);
 
   const { data: bounty, refetch, isLoading } = useReadContract({
     address: ESCROW_ADDRESS ?? undefined,
@@ -106,6 +111,40 @@ export default function BountyDetailPage() {
   const hasEvidence = !isZeroHash(b.arkivEntityKey);
   const isWorker = !!address && address.toLowerCase() === b.worker?.toLowerCase();
   const nowSeconds = Math.floor(Date.now() / 1000);
+
+  useEffect(() => {
+    if (!hasEvidence || !b?.arkivEntityKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = getArkivClient();
+        const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        const candidates = [
+          lookupStoredEntityKey(b.arkivEntityKey),
+          lookupBountyEntityKey(bountyId ?? ""),
+          b.arkivEntityKey
+        ].filter((k): k is string => !!k && k !== ZERO_KEY);
+
+        for (const k of candidates) {
+          try {
+            const res = await readEvidenceBundle(client, k);
+            const unpacked = await unpackBundle(res.bundle);
+            if (!cancelled && unpacked.metadata?.video) {
+              setVideoEvidence(unpacked.metadata.video);
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasEvidence, b?.arkivEntityKey, bountyId]);
 
   const handlePledge = async () => {
     if (!address) return;
@@ -188,6 +227,39 @@ export default function BountyDetailPage() {
           <div className="mt-4 space-y-2">
             <HashBadge label="Evidence hash (SHA-256)" hash={b.evidenceHash} />
             <HashBadge label="Arkiv entity key" hash={b.arkivEntityKey} />
+          </div>
+        )}
+
+        {videoEvidence && (
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-1.5">
+                <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                  Ethereum Swarm (BZZ)
+                </span>
+                <span className="text-xs font-semibold text-amber-800">
+                  Walkthrough Video Attached ({videoEvidence.durationSeconds}s)
+                </span>
+              </div>
+              <a
+                href={getVideoUrl(videoEvidence.swarmReference)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+              >
+                Verify on Swarm Gateway ↗
+              </a>
+            </div>
+            <video
+              src={getVideoPlaybackUrl(videoEvidence.swarmReference)}
+              controls
+              playsInline
+              className="w-full max-h-64 rounded-lg bg-black object-contain"
+            />
+            <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-800">
+              <span>Swarm Ref: {videoEvidence.swarmReference.slice(0, 20)}…</span>
+              <span>SHA: {videoEvidence.videoSha256.slice(0, 16)}…</span>
+            </div>
           </div>
         )}
 

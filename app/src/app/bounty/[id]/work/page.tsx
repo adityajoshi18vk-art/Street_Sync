@@ -28,6 +28,11 @@ import CameraCapture, { type CaptureResult } from "@/components/CameraCapture";
 import CompressionStatsPanel from "@/components/CompressionStatsPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { resizeAndEncodePhoto } from "@streetsync/evidence";
+import {
+  getVideoPlaybackUrl,
+  getVideoUrl,
+  type VideoEvidence
+} from "@streetsync/swarm-client";
 
 type Phase =
   | "verify"
@@ -56,6 +61,7 @@ export default function WorkerPage() {
 
   const [beforeCapture, setBeforeCapture] = useState<CaptureResult | null>(null);
   const [afterCapture, setAfterCapture] = useState<CaptureResult | null>(null);
+  const [videoWalkthrough, setVideoWalkthrough] = useState<VideoEvidence | null>(null);
   const [stats, setStats] = useState<CompressionStats | null>(null);
   const [bundleResult, setBundleResult] = useState<{
     bundle: Uint8Array;
@@ -188,7 +194,8 @@ export default function WorkerPage() {
         deviceSummary,
         beforeImageSha256: beforeRes.sha256Hex,
         afterImageSha256: afterRes.sha256Hex,
-        appVersion: APP_VERSION
+        appVersion: APP_VERSION,
+        video: videoWalkthrough ?? undefined
       };
 
       const built = await buildSignedBundle({
@@ -219,7 +226,8 @@ export default function WorkerPage() {
     bountyId,
     deviceSummary,
     phase,
-    signMessageAsync
+    signMessageAsync,
+    videoWalkthrough
   ]);
 
   // ─── Step 3: Write to Arkiv → submitEvidence() ─────────────────────────────
@@ -278,6 +286,7 @@ export default function WorkerPage() {
   const resetCaptures = useCallback(() => {
     setBeforeCapture(null);
     setAfterCapture(null);
+    setVideoWalkthrough(null);
     setStats(null);
     setBundleResult(null);
     setPhase("work");
@@ -413,6 +422,8 @@ export default function WorkerPage() {
             <CameraCapture
               slot={pendingSlot}
               challengeCode={challengeCode}
+              videoWalkthrough={videoWalkthrough}
+              onVideoRecorded={(res) => setVideoWalkthrough(res)}
               onCapture={(result) =>
                 pendingSlot === "before"
                   ? setBeforeCapture(result)
@@ -451,6 +462,37 @@ export default function WorkerPage() {
                   </div>
                 )
               )}
+            </div>
+          )}
+
+          {videoWalkthrough && (
+            <div className="overflow-hidden rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-900">
+                    Swarm Video Walkthrough
+                  </span>
+                  <span className="text-xs text-amber-800">
+                    {videoWalkthrough.durationSeconds}s · {(videoWalkthrough.sizeBytes / 1024).toFixed(0)} KB
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVideoWalkthrough(null)}
+                  className="text-xs font-medium text-amber-700 hover:text-amber-900 underline"
+                >
+                  Remove
+                </button>
+              </div>
+              <video
+                src={getVideoPlaybackUrl(videoWalkthrough.swarmReference)}
+                controls
+                playsInline
+                className="w-full max-h-56 rounded-lg bg-black"
+              />
+              <p className="mt-2 text-[11px] font-mono text-amber-700 truncate">
+                Bzz reference: {videoWalkthrough.swarmReference}
+              </p>
             </div>
           )}
 
