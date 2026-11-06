@@ -120,6 +120,51 @@ export interface BackendHealth {
   worldAppId: string;
 }
 
+export interface StickerStatus {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  tier: "bronze" | "silver" | "gold";
+  xp: number;
+  target: number;
+  progress: number;
+  earned: boolean;
+  awardedAt: number | null;
+}
+
+export interface StickerProfile {
+  address: string;
+  stats: {
+    bountiesCreated: number;
+    pledgedBounties: number;
+    pledgedTotal: string;
+    bountiesClaimed: number;
+    approvedFixes: number;
+    evidenceSubmitted: number;
+    votesRevealed: number;
+    slashes: number;
+  };
+  xp: number;
+  level: { index: number; title: string; minXp: number; nextXp: number | null };
+  earnedCount: number;
+  totalCount: number;
+  stickers: StickerStatus[];
+}
+
+/**
+ * GET /api/stickers/:address — gamification sticker collection, XP, and level.
+ */
+export async function getStickerProfile(address: string): Promise<StickerProfile> {
+  const res = await fetch(`${BACKEND_API_URL}/api/stickers/${address.toLowerCase()}`, {
+    cache: "no-store"
+  });
+  if (!res.ok) {
+    throw new Error(`Sticker profile unavailable: ${await parseError(res)}`);
+  }
+  return (await res.json()) as StickerProfile;
+}
+
 export async function getBackendHealth(): Promise<BackendHealth> {
   const res = await fetch(`${BACKEND_API_URL}/api/health`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Backend unhealthy: HTTP ${res.status}`);

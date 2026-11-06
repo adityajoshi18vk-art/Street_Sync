@@ -17,6 +17,7 @@ import {
   setVerifyingContract,
   RoleEnum,
 } from "../src/signer.js";
+import { computeStickerProfile, STICKER_CATALOG } from "../src/stickers.js";
 
 // Mock environment for test
 const MOCK_ESCROW = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address;
@@ -34,6 +35,8 @@ describe("StreetSync Backend Test Suite", () => {
       DELETE FROM vote_commits;
       DELETE FROM settlements;
       DELETE FROM nonces;
+      DELETE FROM reviewer_slashes;
+      DELETE FROM stickers;
     `);
   });
 
@@ -217,5 +220,75 @@ describe("StreetSync Backend Test Suite", () => {
     // Check votes
     const votes = dbAccess.getVotes("100");
     assert.ok(Array.isArray(votes));
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  5. Gamification: Sticker Awards, XP & Levels
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it("Awards worker stickers for approved fixes and evidence", () => {
+    // Worker 0x4444… completed the lifecycle above: evidence + approved fix
+    const profile = computeStickerProfile("0x4444444444444444444444444444444444444444");
+
+    const byId = new Map(profile.stickers.map((s) => [s.id, s]));
+    assert.equal(profile.totalCount, STICKER_CATALOG.length);
+    assert.ok(byId.get("street-surgeon")?.earned, "first approved fix sticker");
+    assert.ok(byId.get("proof-positive")?.earned, "evidence sticker");
+    assert.equal(byId.get("pothole-slayer")?.earned, false);
+    assert.equal(byId.get("pothole-slayer")?.progress, 1);
+
+    // XP: 1 approved fix (100) + 1 evidence (40) + sticker bonuses (100 + 40)
+    assert.equal(profile.xp, 280);
+    assert.equal(profile.level.title, "Block Builder");
+    assert.equal(profile.earnedCount, 2);
+  });
+
+  it("Awards creator/pledger stickers and keeps awarded_at stable", () => {
+    const creator = "0x3333333333333333333333333333333333333333";
+    const first = computeStickerProfile(creator);
+    const spark = first.stickers.find((s) => s.id === "first-spark");
+    assert.ok(spark?.earned, "creator earns First Spark");
+    assert.ok(spark.awardedAt, "awarded_at persisted");
+
+    // Recomputing must not re-award or change the award timestamp
+    const second = computeStickerProfile(creator);
+    const spark2 = second.stickers.find((s) => s.id === "first-spark");
+    assert.equal(spark2?.awardedAt, spark.awardedAt);
+
+    // Pledged to only 1 bounty so far
+    const backer = second.stickers.find((s) => s.id === "block-backer");
+    assert.equal(backer?.earned, false);
+    assert.equal(backer?.progress, 1);
+  });
+
+  it("Awards reviewer stickers only after reveals, voids Clean Record on slash", () => {
+    const reviewer = "0xrev1";
+
+    // Committed but not revealed → no reveal credit yet
+    dbAccess.insertVoteCommit("100", 0, reviewer, "0xcommit", "107", "0xtx4");
+    const unrevealed = dbAccess.getWalletStats(reviewer);
+    assert.equal(unrevealed.votesRevealed, 0);
+
+    dbAccess.updateVoteReveal("100", reviewer, true, "108", "0xtx5");
+    const revealed = dbAccess.getWalletStats(reviewer);
+    assert.equal(revealed.votesRevealed, 1);
+
+    // Slash voids Clean Record progress
+    dbAccess.insertSlash("100", reviewer, "10000000", "109", "0xtx6");
+    const slashed = dbAccess.getWalletStats(reviewer);
+    assert.equal(slashed.slashes, 1);
+    const cleanRecord = STICKER_CATALOG.find((s) => s.id === "clean-record")!;
+    assert.equal(cleanRecord.progress(slashed), 0);
+    const sharpEye = STICKER_CATALOG.find((s) => s.id === "sharp-eye")!;
+    assert.equal(sharpEye.progress(slashed), 1);
+  });
+
+  it("Returns an empty zero-XP profile for inactive wallets", () => {
+    const profile = computeStickerProfile("0x9999999999999999999999999999999999999999");
+    assert.equal(profile.xp, 0);
+    assert.equal(profile.earnedCount, 0);
+    assert.equal(profile.level.title, "Newcomer");
+    assert.equal(profile.level.nextXp, 50);
+    assert.ok(profile.stickers.every((s) => !s.earned && s.progress === 0));
   });
 });

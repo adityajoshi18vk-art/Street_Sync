@@ -15,6 +15,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import dbAccess from "./db.js";
 import { signAttestation, attesterAddress, RoleEnum, setVerifyingContract } from "./signer.js";
+import { computeStickerProfile } from "./stickers.js";
 import { startIndexer, stopIndexer } from "./indexer.js";
 import type { Address } from "viem";
 
@@ -314,6 +315,19 @@ app.get<{ Params: { address: string } }>("/api/reviewers/:address/assignments", 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  GET /api/stickers/:address
+//  Gamification: sticker collection, XP, and level for a wallet
+// ═══════════════════════════════════════════════════════════════════════════════
+
+app.get<{ Params: { address: string } }>("/api/stickers/:address", async (request, reply) => {
+  const addr = request.params.address?.toLowerCase();
+  if (!addr || !/^0x[0-9a-f]{40}$/.test(addr)) {
+    return reply.status(400).send({ error: "Invalid wallet address" });
+  }
+  return reply.send(computeStickerProfile(addr));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  GET /api/health
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -359,6 +373,7 @@ async function main() {
     console.log("  GET  /api/bounties");
     console.log("  GET  /api/bounties/:id");
     console.log("  GET  /api/reviewers/:address/assignments");
+    console.log("  GET  /api/stickers/:address");
     console.log("  GET  /api/health");
   } catch (err) {
     app.log.error(err);
