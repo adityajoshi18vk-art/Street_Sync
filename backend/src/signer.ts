@@ -163,6 +163,7 @@ export const RoleEnum = {
   None: 0,
   Worker: 1,
   Reviewer: 2,
+  Neighbour: 3,
 } as const;
 
 export type RoleValue = (typeof RoleEnum)[keyof typeof RoleEnum];

@@ -68,7 +68,13 @@ async function main() {
   const commitWindow  = BigInt(process.env.COMMIT_WINDOW  ?? "300");
   const revealWindow  = BigInt(process.env.REVEAL_WINDOW  ?? "300");
   const claimDuration = BigInt(process.env.CLAIM_DURATION ?? "3600");
+  const validationWindow = BigInt(process.env.VALIDATION_WINDOW ?? "86400");
+  const validationQuorum = Number(process.env.VALIDATION_QUORUM ?? "2");
+  if (!Number.isInteger(validationQuorum) || validationQuorum < 0 || validationQuorum > 10) {
+    throw new Error("VALIDATION_QUORUM must be an integer from 0 to 10");
+  }
   console.log(`commitWindow: ${commitWindow}s, revealWindow: ${revealWindow}s, claimDuration: ${claimDuration}s`);
+  console.log(`validationWindow: ${validationWindow}s, validationQuorum: ${validationQuorum}`);
 
   // ── 4. Deploy StreetSyncEscrow ──────────────────────────────────────────
   const Escrow = await ethers.getContractFactory("StreetSyncEscrow");
@@ -78,6 +84,8 @@ async function main() {
     commitWindow,
     revealWindow,
     claimDuration,
+    validationWindow,
+    validationQuorum,
   );
   await escrow.waitForDeployment();
   const escrowAddress = await escrow.getAddress();
@@ -123,6 +131,8 @@ async function main() {
       commitWindowSeconds: Number(commitWindow),
       revealWindowSeconds: Number(revealWindow),
       claimDurationSeconds: Number(claimDuration),
+      validationWindowSeconds: Number(validationWindow),
+      validationQuorum,
       usdcDecimals: 6,
     },
     contracts: {

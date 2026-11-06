@@ -38,6 +38,10 @@ abstract contract ReviewerPool {
     /// @notice Index of a reviewer inside _poolByRegion[regionCell] (1-based; 0 = not present).
     mapping(uint16 => mapping(address => uint256)) internal _poolIndex;
 
+    /// @notice Every reviewer ever registered; used when a region has too few eligible reviewers.
+    address[] internal _allReviewers;
+    mapping(address => bool) internal _inAllReviewers;
+
     // ─── Constructor ──────────────────────────────────────────────────────────
 
     constructor(address usdcToken) {
@@ -51,21 +55,22 @@ abstract contract ReviewerPool {
     function _registerReviewer(address wallet, uint16 regionCell) internal {
         if (reviewers[wallet].active) revert AlreadyRegistered();
 
-        // Transfer 2 USDC stake from the reviewer to this contract
         USDC.safeTransferFrom(wallet, address(this), REVIEWER_STAKE);
 
-        reviewers[wallet] = Reviewer({
-            wallet:        wallet,
-            regionCell:    regionCell,
-            stakedAmount:  REVIEWER_STAKE,
-            active:        true,
-            rewardBalance: 0
-        });
+        Reviewer storage r = reviewers[wallet];
+        // Re-registration keeps any unclaimed rewards.
+        r.wallet       = wallet;
+        r.regionCell   = regionCell;
+        r.stakedAmount = REVIEWER_STAKE;
+        r.active       = true;
 
-        // Add to regional pool if not already present (handles re-registration after de-activation)
         if (_poolIndex[regionCell][wallet] == 0) {
             _poolByRegion[regionCell].push(wallet);
             _poolIndex[regionCell][wallet] = _poolByRegion[regionCell].length; // 1-based
+        }
+        if (!_inAllReviewers[wallet]) {
+            _inAllReviewers[wallet] = true;
+            _allReviewers.push(wallet);
         }
 
         emit ReviewerRegistered(wallet, regionCell, REVIEWER_STAKE);
@@ -86,13 +91,43 @@ abstract contract ReviewerPool {
         address  worker,
         address[] memory excludePledgers
     ) internal view returns (address[3] memory panel) {
-        address[] storage pool = _poolByRegion[regionCell];
+        (address[] memory arr, uint256 eligibleCount) =
+            _eligibleReviewers(regionCell, creator, worker, excludePledgers);
+        if (eligibleCount < PANEL_SIZE) revert InsufficientReviewers();
+
+        // Fisher-Yates partial shuffle for PANEL_SIZE picks
+        for (uint256 i = 0; i < PANEL_SIZE; ) {
+            uint256 j = i + uint256(keccak256(abi.encodePacked(seed, i))) % (eligibleCount - i);
+            address tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            panel[i] = arr[i];
+            unchecked { ++i; }
+        }
+    }
+
+    /// @dev Eligible reviewers from the bounty's region, or from every registered
+    ///      reviewer when the region alone cannot fill a panel.
+    function _eligibleReviewers(
+        uint16   regionCell,
+        address  creator,
+        address  worker,
+        address[] memory excludePledgers
+    ) internal view returns (address[] memory eligible, uint256 count) {
+        (eligible, count) = _filterEligible(_poolByRegion[regionCell], creator, worker, excludePledgers);
+        if (count < PANEL_SIZE) {
+            (eligible, count) = _filterEligible(_allReviewers, creator, worker, excludePledgers);
+        }
+    }
+
+    function _filterEligible(
+        address[] storage pool,
+        address  creator,
+        address  worker,
+        address[] memory excludePledgers
+    ) private view returns (address[] memory eligible, uint256 count) {
         uint256 poolLen = pool.length;
-
-        // Build eligible list (active + not excluded)
-        address[] memory eligible = new address[](poolLen);
-        uint256 eligibleCount = 0;
-
+        eligible = new address[](poolLen);
         for (uint256 i = 0; i < poolLen; ) {
             address candidate = pool[i];
             if (
@@ -101,30 +136,9 @@ abstract contract ReviewerPool {
                 candidate != worker &&
                 !_isPledger(candidate, excludePledgers)
             ) {
-                eligible[eligibleCount] = candidate;
-                unchecked { ++eligibleCount; }
+                eligible[count] = candidate;
+                unchecked { ++count; }
             }
-            unchecked { ++i; }
-        }
-
-        if (eligibleCount < PANEL_SIZE) revert InsufficientReviewers();
-
-        // Fisher-Yates partial shuffle for PANEL_SIZE picks
-        // We operate on a memory copy of the first `eligibleCount` elements
-        address[] memory arr = new address[](eligibleCount);
-        for (uint256 i = 0; i < eligibleCount; ) {
-            arr[i] = eligible[i];
-            unchecked { ++i; }
-        }
-
-        for (uint256 i = 0; i < PANEL_SIZE; ) {
-            // Derive a pseudo-random index in [i, eligibleCount)
-            uint256 j = i + uint256(keccak256(abi.encodePacked(seed, i))) % (eligibleCount - i);
-            // Swap
-            address tmp = arr[i];
-            arr[i] = arr[j];
-            arr[j] = tmp;
-            panel[i] = arr[i];
             unchecked { ++i; }
         }
     }
@@ -189,6 +203,11 @@ abstract contract ReviewerPool {
     /// @notice Returns the number of addresses registered in a region pool (active or not).
     function poolSize(uint16 regionCell) external view returns (uint256) {
         return _poolByRegion[regionCell].length;
+    }
+
+    /// @notice Total number of reviewers ever registered (active or not).
+    function totalReviewers() external view returns (uint256) {
+        return _allReviewers.length;
     }
 
     /// @notice Returns all addresses registered in a region pool.
