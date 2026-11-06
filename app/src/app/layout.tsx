@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
-import { ACTIVE_CHAIN, isLocalNetwork } from "@/config/contracts";
+import { ACTIVE_CHAIN, isLocalNetwork, contractsDeployed, DEPLOYMENT_ERROR } from "@/config/contracts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -64,6 +64,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </header>
           <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-5 safe-bottom">
+            {!contractsDeployed && (
+              <div role="alert" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Deployment required</p>
+                <p className="mt-1">{DEPLOYMENT_ERROR}</p>
+                <p className="mt-1">Funding, claiming, and reviewing are disabled until setup is complete.</p>
+              </div>
+            )}
             {children}
           </main>
         </Providers>
