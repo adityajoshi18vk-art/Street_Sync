@@ -27,7 +27,8 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { getReviewerAssignments, listBounties, type Attestation } from "@/lib/api";
+import { getReviewerAssignments, type Attestation } from "@/lib/api";
+import { loadBounties } from "@/lib/bounty-source";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
 import { normalizeBounty, shortAddress, statusName, type OnChainBounty, type ReviewerAssignment } from "@/lib/types";
 import { friendlyError } from "@/lib/errors";
@@ -808,17 +809,18 @@ export default function ReviewPage() {
 /** Submitted bounties that still need their review panel drawn (anyone may trigger it). */
 function AwaitingPanel() {
   const [items, setItems] = useState<{ bountyId: string; description: string | null }[]>([]);
+  const config = useConfig();
   useEffect(() => {
     let cancelled = false;
-    listBounties({ status: 2, limit: 50 })
-      .then((rows) => {
+    loadBounties(config, { status: 2, limit: 50 })
+      .then(({ rows }) => {
         if (!cancelled) setItems(rows.map(normalizeBounty).map((b) => ({ bountyId: b.bountyId, description: b.description ?? null })));
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [config]);
   if (items.length === 0) return null;
   return (
     <section className="rounded-xl bg-white p-5 shadow-card ring-1 ring-violet-200">

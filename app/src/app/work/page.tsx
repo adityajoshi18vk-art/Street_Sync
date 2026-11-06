@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
-import { listBounties } from "@/lib/api";
+import { useAccount, useConfig } from "wagmi";
+import { loadBounties } from "@/lib/bounty-source";
+import { IndexStatusBanner } from "@/components/IndexStatusBanner";
 import { STATUS, countdownLabel } from "@/lib/lifecycle";
 import { bountyDisplayStatus, formatUsdcDisplaySafe } from "@/lib/map-utils";
 import { normalizeBounty, type BountyMapItem } from "@/lib/types";
@@ -24,18 +25,23 @@ export default function WorkDashboard() {
   const [bounties, setBounties] = useState<BountyMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fromChain, setFromChain] = useState(false);
+  const config = useConfig();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setBounties((await listBounties({ limit: 200 })).map(normalizeBounty));
-      setError(null);
+      const res = await loadBounties(config, { limit: 200 });
+      setBounties(res.rows.map(normalizeBounty));
+      setFromChain(res.source === "chain");
+      setError(res.backendError);
     } catch (e) {
+      setFromChain(false);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [config]);
 
   useEffect(() => {
     void load();
@@ -70,14 +76,7 @@ export default function WorkDashboard() {
         </ul>
       </section>
 
-      {error && (
-        <div className="flex items-center justify-between gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
-          <span>Could not load bounties: {error}</span>
-          <button onClick={() => void load()} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">
-            Retry
-          </button>
-        </div>
-      )}
+      {error && <IndexStatusBanner error={error} fallback={fromChain} onRetry={() => void load()} />}
 
       {address && myJobs.length > 0 && (
         <section className="space-y-2">
