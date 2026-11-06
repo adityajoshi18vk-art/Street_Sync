@@ -67,9 +67,10 @@ export async function approveUsdcExact(params: {
   return true;
 }
 
-export async function waitTx(config: Config, hash: string): Promise<void> {
+export async function waitTx(config: Config, hash: string) {
   const receipt = await waitForTransactionReceipt(config, {
     hash: hash as Hash, chainId: ACTIVE_CHAIN.id
   });
   if (receipt.status !== "success") throw new Error("Transaction reverted. No action was completed.");
+  return receipt;
 }
