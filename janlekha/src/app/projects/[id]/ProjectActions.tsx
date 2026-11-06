@@ -56,7 +56,7 @@ function PublishTender({ s, now }: { s: ActionState; now: bigint }) {
         <TextInput label="Bid deadline (your local time)" type="datetime-local" value={bidLocal} onChange={setBidLocal} testId="bid-deadline" />
         <TextInput label="Reveal deadline (your local time)" type="datetime-local" value={revealLocal} onChange={setRevealLocal} testId="reveal-deadline" />
       </div>
-      <p className="text-xs text-neutral-500">Vendors commit sealed bids until the bid deadline, then reveal them until the reveal deadline. Only one tender can be published per project.</p>
+      <p className="text-xs text-slate-400">Vendors commit sealed bids until the bid deadline, then reveal them until the reveal deadline. Only one tender can be published per project.</p>
       <SubmitRow label="Publish tender" blocked={blocked} busy={tx.busy} state={tx.state} onSubmit={() => void tx.run("publishTender", [BigInt(s.projectId), doc!, bid!, reveal!])} />
     </ActionCard>
   );
@@ -94,16 +94,16 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
     <ActionCard title="Submit a sealed bid" actor="Vendor" testId="commit-bid">
       {myBid ? (
         <>
-          <p className="text-sm text-neutral-700">Your sealed bid is recorded (commitment <code className="font-mono text-xs">{shortHex(myBid.commitment, 10)}</code>).</p>
+          <p className="text-sm text-slate-200">Your sealed bid is recorded (commitment <code className="font-mono text-xs">{shortHex(myBid.commitment, 10)}</code>).</p>
           {stored && (
-            <button type="button" onClick={() => downloadBidBackup(stored)} className="text-sm text-blue-700 underline underline-offset-2">
+            <button type="button" onClick={() => downloadBidBackup(stored)} className="text-sm text-blue-300 underline underline-offset-2">
               Download bid backup again
             </button>
           )}
         </>
       ) : (
         <>
-          <p className="text-xs text-neutral-600">
+          <p className="text-xs text-slate-300">
             Only a hash of your bid is published now. Amount and quotation stay secret until you reveal after the bid deadline.
           </p>
           <DocumentInput label="Quotation (PDF)" purpose="confidential" onChange={setQuotation} testId="quotation-doc" />
@@ -128,7 +128,7 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
               }}
             />
           ) : (
-            <div className="rounded-lg bg-neutral-50 p-3 text-xs text-neutral-700">
+            <div className="rounded-lg bg-white/[0.05] p-3 text-xs text-slate-200">
               <p>
                 Sealed with a 32-byte salt from <code>crypto.getRandomValues</code>. Commitment{" "}
                 <code data-testid="sealed-commitment" className="break-all font-mono">{sealed.commitment}</code>
@@ -139,11 +139,11 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
                   downloadBidBackup(sealed);
                   setSealedState({ key: inputKey, backup: sealed, backedUp: true });
                 }}
-                className="mt-2 rounded-md border border-neutral-300 bg-white px-3 py-1.5 font-medium"
+                className="mt-2 btn-ghost !px-3 !py-1.5"
               >
                 {backedUp ? "Backup downloaded ✓ (download again)" : "Download bid backup (required)"}
               </button>
-              <p className="mt-1 text-neutral-500">Also saved in this browser. Keep the file private until you reveal.</p>
+              <p className="mt-1 text-slate-400">Also saved in this browser. Keep the file private until you reveal.</p>
             </div>
           )}
           {sealed && <SubmitRow label="Commit sealed bid" blocked={commitBlocked} busy={tx.busy} state={tx.state} onSubmit={() => void tx.run("commitBid", [BigInt(s.projectId), sealed.commitment])} />}
@@ -213,9 +213,9 @@ function RevealBid({ s, now }: { s: ActionState; now: bigint }) {
 
   return (
     <ActionCard title="Reveal your sealed bid" actor="Vendor" testId="reveal-bid">
-      <p className="text-xs text-neutral-600">Revealing publishes your amount and quotation hash. The contract checks them against your commitment.</p>
+      <p className="text-xs text-slate-300">Revealing publishes your amount and quotation hash. The contract checks them against your commitment.</p>
       <label className="block text-sm">
-        <span className="font-medium text-neutral-800">{stored ? "Using the backup saved in this browser. Import a file instead:" : "Import bid backup (JSON)"}</span>
+        <span className="font-medium text-slate-100">{stored ? "Using the backup saved in this browser. Import a file instead:" : "Import bid backup (JSON)"}</span>
         <input
           type="file"
           accept="application/json,.json"
@@ -234,9 +234,9 @@ function RevealBid({ s, now }: { s: ActionState; now: bigint }) {
           className="mt-1 block w-full text-sm"
         />
       </label>
-      {importError && <p role="alert" className="text-xs text-red-700">{importError}</p>}
+      {importError && <p role="alert" className="text-xs text-red-300">{importError}</p>}
       {backup && (
-        <p data-testid="active-backup" className="text-xs text-neutral-700">
+        <p data-testid="active-backup" className="text-xs text-slate-200">
           Revealing with the {imported ? "imported file" : "backup saved in this browser"}: {formatPaise(BigInt(backup.amountPaise))}, quotation{" "}
           <code className="font-mono">{shortHex(backup.quotationDocumentHash, 10)}</code>
         </p>
@@ -276,8 +276,8 @@ function AwardContract({ s }: { s: ActionState }) {
   return (
     <ActionCard title="Record the award" actor="Department" testId="award">
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-neutral-800">Revealed bids (the award amount is taken from the chosen bid)</legend>
-        {revealed.length === 0 && <p className="text-xs text-neutral-500">No revealed bids.</p>}
+        <legend className="text-sm font-medium text-slate-100">Revealed bids (the award amount is taken from the chosen bid)</legend>
+        {revealed.length === 0 && <p className="text-xs text-slate-400">No revealed bids.</p>}
         {revealed.map((b) => (
           <label key={b.vendor} className="flex items-center gap-2 text-sm">
             <input type="radio" name="award-vendor" checked={same(vendor ?? undefined, b.vendor)} onChange={() => setVendor(getAddress(b.vendor))} />
@@ -316,7 +316,7 @@ function DefineMilestone({ s }: { s: ActionState }) {
 
   return (
     <ActionCard title="Define a milestone" actor="Department" testId="define-milestone">
-      <p className="text-xs text-neutral-600">{formatPaise(remaining)} of the {formatPaise(BigInt(award.amountPaise))} award is not yet assigned to milestones.</p>
+      <p className="text-xs text-slate-300">{formatPaise(remaining)} of the {formatPaise(BigInt(award.amountPaise))} award is not yet assigned to milestones.</p>
       <TextInput label="Milestone amount (₹)" value={amount} onChange={setAmount} placeholder="12,00,000" hint={paise ? `= ${formatPaise(paise)}` : undefined} testId="milestone-amount" />
       <DocumentInput label="Milestone specification (PDF)" purpose="public" onChange={setSpec} testId="spec-doc" />
       <SubmitRow label="Define milestone" blocked={blocked} busy={tx.busy} state={tx.state} onSubmit={() => void tx.run("defineMilestone", [BigInt(s.projectId), paise!, spec!])} />
@@ -372,7 +372,7 @@ function AttestPayment({ s, m }: { s: ActionState; m: ActionState["milestones"][
     (!doc ? "Add the mock PFMS payment advice PDF." : null);
   return (
     <ActionCard title={`Milestone ${m.id}: record mock PFMS payment attestation`} actor="PAO" testId={`attest-${m.id}`}>
-      <p className="text-xs text-amber-900">
+      <p className="text-xs text-amber-300">
         Mock PFMS payment attestation only. This records that a synthetic payment advice exists; no INR, HBAR or token moves.
       </p>
       <p className="text-sm">
@@ -408,15 +408,15 @@ export function ProjectActions({ state }: { state: ActionState }) {
   }, [state, now, t]);
 
   return (
-    <section className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
-      <h2 className="text-base font-semibold">Authorised actions</h2>
-      <p className="mb-3 text-xs text-neutral-600">
+    <section className="rounded-xl border border-blue-400/30 bg-blue-400/[0.06] p-4">
+      <h2 className="heading text-base">Authorised actions</h2>
+      <p className="mb-3 text-xs text-slate-300">
         For department, vendor, inspector and PAO accounts. Each action is a transaction on {appChain.name}; the records above update only after it
         is confirmed. Citizens do not need a wallet.
       </p>
       <TxActivityProvider>
         {panels.length === 0 ? (
-          <p className="text-sm text-neutral-600">No further actions: all milestones are complete.</p>
+          <p className="text-sm text-slate-300">No further actions: all milestones are complete.</p>
         ) : (
           // Remount every form when the account changes: one account's inputs (e.g. a confidential quotation)
           // and confirmed-action locks must never carry over to another account.

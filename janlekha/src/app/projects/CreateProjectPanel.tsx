@@ -28,7 +28,7 @@ function CreateProjectForm() {
 
   return (
     <ActionCard title="Create a project" actor="Department" testId="create-project">
-      <p className="text-xs text-neutral-600">
+      <p className="text-xs text-slate-300">
         Records the sanction document hash and the allocation on-chain. Amounts are stored in paise; no money moves.
       </p>
       <DocumentInput label="Sanction order (PDF)" purpose="public" onChange={setSanction} testId="sanction-doc" />
@@ -69,8 +69,8 @@ function CreateProjectForm() {
 
 export function CreateProjectPanel() {
   return (
-    <details className="group rounded-xl border border-neutral-200 bg-white p-4 open:pb-5">
-      <summary className="cursor-pointer text-sm font-semibold text-neutral-800">Department tools: create a project</summary>
+    <details className="group card p-4 open:pb-5">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-100">Department tools: create a project</summary>
       <div className="mt-4">
         <TxActivityProvider>
           <CreateProjectForm />

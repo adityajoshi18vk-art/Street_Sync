@@ -126,12 +126,12 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   }, []);
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-gray-900">Reviewer registration</h2>
+    <section className="card p-5 animate-rise">
+      <h2 className="heading text-sm">Reviewer registration</h2>
       {registered ? (
-        <div className="mt-3 space-y-1 text-sm text-gray-700">
-          <p className="font-semibold text-emerald-700">Active reviewer ✓</p>
-          <p className="text-xs text-gray-500">
+        <div className="mt-3 space-y-1 text-sm text-slate-300">
+          <p className="font-semibold text-emerald-300">Active reviewer ✓</p>
+          <p className="text-xs text-slate-400">
             Region cell {reviewer?.regionCell} · stake{" "}
             {reviewer ? formatUsdcDisplay(reviewer.stakedAmount) : "—"} USDC · rewards{" "}
             {reviewer ? formatUsdcDisplay(reviewer.rewardBalance) : "—"} USDC
@@ -139,21 +139,21 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         </div>
       ) : (
         <>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-slate-400">
             Verify with World ID, approve exactly {formatUsdcDisplay(stake)} USDC of stake, and
             register. Stakes are slashed if you sit on a panel and fail to reveal.
           </p>
           {!address ? (
-            <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+            <p className="mt-3 alert-warn text-xs">
               Connect your wallet (header) to register.
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+              <div className="flex items-center justify-between card-inset p-3 text-xs text-slate-400">
                 <span>
                   Region: <span className="font-semibold">{gps ? regionCellFromLatLng(gps.lat, gps.lng) : "—"}</span>
                   {gps && (
-                    <span className="ml-1 text-gray-400">
+                    <span className="ml-1 text-slate-500">
                       ({gps.lat.toFixed(4)}, {gps.lng.toFixed(4)})
                     </span>
                   )}
@@ -161,15 +161,15 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                 <button
                   type="button"
                   onClick={requestGps}
-                  className="rounded-lg border border-gray-300 px-2 py-1 font-semibold text-gray-600 hover:bg-white"
+                  className="btn-ghost px-2.5 py-1 text-xs"
                 >
                   {gps ? "Refresh" : "Use my GPS"}
                 </button>
               </div>
-              {gpsError && <p className="text-xs text-amber-600">{gpsError}</p>}
-              {error && <p className="text-xs text-red-600">{error}</p>}
+              {gpsError && <p className="text-xs text-amber-300">{gpsError}</p>}
+              {error && <p className="text-xs text-red-300">{error}</p>}
               {txHash && (
-                <p className="break-all text-[11px] text-emerald-600">Registration tx: {txHash}</p>
+                <p className="break-all text-[11px] text-emerald-300">Registration tx: {txHash}</p>
               )}
               <IDKitWidget
                 app_id={WORLD_APP_ID}
@@ -201,7 +201,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                     type="button"
                     onClick={open}
                     disabled={busy}
-                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-gray-300"
+                    className="btn-primary w-full px-4 py-3 text-sm"
                   >
                     {busy ? "Registering…" : "Verify & stake to become a reviewer"}
                   </button>
@@ -299,18 +299,18 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
   }, [verification]);
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <section className="card p-5 animate-rise">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">Evidence (Arkiv)</h3>
+        <h3 className="heading text-sm">Evidence (Arkiv)</h3>
         <button
           type="button"
           onClick={() => void load()}
-          className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          className="btn-ghost px-2.5 py-1 text-xs"
         >
           {loading ? "Fetching…" : "Re-fetch"}
         </button>
       </div>
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
 
       {verification && (
         <div className="mt-3 space-y-3">
@@ -318,8 +318,8 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             <span
               className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
                 verification.evidenceHashMatch
-                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                  : "bg-red-50 text-red-700 ring-red-200"
+                  ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
+                  : "bg-red-400/10 text-red-300 ring-red-400/30"
               }`}
             >
               {verification.evidenceHashMatch ? "SHA-256 hash match" : "Hash mismatch"}
@@ -327,13 +327,13 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             <span
               className={`rounded-full px-2 py-0.5 font-semibold ring-1 ${
                 verification.signatureValid
-                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                  : "bg-red-50 text-red-700 ring-red-200"
+                  ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
+                  : "bg-red-400/10 text-red-300 ring-red-400/30"
               }`}
             >
               {verification.signatureValid ? "Worker signature valid" : "Signature invalid"}
             </span>
-            <span className="rounded-full bg-gray-50 px-2 py-0.5 text-gray-600 ring-1 ring-gray-200">
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-slate-300 ring-1 ring-white/10">
               {bundleSize ? `${(bundleSize / 1024).toFixed(1)} KiB bundle` : ""}
             </span>
           </div>
@@ -341,17 +341,17 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
           {beforeUrl && afterUrl ? (
             <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
           ) : (
-            <p className="text-xs text-gray-400">Photos unavailable in bundle.</p>
+            <p className="text-xs text-slate-500">Photos unavailable in bundle.</p>
           )}
 
           {verification.metadata?.video && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">
+                  <span className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-200">
                     Ethereum Swarm (BZZ)
                   </span>
-                  <span className="text-xs font-semibold text-amber-800">
+                  <span className="text-xs font-semibold text-amber-200">
                     Video Walkthrough ({verification.metadata.video.durationSeconds}s)
                   </span>
                 </div>
@@ -359,7 +359,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
                   href={getVideoUrl(verification.metadata.video.swarmReference)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-semibold text-amber-700 hover:text-amber-900 underline"
+                  className="text-xs font-semibold text-amber-300 hover:text-amber-200 underline"
                 >
                   Verify on Swarm Gateway ↗
                 </a>
@@ -370,7 +370,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
                 playsInline
                 className="w-full max-h-64 rounded-lg bg-black object-contain"
               />
-              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-800">
+              <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-amber-200">
                 <span>Ref: {verification.metadata.video.swarmReference.slice(0, 20)}…</span>
                 <span>SHA: {verification.metadata.video.videoSha256.slice(0, 16)}…</span>
               </div>
@@ -378,9 +378,9 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
           )}
 
           {verification.metadata && (
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-400">
               <dt>Challenge code</dt>
-              <dd className="font-mono font-semibold text-gray-800">
+              <dd className="font-mono font-semibold text-slate-200">
                 {String(verification.metadata.visualChallengeCode).padStart(4, "0")}
               </dd>
               <dt>GPS accuracy</dt>
@@ -398,7 +398,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             </dl>
           )}
           {verification.errors.length > 0 && (
-            <ul className="list-disc pl-4 text-[11px] text-amber-600">
+            <ul className="list-disc pl-4 text-[11px] text-amber-300">
               {verification.errors.map((e, i) => (
                 <li key={i}>{e}</li>
               ))}
@@ -407,7 +407,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
         </div>
       )}
       {!verification && !loading && !error && (
-        <p className="mt-2 text-xs text-gray-400">Press Re-fetch to pull the bundle.</p>
+        <p className="mt-2 text-xs text-slate-500">Press Re-fetch to pull the bundle.</p>
       )}
     </section>
   );
@@ -526,27 +526,27 @@ function AssignmentCard({
     status === 3;
 
   return (
-    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="space-y-3 card p-5">
       <div className="flex items-center justify-between">
         <Link
           href={`/bounty/${assignment.bountyId}`}
-          className="text-sm font-semibold text-indigo-600 hover:underline"
+          className="text-sm font-semibold text-brand-300 hover:text-brand-200 hover:underline"
         >
           Bounty #{assignment.bountyId}
         </Link>
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-300 ring-1 ring-white/10">
           {statusName(status)} · round {reviewRound}
         </span>
       </div>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-slate-400">
         Pool {formatUsdcDisplay(totalPledged)} USDC · panel{" "}
         {panelMembers.filter((m) => m !== "0x0000000000000000000000000000000000000000").length}/3
         {myVote?.committed ? ` · committed${myVote.revealed ? " & revealed" : ""}` : ""}
       </p>
 
       {status === 2 && (
-        <div className="rounded-lg bg-violet-50 p-3">
-          <p className="text-xs text-violet-700">
+        <div className="card-inset p-3">
+          <p className="text-xs text-slate-300">
             {panelReady
               ? "Selection block reached — you can assign the panel now."
               : `Waiting for randomness: ${blocksRemaining !== null && blocksRemaining > 0 ? `${blocksRemaining} more block${blocksRemaining === 1 ? "" : "s"}` : "confirming…"} (needs block > ${selectionBlock?.toString()})`}
@@ -555,7 +555,7 @@ function AssignmentCard({
             type="button"
             disabled={!panelReady || busy}
             onClick={() => void runTx("assignPanel")}
-            className="mt-2 w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700 disabled:bg-gray-300"
+            className="btn-primary mt-2 w-full px-3 py-2 text-xs"
           >
             Assign panel
           </button>
@@ -581,10 +581,10 @@ function AssignmentCard({
                 onTxSuccess={onTx}
               />
             ) : (
-              <p className="text-xs text-gray-400">Loading voting windows…</p>
+              <p className="text-xs text-slate-500">Loading voting windows…</p>
             )
           ) : (
-            <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
+            <p className="card-inset p-3 text-xs text-slate-400">
               You are not on this panel (3 reviewers were drawn from your region pool). You can
               still inspect the evidence above and settle once the window closes.
             </p>
@@ -594,7 +594,7 @@ function AssignmentCard({
               type="button"
               disabled={!revealExpired || busy}
               onClick={() => void runTx("pokeOrReplace")}
-              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-40"
+              className="rounded-xl bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-300 ring-1 ring-amber-400/30 transition hover:bg-amber-400/20 disabled:opacity-40"
               title="Slash & replace reviewers who missed the reveal window"
             >
               Slash / replace inactive
@@ -603,7 +603,7 @@ function AssignmentCard({
               type="button"
               disabled={!revealExpired || busy || justSettled}
               onClick={() => void runTx("settle")}
-              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+              className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/30 transition hover:bg-emerald-400/20 disabled:opacity-40"
             >
               {justSettled ? "Settling…" : "Settle bounty"}
             </button>
@@ -620,7 +620,7 @@ function AssignmentCard({
         />
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-red-300">{error}</p>}
       {txHash && (
         <HashBadge label="tx" hash={txHash} href={`${ACTIVE_CHAIN.blockExplorers?.default?.url}/tx/${txHash}`} />
       )}
@@ -654,10 +654,10 @@ export default function ReviewPage() {
   }, [loadAssignments]);
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-6">
-      <header className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Reviewer dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
+    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
+      <header className="mb-8 animate-rise">
+        <h1 className="heading text-2xl">Reviewer dashboard</h1>
+        <p className="mt-1.5 text-sm text-slate-400">
           Stake, inspect evidence, commit-reveal your vote, and keep panels honest.
         </p>
       </header>
@@ -666,13 +666,13 @@ export default function ReviewPage() {
         <RegistrationCard onRegistered={() => void loadAssignments()} />
 
         {loadError && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          <div className="alert-warn text-sm">
             {loadError} — the backend may be offline. Registration still works on-chain.
           </div>
         )}
 
         {assignments && assignments.length === 0 && (
-          <p className="rounded-xl border border-dashed border-gray-300 bg-white p-5 text-sm text-gray-500">
+          <p className="card border-dashed p-5 text-sm text-slate-400">
             No panel assignments yet. Once registered, panels are drawn from your region pool
             after a worker submits evidence.
           </p>
@@ -686,9 +686,9 @@ export default function ReviewPage() {
           />
         ))}
 
-        <p className="pt-4 text-center text-xs text-gray-400">
+        <p className="pt-4 text-center text-xs text-slate-500">
           Escrow {shortAddress(ESCROW_ADDRESS, 4)} ·{" "}
-          <Link href="/audit/1" className="text-gray-400 underline">
+          <Link href="/audit/1" className="text-slate-400 underline hover:text-slate-200">
             try the public audit
           </Link>
         </p>

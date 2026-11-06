@@ -73,6 +73,7 @@ export default function MapView({
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="map-tiles-dark"
         />
         <ClickAndFocusHandler onMapClick={onMapClick} center={center} />
 
@@ -94,21 +95,21 @@ export default function MapView({
             >
               <Popup>
                 <div className="min-w-[180px] space-y-1">
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-semibold text-white">
                     Bounty #{b.bountyId}
                   </p>
-                  <p className="text-xs" style={{ color }}>
+                  <p className="text-xs font-semibold" style={{ color }}>
                     {statusName(b.status)}
                   </p>
-                  <p className="text-xs text-gray-600">
-                    Escrow: <strong>{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
+                  <p className="text-xs text-slate-400">
+                    Escrow: <strong className="text-slate-200">{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
                   </p>
                   {b.description && (
-                    <p className="line-clamp-2 text-xs text-gray-500">{b.description}</p>
+                    <p className="line-clamp-2 text-xs text-slate-500">{b.description}</p>
                   )}
                   <Link
                     href={`/bounty/${b.bountyId}`}
-                    className="mt-1 inline-block rounded bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-700"
+                    className="mt-1 inline-block rounded-lg bg-gradient-to-b from-brand-500 to-brand-700 px-2.5 py-1 text-xs font-semibold !text-white hover:from-brand-400 hover:to-brand-600"
                   >
                     Open bounty
                   </Link>
@@ -135,13 +136,13 @@ export default function MapView({
         )}
       </MapContainer>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-white/95 px-3 py-2 text-[11px] font-medium shadow-card ring-1 ring-gray-200">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-white/10 bg-ink-900/85 px-3 py-2 text-[11px] font-medium backdrop-blur-md">
         {(["Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map(
           (name) => (
-            <span key={name} className="flex items-center gap-1 text-gray-700">
+            <span key={name} className="flex items-center gap-1 text-slate-300">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: STATUS_COLORS[name] }}
+                style={{ backgroundColor: STATUS_COLORS[name], boxShadow: `0 0 5px ${STATUS_COLORS[name]}` }}
               />
               {name}
             </span>

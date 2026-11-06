@@ -1,9 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { Inter, Space_Grotesk } from "next/font/google";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ACTIVE_CHAIN, isLocalNetwork, JANLEKHA_URL } from "@/config/contracts";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-display" });
 
 export const metadata: Metadata = {
   title: {
@@ -16,7 +20,7 @@ export const metadata: Metadata = {
   applicationName: "StreetSync",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "StreetSync"
   }
 };
@@ -25,53 +29,80 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#1b6bf5"
+  themeColor: "#05070d"
 };
+
+const NAV_LINKS = [
+  { href: "/", label: "Map" },
+  { href: "/review", label: "Review" },
+  { href: "/stickers", label: "Stickers" }
+];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh">
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <body className="min-h-dvh font-sans">
         <Providers>
-          <header className="sticky top-0 z-[600] border-b border-gray-200 bg-white/90 backdrop-blur">
+          <header className="sticky top-0 z-[600] border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
+            {/* hairline gradient accent under the glass header */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-              <Link href="/" className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-black text-white">
+              <Link href="/" className="group flex items-center gap-2.5">
+                <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-700 text-sm font-black text-white shadow-glow-sm transition group-hover:shadow-glow">
                   SS
+                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent-400 animate-glow-pulse" />
                 </span>
-                <span className="text-base font-bold tracking-tight text-gray-900">
-                  StreetSync
+                <span className="font-display text-lg font-bold tracking-tight text-white">
+                  Street<span className="text-gradient">Sync</span>
                 </span>
                 <span
-                  className={`hidden rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline ${
+                  className={`hidden rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider sm:inline ${
                     isLocalNetwork
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-brand-50 text-brand-700"
+                      ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
+                      : "border-brand-400/30 bg-brand-400/10 text-brand-300"
                   }`}
                 >
                   {ACTIVE_CHAIN.name}
                 </span>
               </Link>
-              <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 md:flex">
-                <Link href="/" className="hover:text-brand-700">
-                  Map
-                </Link>
-                <Link href="/review" className="hover:text-brand-700">
-                  Review
-                </Link>
-                <Link href="/stickers" className="hover:text-brand-700">
-                  Stickers
-                </Link>
-                <a href={JANLEKHA_URL} className="border-l border-gray-200 pl-4 hover:text-brand-700">
+              <nav className="hidden items-center gap-1 md:flex">
+                {NAV_LINKS.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+                <a
+                  href={JANLEKHA_URL}
+                  className="ml-2 rounded-lg border-l border-white/10 px-3 py-2 pl-5 text-sm font-medium text-slate-400 transition hover:text-accent-300"
+                >
                   JanLekha · Spending
                 </a>
               </nav>
               <ConnectButton />
             </div>
           </header>
-          <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-5 safe-bottom">
+          <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 safe-bottom">
             {children}
           </main>
+          <footer className="border-t border-white/[0.06] py-8">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-slate-500">
+              <p>
+                <span className="font-display font-bold text-slate-300">StreetSync</span> · verified
+                humans fixing real streets
+              </p>
+              <p className="flex items-center gap-3">
+                <span>Arc Testnet · USDC escrow</span>
+                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span>World ID v4</span>
+                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span>Arkiv + Swarm evidence</span>
+              </p>
+            </div>
+          </footer>
         </Providers>
       </body>
     </html>

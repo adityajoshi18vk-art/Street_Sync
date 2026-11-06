@@ -28,19 +28,19 @@ export const metadata: Metadata = { title: "Project" };
 async function DocumentHash({ projectId, docKey, label, hash }: { projectId: bigint; docKey: string; label: string; hash: Hex }) {
   const offChain = await findOffChainCopy(hash);
   return (
-    <div className="rounded-lg border border-neutral-200 p-3">
+    <div className="rounded-lg border border-white/[0.08] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium text-neutral-600">{label} · SHA-256</p>
+        <p className="text-xs font-medium text-slate-300">{label} · SHA-256</p>
         <Link
           href={`/verify?project=${projectId}&doc=${encodeURIComponent(docKey)}`}
-          className="text-xs font-medium text-blue-700 underline underline-offset-2"
+          className="text-xs font-medium text-blue-300 underline underline-offset-2"
         >
           Verify a copy
         </Link>
       </div>
       <HashText hash={hash} />
       {offChain && (
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-slate-400">
           Off-chain copy:{" "}
           <a href={offChain.url} className="underline underline-offset-2" download>
             {offChain.title}
@@ -56,7 +56,7 @@ function Deadline({ label, at, now }: { label: string; at: bigint; now: bigint }
   return (
     <Field label={label}>
       {formatTimestamp(at)}{" "}
-      <span className="text-xs text-neutral-500">{now >= at ? "(passed)" : "(upcoming)"}</span>
+      <span className="text-xs text-slate-400">{now >= at ? "(passed)" : "(upcoming)"}</span>
     </Field>
   );
 }
@@ -72,7 +72,7 @@ const STEP_LABEL: Record<(typeof MILESTONE_STEPS)[number], string> = {
 function MilestoneCard({ m, projectId, explorerUrl }: { m: MilestoneView; projectId: bigint; explorerUrl: string | null }) {
   const reached = MILESTONE_STEPS.indexOf(m.status as (typeof MILESTONE_STEPS)[number]);
   return (
-    <div className="rounded-lg border border-neutral-200 p-4">
+    <div className="rounded-lg border border-white/[0.08] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold">
           Milestone {m.id} · <span className="tabular-nums">{formatPaise(m.amountPaise)}</span>
@@ -83,7 +83,7 @@ function MilestoneCard({ m, projectId, explorerUrl }: { m: MilestoneView; projec
         {MILESTONE_STEPS.map((step, i) => (
           <li
             key={step}
-            className={`rounded-md px-2 py-1.5 ring-1 ring-inset ${i <= reached ? "bg-emerald-50 text-emerald-900 ring-emerald-200" : "bg-neutral-50 text-neutral-400 ring-neutral-200"}`}
+            className={`rounded-md px-2 py-1.5 ring-1 ring-inset ${i <= reached ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30" : "bg-white/[0.05] text-slate-500 ring-white/10"}`}
           >
             {i <= reached ? "✓ " : ""}
             {STEP_LABEL[step]}
@@ -157,20 +157,20 @@ function describe(e: TimelineEvent, explorerUrl: string | null): { title: string
 
 function Timeline({ project, explorerUrl, isHedera }: { project: ProjectDetail; explorerUrl: string | null; isHedera: boolean }) {
   if (!project.timeline.ok) return <ErrorPanel failure={project.timeline.failure} />;
-  if (project.timeline.events.length === 0) return <p className="text-sm text-neutral-500">No events found for this project.</p>;
+  if (project.timeline.events.length === 0) return <p className="text-sm text-slate-400">No events found for this project.</p>;
   return (
-    <ol className="relative space-y-4 border-l border-neutral-200 pl-5">
+    <ol className="relative space-y-4 border-l border-white/[0.08] pl-5">
       {project.timeline.events.map((e) => {
         const d = describe(e, explorerUrl);
         return (
           <li key={`${e.txHash}-${e.logIndex}`} className="relative">
-            <span className={`absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full ${d.mock ? "bg-amber-500" : "bg-emerald-600"}`} />
-            <p className="text-xs text-neutral-500">{formatTimestamp(e.timestamp)}</p>
+            <span className={`absolute -left-[26px] top-1.5 h-2.5 w-2.5 rounded-full ${d.mock ? "bg-amber-400" : "bg-emerald-400"}`} />
+            <p className="text-xs text-slate-400">{formatTimestamp(e.timestamp)}</p>
             <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
               {d.title} {d.mock && <MockPayment />}
             </p>
-            <p className="mt-0.5 text-sm text-neutral-700">{d.body}</p>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-0.5 text-sm text-slate-200">{d.body}</p>
+            <p className="mt-1 text-xs text-slate-400">
               {isHedera ? "Hedera transaction" : "Transaction"} <TxLink hash={e.txHash} explorerUrl={explorerUrl} />
             </p>
           </li>
@@ -195,9 +195,9 @@ async function ProjectContent({ id }: { id: string }) {
   return (
     <div className="space-y-5">
       <header>
-        <p className="text-sm text-neutral-500">Project #{p.id.toString()}</p>
-        <h1 className="text-2xl font-semibold">{meta?.title ?? `Untitled project #${p.id}`}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-600">
+        <p className="text-sm text-slate-400">Project #{p.id.toString()}</p>
+        <h1 className="heading text-2xl">{meta?.title ?? `Untitled project #${p.id}`}</h1>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
           <Badge tone="good">{p.stage}</Badge>
           {meta && (
             <span>
@@ -205,7 +205,7 @@ async function ProjectContent({ id }: { id: string }) {
             </span>
           )}
         </div>
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-slate-400">
           Department account <AddressText address={p.department} explorerUrl={explorerUrl} /> · created {formatTimestamp(p.createdAt)} · read live at block{" "}
           {ctx.blockNumber.toString()} (chain time {formatTimestamp(ctx.chainTime)})
         </p>
@@ -218,7 +218,7 @@ async function ProjectContent({ id }: { id: string }) {
           <Field label="Paid (mock PFMS attested)"><span className="text-lg font-semibold tabular-nums">{formatPaise(p.budget.paidPaise)}</span></Field>
           <Field label="Unreserved"><span className="text-lg font-semibold tabular-nums">{formatPaise(unreserved)}</span></Field>
         </dl>
-        <p className="mt-3 text-xs text-neutral-500">
+        <p className="mt-3 text-xs text-slate-400">
           Contract accounting records in paise. INR is not transferred on-chain; payments are mock PFMS attestations only.
         </p>
         <div className="mt-3">
@@ -228,7 +228,7 @@ async function ProjectContent({ id }: { id: string }) {
 
       <Section title="Tender and sealed bids" badge={<OnChain />}>
         {!p.tender ? (
-          <p className="text-sm text-neutral-600">No tender has been published for this project yet.</p>
+          <p className="text-sm text-slate-300">No tender has been published for this project yet.</p>
         ) : (
           <div className="space-y-4">
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -243,7 +243,7 @@ async function ProjectContent({ id }: { id: string }) {
             {p.bids.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="text-xs text-neutral-500">
+                  <thead className="text-xs text-slate-400">
                     <tr>
                       <th className="py-2 pr-3 font-medium">Vendor</th>
                       <th className="py-2 pr-3 font-medium">Committed</th>
@@ -251,7 +251,7 @@ async function ProjectContent({ id }: { id: string }) {
                       <th className="py-2 pr-3 font-medium">Quotation</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-neutral-100">
+                  <tbody className="divide-y divide-white/[0.06]">
                     {p.bids.map((b) => (
                       <tr key={b.vendor} className="align-top">
                         <td className="py-2 pr-3">
@@ -264,10 +264,10 @@ async function ProjectContent({ id }: { id: string }) {
                           {b.revealed ? (
                             <>
                               <span className="font-medium tabular-nums">{formatPaise(b.amountPaise)}</span>
-                              <code className="mt-0.5 block break-all font-mono text-[11px] text-neutral-500">{b.quotationDocumentHash}</code>
+                              <code className="mt-0.5 block break-all font-mono text-[11px] text-slate-400">{b.quotationDocumentHash}</code>
                             </>
                           ) : (
-                            <span className="text-xs text-neutral-500">Hidden until the vendor reveals after the bid deadline</span>
+                            <span className="text-xs text-slate-400">Hidden until the vendor reveals after the bid deadline</span>
                           )}
                         </td>
                       </tr>
@@ -282,7 +282,7 @@ async function ProjectContent({ id }: { id: string }) {
 
       <Section title="Award" badge={<OnChain />}>
         {!p.award ? (
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-slate-300">
             {p.tender && ctx.chainTime >= p.tender.revealDeadline ? "Reveal period has ended; awaiting the department's award." : "Not awarded yet. An award is only possible after the reveal deadline."}
           </p>
         ) : (
@@ -303,10 +303,10 @@ async function ProjectContent({ id }: { id: string }) {
       {p.award && (
         <Section title={`Milestones (${p.milestones.length})`} badge={<OnChain />}>
           {p.milestones.length === 0 ? (
-            <p className="text-sm text-neutral-600">No milestones defined yet.</p>
+            <p className="text-sm text-slate-300">No milestones defined yet.</p>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-slate-400">
                 {formatPaise(p.award.milestoneTotalPaise)} of {formatPaise(p.award.amountPaise)} allocated to milestones.
               </p>
               {p.milestones.map((m) => (
@@ -323,7 +323,7 @@ async function ProjectContent({ id }: { id: string }) {
         <Timeline project={p} explorerUrl={explorerUrl} isHedera={isHedera} />
       </Section>
 
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-slate-400">
         Contract <AddressText address={ctx.contractAddress} explorerUrl={explorerUrl} /> on chain {ctx.cfg.chainId}. On-chain records prove
         timestamps, approvals and document integrity; they do not independently prove physical work or bank settlement.
       </p>
