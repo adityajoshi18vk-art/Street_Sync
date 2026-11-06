@@ -12,7 +12,7 @@ import {
   useMap,
   useMapEvents
 } from "react-leaflet";
-import { STATUS_COLORS, statusName, formatUsdcDisplaySafe } from "@/lib/map-utils";
+import { STATUS_COLORS, STATUS_LABELS, bountyDisplayStatus, formatUsdcDisplaySafe } from "@/lib/map-utils";
 import type { BountyMapItem } from "@/lib/types";
 
 export interface MapViewProps {
@@ -77,7 +77,8 @@ export default function MapView({
         <ClickAndFocusHandler onMapClick={onMapClick} center={center} />
 
         {bounties.map((b) => {
-          const color = STATUS_COLORS[statusName(b.status)];
+          const display = bountyDisplayStatus(b, Math.floor(Date.now() / 1000));
+          const color = display.color;
           const selected = b.bountyId === selectedId;
           return (
             <CircleMarker
@@ -98,7 +99,7 @@ export default function MapView({
                     Bounty #{b.bountyId}
                   </p>
                   <p className="text-xs" style={{ color }}>
-                    {statusName(b.status)}
+                    {display.label}
                   </p>
                   <p className="text-xs text-gray-600">
                     Escrow: <strong>{formatUsdcDisplaySafe(b.totalPledged)} USDC</strong>
@@ -136,14 +137,14 @@ export default function MapView({
       </MapContainer>
 
       <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-x-3 gap-y-1 rounded-lg bg-white/95 px-3 py-2 text-[11px] font-medium shadow-card ring-1 ring-gray-200">
-        {(["Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map(
+        {(["Proposed", "Open", "Claimed", "Submitted", "InReview", "Approved", "Rejected", "Refunded"] as const).map(
           (name) => (
             <span key={name} className="flex items-center gap-1 text-gray-700">
               <span
                 className="inline-block h-2.5 w-2.5 rounded-full"
                 style={{ backgroundColor: STATUS_COLORS[name] }}
               />
-              {name}
+              {STATUS_LABELS[name]}
             </span>
           )
         )}
