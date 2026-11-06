@@ -57,8 +57,8 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-neutral-200 bg-white p-5">
-        <label htmlFor="doc" className="text-sm font-medium text-neutral-800">
+      <div className="card p-5">
+        <label htmlFor="doc" className="text-sm font-medium text-slate-100">
           1. Which on-chain document are you checking?
         </label>
         <select
@@ -68,7 +68,7 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
             setSelectedKey(e.target.value);
             setOutcome({ state: "idle" });
           }}
-          className="mt-2 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm"
+          className="field mt-2"
         >
           {options.map((o) => (
             <option key={o.key} value={o.key}>
@@ -76,10 +76,10 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
             </option>
           ))}
         </select>
-        <p className="mt-3 text-xs font-medium text-neutral-500">On-chain SHA-256 (recorded {expected.recordedAt})</p>
+        <p className="mt-3 text-xs font-medium text-slate-400">On-chain SHA-256 (recorded {expected.recordedAt})</p>
         <code data-testid="onchain-hash" className="block break-all font-mono text-xs">{expected.hash}</code>
         {expected.offChainFile && (
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-xs text-slate-400">
             Demo copy (off-chain, unverified until you check it):{" "}
             <a href={expected.offChainFile} download className="underline underline-offset-2">
               download
@@ -87,7 +87,7 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
           </p>
         )}
 
-        <label htmlFor="file" className="mt-5 block text-sm font-medium text-neutral-800">
+        <label htmlFor="file" className="mt-5 block text-sm font-medium text-slate-100">
           2. Select the PDF on your device
         </label>
         <input
@@ -98,18 +98,18 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
             void onFile(e.target.files?.[0]);
             e.target.value = "";
           }}
-          className="mt-2 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+          className="mt-2 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:text-slate-100 hover:file:bg-white/20 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-100"
         />
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-slate-400">
           The file is hashed in your browser and never uploaded.
         </p>
       </div>
 
       {outcome.state === "hashing" && (
-        <p className="text-sm text-neutral-600">Computing SHA-256 of {outcome.fileName}…</p>
+        <p className="text-sm text-slate-300">Computing SHA-256 of {outcome.fileName}…</p>
       )}
       {outcome.state === "error" && (
-        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">
           {outcome.message}
         </div>
       )}
@@ -117,30 +117,30 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
         <div
           role="status"
           data-testid="verify-result"
-          className={`rounded-xl border-2 p-5 ${match ? "border-emerald-500 bg-emerald-50" : "border-red-500 bg-red-50"}`}
+          className={`rounded-xl border-2 p-5 ${match ? "border-emerald-400 bg-emerald-400/10" : "border-red-400 bg-red-400/10"}`}
         >
-          <p className={`text-2xl font-black tracking-tight ${match ? "text-emerald-800" : "text-red-800"}`}>
+          <p className={`text-2xl font-black tracking-tight ${match ? "text-emerald-300" : "text-red-300"}`}>
             {match ? "MATCH" : "MISMATCH"}
           </p>
-          <p className={`mt-1 text-sm ${match ? "text-emerald-900" : "text-red-900"}`}>
+          <p className={`mt-1 text-sm ${match ? "text-emerald-300" : "text-red-300"}`}>
             {match
               ? `${outcome.fileName} is byte-for-byte identical to the document whose hash was recorded on-chain as "${outcome.expected.label}".`
               : `${outcome.fileName} differs from the document recorded on-chain as "${outcome.expected.label}". It has been modified or is a different document.`}
           </p>
           <dl className="mt-4 space-y-2 text-xs">
             <div>
-              <dt className="font-medium text-neutral-600">On-chain SHA-256 ({outcome.expected.label})</dt>
+              <dt className="font-medium text-slate-300">On-chain SHA-256 ({outcome.expected.label})</dt>
               <dd><code className="break-all font-mono">{outcome.expected.hash}</code></dd>
             </div>
             <div>
-              <dt className="font-medium text-neutral-600">
+              <dt className="font-medium text-slate-300">
                 SHA-256 of {outcome.fileName} ({outcome.size.toLocaleString("en-IN")} bytes)
               </dt>
               <dd><code data-testid="file-hash" className="break-all font-mono">{outcome.fileHash}</code></dd>
             </div>
           </dl>
           {outcome.alsoMatches && (
-            <p className="mt-3 text-xs text-neutral-700">
+            <p className="mt-3 text-xs text-slate-200">
               Note: this file does match a different on-chain document of this project: “{outcome.alsoMatches.label}”.
             </p>
           )}

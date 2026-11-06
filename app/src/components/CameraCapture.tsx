@@ -365,15 +365,15 @@ export default function CameraCapture({
   const codeDigits = challengeCode ? String(challengeCode).padStart(4, "0").split("") : null;
 
   return (
-    <div className="overflow-hidden rounded-xl bg-gray-900 ring-1 ring-gray-700">
+    <div className="card overflow-hidden bg-ink-900/80">
       <div className="flex items-center justify-between px-4 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-widest text-gray-300">
+        <span className="label-micro !text-slate-300">
           {slot} photo
         </span>
-        <span className="flex items-center gap-2 text-[11px] text-gray-400">
+        <span className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
           <span
             className={`h-1.5 w-1.5 rounded-full ${
-              cameraState === "live" ? "animate-pulse bg-red-500" : "bg-gray-500"
+              cameraState === "live" ? "animate-pulse bg-red-500 shadow-[0_0_8px_rgb(239_68_68)]" : "bg-slate-600"
             }`}
           />
           {cameraState === "live" ? "REC" : "standby"}
@@ -381,18 +381,18 @@ export default function CameraCapture({
       </div>
 
       {/* Anti-spoofing challenge code — must be visible in the photo frame */}
-      <div className="flex items-center justify-center gap-2 border-y border-gray-800 bg-black/40 py-3">
+      <div className="flex items-center justify-center gap-2 border-y border-white/[0.06] bg-black/40 py-3">
         {codeDigits ? (
           codeDigits.map((d, i) => (
             <span
               key={i}
-              className="flex h-12 w-9 items-center justify-center rounded-md bg-white text-2xl font-black text-gray-900 shadow"
+              className="flex h-12 w-9 items-center justify-center rounded-lg bg-white text-2xl font-black text-ink-950 shadow-glow-sm"
             >
               {d}
             </span>
           ))
         ) : (
-          <span className="text-xs text-gray-500">Challenge code appears here after claim</span>
+          <span className="text-xs text-slate-500">Challenge code appears here after claim</span>
         )}
       </div>
 
@@ -408,14 +408,14 @@ export default function CameraCapture({
             {cameraState === "denied" ? (
               <>
                 <p className="text-sm text-red-400">Camera access denied.</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-400">
                   Use the system camera button below — gallery uploads are rejected by the flow.
                 </p>
               </>
             ) : cameraState === "starting" ? (
-              <p className="text-sm text-gray-300">Starting camera…</p>
+              <p className="text-sm text-slate-300">Starting camera…</p>
             ) : (
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-slate-400">
                 Camera preview will appear here (rear camera enforced).
               </p>
             )}
@@ -438,17 +438,17 @@ export default function CameraCapture({
       <canvas ref={canvasRef} className="hidden" />
 
       {videoWalkthrough && (
-        <div className="mx-4 mt-3 flex items-center justify-between rounded-lg bg-amber-500/10 px-3 py-2 text-xs ring-1 ring-amber-500/30">
+        <div className="mx-4 mt-3 flex items-center justify-between rounded-xl bg-amber-400/10 px-3 py-2 text-xs ring-1 ring-amber-400/30">
           <div className="flex items-center gap-2">
             <span className="font-bold text-amber-400">Swarm Video:</span>
-            <span className="font-mono text-gray-300">{videoWalkthrough.swarmReference.slice(0, 14)}…</span>
+            <span className="font-mono text-slate-300">{videoWalkthrough.swarmReference.slice(0, 14)}…</span>
           </div>
           <span className="text-[10px] font-semibold text-emerald-400">✓ Sealed for Arkiv</span>
         </div>
       )}
 
       {videoError && (
-        <div className="mx-4 mt-2 rounded-lg bg-red-950/60 p-2 text-xs text-red-300 ring-1 ring-red-500/30">
+        <div className="mx-4 mt-2 rounded-xl bg-red-400/10 p-2.5 text-xs text-red-300 ring-1 ring-red-400/30">
           {videoError}
         </div>
       )}
@@ -460,14 +460,14 @@ export default function CameraCapture({
               <button
                 onClick={captureFromVideo}
                 disabled={capturing || recordingVideo}
-                className="flex-1 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50"
+                className="btn-primary flex-1"
               >
                 {capturing ? "Capturing…" : `Capture ${slot} photo`}
               </button>
               <button
                 onClick={stopCamera}
                 disabled={recordingVideo}
-                className="rounded-lg bg-gray-800 px-3 py-2.5 text-sm font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700 disabled:opacity-50"
+                className="btn-ghost"
               >
                 Stop
               </button>
@@ -478,10 +478,10 @@ export default function CameraCapture({
               type="button"
               onClick={recordingVideo ? stopVideoRecording : startVideoRecording}
               disabled={capturing || videoUploading}
-              className={`w-full rounded-lg py-2 text-xs font-semibold text-white transition ${
+              className={`btn w-full py-2 text-xs text-white ${
                 recordingVideo
-                  ? "bg-red-600 animate-pulse hover:bg-red-700"
-                  : "bg-amber-600 hover:bg-amber-700"
+                  ? "bg-red-600 animate-pulse hover:bg-red-500"
+                  : "bg-amber-600 hover:bg-amber-500"
               } disabled:opacity-50`}
             >
               {videoUploading
@@ -495,7 +495,7 @@ export default function CameraCapture({
           <button
             onClick={startCamera}
             disabled={cameraState === "starting"}
-            className="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:opacity-50"
+            className="btn-primary w-full"
           >
             {cameraState === "starting" ? "Starting…" : "Start live camera"}
           </button>
@@ -503,7 +503,7 @@ export default function CameraCapture({
 
         <div className="grid grid-cols-2 gap-2">
           {/* capture="environment" opens the camera directly — no gallery picker */}
-          <label className="cursor-pointer rounded-lg bg-gray-800 py-2 text-center text-xs font-medium text-gray-300 ring-1 ring-gray-600 transition hover:bg-gray-700">
+          <label className="btn-ghost cursor-pointer py-2 text-xs">
             system camera
             <input
               type="file"
@@ -519,7 +519,7 @@ export default function CameraCapture({
           </label>
 
           {/* upload video walkthrough */}
-          <label className="cursor-pointer rounded-lg bg-gray-800 py-2 text-center text-xs font-medium text-amber-300/90 ring-1 ring-amber-500/30 transition hover:bg-gray-700">
+          <label className="btn-ghost cursor-pointer py-2 text-xs !text-amber-300">
             {videoUploading ? "uploading…" : "upload video"}
             <input
               type="file"
@@ -535,13 +535,13 @@ export default function CameraCapture({
         </div>
 
         {(heading === null || gpsStatus !== "locked") && (
-          <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-700 ring-1 ring-amber-200">
+          <div className="alert-warn flex items-center justify-between !px-3 !py-2 text-[11px]">
             <span>
               {gpsStatus !== "locked" ? "Waiting for GPS fix. " : ""}
               {heading === null ? "Compass not streaming." : ""}
             </span>
             {heading === null && (
-              <button onClick={enableCompass} className="font-semibold text-amber-800 underline">
+              <button onClick={enableCompass} className="font-semibold text-amber-200 underline">
                 Enable
               </button>
             )}

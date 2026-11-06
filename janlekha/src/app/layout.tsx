@@ -13,17 +13,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col bg-neutral-50">
+      <body className="flex min-h-full flex-col">
         <Providers>
-        <header className="border-b border-neutral-200 bg-white">
+        <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-ink-950/70 backdrop-blur-xl">
           <nav className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-6 py-3 text-sm">
-            <Link href="/" className="font-semibold text-neutral-900">JanLekha</Link>
-            <Link href="/projects" className="text-neutral-600 hover:text-neutral-900">Projects</Link>
-            <Link href="/verify" className="text-neutral-600 hover:text-neutral-900">Verify a document</Link>
-            <a href={publicEnv.NEXT_PUBLIC_STREETSYNC_URL} className="border-l border-neutral-200 pl-5 text-neutral-600 hover:text-neutral-900">
+            <Link href="/" className="heading text-base">Jan<span className="text-gradient">Lekha</span></Link>
+            <Link href="/projects" className="text-slate-300 hover:text-white">Projects</Link>
+            <Link href="/verify" className="text-slate-300 hover:text-white">Verify a document</Link>
+            <a href={publicEnv.NEXT_PUBLIC_STREETSYNC_URL} className="border-l border-white/[0.08] pl-5 text-slate-300 hover:text-white">
               StreetSync · Repairs
             </a>
-            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
+            <span className="rounded-full bg-amber-400/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-300 ring-1 ring-amber-400/30">
               Synthetic demo data
             </span>
             <div className="ml-auto">
@@ -31,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </nav>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">{children}</main>
+        <main className="animate-rise mx-auto w-full max-w-5xl flex-1 px-6 py-8">{children}</main>
         </Providers>
       </body>
     </html>

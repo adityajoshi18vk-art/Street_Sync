@@ -7,12 +7,12 @@ import { addressUrl, shortHex, txUrl } from "@/lib/janlekha/format";
 type BadgeTone = "onchain" | "mock" | "offchain" | "neutral" | "good" | "warn";
 
 const TONES: Record<BadgeTone, string> = {
-  onchain: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  mock: "bg-amber-50 text-amber-900 ring-amber-300",
-  offchain: "bg-slate-50 text-slate-600 ring-slate-200",
-  neutral: "bg-neutral-100 text-neutral-700 ring-neutral-200",
-  good: "bg-blue-50 text-blue-800 ring-blue-200",
-  warn: "bg-orange-50 text-orange-800 ring-orange-200",
+  onchain: "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30",
+  mock: "bg-amber-400/10 text-amber-300 ring-amber-400/40",
+  offchain: "bg-white/[0.05] text-slate-400 ring-white/10",
+  neutral: "bg-white/[0.05] text-slate-200 ring-white/10",
+  good: "bg-blue-400/10 text-blue-300 ring-blue-400/30",
+  warn: "bg-orange-400/10 text-orange-300 ring-orange-400/30",
 };
 
 export function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
@@ -29,9 +29,9 @@ export const MockPayment = () => <Badge tone="mock">Mock PFMS payment attested</
 
 export function Section({ title, badge, children }: { title: string; badge?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-neutral-200 bg-white p-5">
+    <section className="card p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
+        <h2 className="heading text-base">{title}</h2>
         {badge}
       </div>
       {children}
@@ -42,22 +42,22 @@ export function Section({ title, badge, children }: { title: string; badge?: Rea
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-medium text-neutral-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-neutral-900">{children}</dd>
+      <dt className="text-xs font-medium text-slate-400">{label}</dt>
+      <dd className="mt-0.5 text-sm text-white">{children}</dd>
     </div>
   );
 }
 
 /** Full hash in monospace: citizens compare these characters, so never truncate them here. */
 export function HashText({ hash }: { hash: Hex }) {
-  return <code className="block break-all font-mono text-xs text-neutral-800">{hash}</code>;
+  return <code className="block break-all font-mono text-xs text-slate-100">{hash}</code>;
 }
 
 export function TxLink({ hash, explorerUrl }: { hash: Hex; explorerUrl: string | null }) {
   const url = txUrl(explorerUrl, hash);
   const label = <code className="font-mono text-xs">{shortHex(hash, 10)}</code>;
   return url ? (
-    <a href={url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2" title={hash}>
+    <a href={url} target="_blank" rel="noreferrer" className="text-blue-300 underline underline-offset-2" title={hash}>
       {label}
     </a>
   ) : (
@@ -69,7 +69,7 @@ export function AddressText({ address, explorerUrl }: { address: Address; explor
   const url = addressUrl(explorerUrl, address);
   const label = <code className="font-mono text-xs">{shortHex(address)}</code>;
   return url ? (
-    <a href={url} target="_blank" rel="noreferrer" className="text-blue-700 underline underline-offset-2" title={address}>
+    <a href={url} target="_blank" rel="noreferrer" className="text-blue-300 underline underline-offset-2" title={address}>
       {label}
     </a>
   ) : (
@@ -79,19 +79,19 @@ export function AddressText({ address, explorerUrl }: { address: Address; explor
 
 export function ErrorPanel({ failure }: { failure: ReadFailure }) {
   return (
-    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5">
-      <p className="font-semibold text-red-900">{failure.title}</p>
-      <p className="mt-1 text-sm text-red-800">{failure.detail}</p>
+    <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-5">
+      <p className="font-semibold text-red-300">{failure.title}</p>
+      <p className="mt-1 text-sm text-red-300">{failure.detail}</p>
     </div>
   );
 }
 
 export function NotFoundPanel({ reason }: { reason: string }) {
   return (
-    <div role="alert" className="rounded-xl border border-neutral-300 bg-white p-6">
-      <p className="font-semibold text-neutral-900">Project not found</p>
-      <p className="mt-1 text-sm text-neutral-600">{reason}</p>
-      <Link href="/projects" className="mt-3 inline-block text-sm text-blue-700 underline underline-offset-2">
+    <div role="alert" className="rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6">
+      <p className="font-semibold text-white">Project not found</p>
+      <p className="mt-1 text-sm text-slate-300">{reason}</p>
+      <Link href="/projects" className="mt-3 inline-block text-sm text-blue-300 underline underline-offset-2">
         Browse all projects
       </Link>
     </div>
@@ -100,6 +100,6 @@ export function NotFoundPanel({ reason }: { reason: string }) {
 
 export function LoadingPanel({ label }: { label: string }) {
   return (
-    <div className="animate-pulse rounded-xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500">{label}</div>
+    <div className="animate-pulse card p-6 text-sm text-slate-400">{label}</div>
   );
 }

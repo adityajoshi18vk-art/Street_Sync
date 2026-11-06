@@ -43,8 +43,8 @@ export function TxActivityProvider({ children }: { children: ReactNode }) {
   return (
     <TxLogContext.Provider value={update}>
       {entries.length > 0 && (
-        <div className="mb-4 rounded-xl border border-neutral-200 bg-white p-4" data-testid="tx-activity">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">Your transactions on this page</p>
+        <div className="mb-4 card p-4" data-testid="tx-activity">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Your transactions on this page</p>
           <ul className="space-y-2">
             {entries.map((e) => (
               <li key={e.id} data-testid="tx-entry" data-tx-id={e.id} data-status={e.state.status}>
@@ -170,26 +170,26 @@ export function TxStatus({ state }: { state: TxState }) {
   const base = "mt-2 rounded-lg px-3 py-2 text-sm";
   switch (state.status) {
     case "checking":
-      return <p data-testid="tx-status" data-status="checking" className={`${base} bg-neutral-100 text-neutral-700`}>Checking the transaction against current contract state…</p>;
+      return <p data-testid="tx-status" data-status="checking" className={`${base} bg-white/[0.05] text-slate-200`}>Checking the transaction against current contract state…</p>;
     case "awaiting-wallet":
-      return <p data-testid="tx-status" data-status="awaiting-wallet" className={`${base} bg-blue-50 text-blue-900`}>Confirm the transaction in your wallet…</p>;
+      return <p data-testid="tx-status" data-status="awaiting-wallet" className={`${base} bg-blue-400/10 text-blue-300`}>Confirm the transaction in your wallet…</p>;
     case "pending":
       return (
-        <div data-testid="tx-status" data-status="pending" className={`${base} bg-blue-50 text-blue-900`}>
+        <div data-testid="tx-status" data-status="pending" className={`${base} bg-blue-400/10 text-blue-300`}>
           <p className="font-semibold">Pending: waiting for network confirmation…</p>
           <p className="mt-0.5 text-xs">Transaction <HashRef hash={state.hash} />. Public records update only after confirmation.</p>
         </div>
       );
     case "confirmed":
       return (
-        <div data-testid="tx-status" data-status="confirmed" className={`${base} bg-emerald-50 text-emerald-900`}>
+        <div data-testid="tx-status" data-status="confirmed" className={`${base} bg-emerald-400/10 text-emerald-300`}>
           <p className="font-semibold">Confirmed in block {state.blockNumber.toString()}</p>
           <p className="mt-0.5 text-xs">Transaction <HashRef hash={state.hash} />. This page reloads its records from the contract.</p>
         </div>
       );
     case "failed":
       return (
-        <div role="alert" data-testid="tx-status" data-status="failed" data-stage={state.stage} className={`${base} bg-red-50 text-red-900`}>
+        <div role="alert" data-testid="tx-status" data-status="failed" data-stage={state.stage} className={`${base} bg-red-400/10 text-red-300`}>
           <p className="font-semibold">Failed: {state.message}</p>
           {STAGE_NOTE[state.stage] && <p className="mt-0.5 text-xs">{STAGE_NOTE[state.stage]}</p>}
           {state.hash && <p className="mt-0.5 text-xs">Transaction <HashRef hash={state.hash} /></p>}

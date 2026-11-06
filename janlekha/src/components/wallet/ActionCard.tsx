@@ -5,10 +5,10 @@ import { TxStatus, type TxState } from "./tx";
 
 export function ActionCard({ title, actor, testId, children }: { title: string; actor: string; testId: string; children: ReactNode }) {
   return (
-    <section data-testid={testId} className="rounded-xl border border-blue-200 bg-white p-5">
+    <section data-testid={testId} className="rounded-xl border border-blue-400/30 bg-white/[0.03] backdrop-blur-xl p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold text-neutral-900">{title}</h3>
-        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200">
+        <h3 className="font-semibold text-white">{title}</h3>
+        <span className="rounded-full bg-blue-400/10 px-2 py-0.5 text-[11px] font-semibold text-blue-300 ring-1 ring-inset ring-blue-400/30">
           {actor}
         </span>
       </div>
@@ -40,12 +40,12 @@ export function SubmitRow({
         type="button"
         onClick={onSubmit}
         disabled={!!blocked || busy || done}
-        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-600"
+        className="btn-primary"
       >
         {busy ? "Working…" : label}
       </button>
       {blocked && !busy && !done && (
-        <p data-testid="blocked-reason" className="mt-2 text-xs text-amber-800">
+        <p data-testid="blocked-reason" className="mt-2 text-xs text-amber-300">
           {blocked}
         </p>
       )}
@@ -57,16 +57,16 @@ export function SubmitRow({
 export function TextInput(props: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; hint?: string; testId?: string }) {
   return (
     <label className="block text-sm">
-      <span className="font-medium text-neutral-800">{props.label}</span>
+      <span className="font-medium text-slate-100">{props.label}</span>
       <input
         data-testid={props.testId}
         type={props.type ?? "text"}
         value={props.value}
         placeholder={props.placeholder}
         onChange={(e) => props.onChange(e.target.value)}
-        className="mt-1 block w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+        className="field mt-1"
       />
-      {props.hint && <span className="mt-1 block text-xs text-neutral-500">{props.hint}</span>}
+      {props.hint && <span className="mt-1 block text-xs text-slate-400">{props.hint}</span>}
     </label>
   );
 }

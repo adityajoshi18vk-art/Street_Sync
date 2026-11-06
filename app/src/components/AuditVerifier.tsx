@@ -190,7 +190,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
 
   if (!ESCROW_ADDRESS || ESCROW_ADDRESS === ZERO_KEY) {
     return (
-      <div className="rounded-xl bg-amber-50 p-6 text-sm text-amber-800 ring-1 ring-amber-200">
+      <div className="alert-warn p-6">
         Escrow contract address is not configured for {ACTIVE_CHAIN.name}. Deploy the contracts and
         set NEXT_PUBLIC_ESCROW_ADDRESS (see app/.env.example).
       </div>
@@ -200,9 +200,9 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
   return (
     <div className="space-y-5">
       {bounty && (
-        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
+        <div className="card animate-rise p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold text-gray-900">Bounty #{bounty.id.toString()}</h2>
+            <h2 className="heading text-lg">Bounty #{bounty.id.toString()}</h2>
             <StatusBadge status={bounty.status} />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
@@ -222,64 +222,64 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       )}
 
       {phase === "loading" && (
-        <div className="rounded-xl bg-white p-6 text-center text-sm text-gray-500 shadow-card ring-1 ring-gray-200">
+        <div className="card p-6 text-center text-sm text-slate-400">
           Fetching raw entity bytes from Arkiv and recomputing SHA-256…
         </div>
       )}
 
       {loadError && (
-        <div className="rounded-xl bg-red-50 p-5 text-sm text-red-700 ring-1 ring-red-200">
+        <div className="alert-error p-5">
           {loadError}
         </div>
       )}
 
       {phase === "done" && bounty && (
-        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
-          <p className="text-sm font-semibold text-gray-900">Cryptographic verification</p>
+        <div className="card animate-rise p-6">
+          <p className="text-sm font-semibold text-white">Cryptographic verification</p>
           <div className="mt-3 space-y-2">
             <HashBadge
               label="Recomputed SHA-256 (browser)"
               hash={computedHash}
               match={hashMatch}
             />
-            <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 ring-1 ring-gray-200">
+            <div className="card-inset flex items-center justify-between gap-3 px-3.5 py-2.5">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                <p className="label-micro">
                   Worker EIP-191 signature
                 </p>
-                <p className="truncate font-mono text-xs text-gray-700">
+                <p className="truncate font-mono text-xs text-slate-300">
                   {recoveredWorker ?? "recovery failed"}
                 </p>
               </div>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  signatureMatch ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                  signatureMatch ? "bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/30" : "bg-red-400/10 text-red-300 ring-1 ring-red-400/30"
                 }`}
               >
                 {signatureMatch ? "VERIFIED" : "MISMATCH"}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs ring-1 ring-gray-200">
-              <span className="text-gray-500">Bundle size (Arkiv entity, ≤128 KiB)</span>
-              <span className="font-mono font-semibold text-gray-800">
+            <div className="card-inset flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
+              <span className="text-slate-400">Bundle size (Arkiv entity, ≤128 KiB)</span>
+              <span className="font-mono font-semibold text-slate-200">
                 {bundleSize?.toLocaleString()} B / {MAX_ARKIV_PAYLOAD.toLocaleString()} B
               </span>
             </div>
             {metadata?.video && (
-              <div className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs ring-1 ring-amber-200">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-amber-400/10 px-3.5 py-2.5 text-xs ring-1 ring-amber-400/30">
                 <div>
-                  <p className="font-semibold text-amber-900">Swarm Video Cryptographic Seal</p>
-                  <p className="font-mono text-[11px] text-amber-700">
+                  <p className="font-semibold text-amber-200">Swarm Video Cryptographic Seal</p>
+                  <p className="font-mono text-[11px] text-amber-300/80">
                     Ref: {metadata.video.swarmReference.slice(0, 16)}… · SHA-256: {metadata.video.videoSha256.slice(0, 12)}…
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                <span className="shrink-0 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-bold text-emerald-300 ring-1 ring-emerald-400/30">
                   SEALED IN ARKIV
                 </span>
               </div>
             )}
             {entityKeyUsed && (
-              <p className="truncate text-[11px] text-gray-400">
+              <p className="truncate text-[11px] text-slate-500">
                 Entity resolved via key: {entityKeyUsed}
               </p>
             )}
@@ -318,18 +318,18 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       )}
 
       {beforeUrl && afterUrl && (
-        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
-          <p className="mb-3 text-sm font-semibold text-gray-900">Evidence photos (from Arkiv)</p>
+        <div className="card animate-rise p-6">
+          <p className="mb-3 text-sm font-semibold text-white">Evidence photos (from Arkiv)</p>
           <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
         </div>
       )}
 
       {metadata?.video && (
-        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200 space-y-3">
+        <div className="card animate-rise space-y-3 p-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Video Walkthrough (Ethereum Swarm)</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-semibold text-white">Video Walkthrough (Ethereum Swarm)</p>
+              <p className="text-xs text-slate-400">
                 Decentralized chunked streaming via Bzz protocol · {metadata.video.durationSeconds}s · {(metadata.video.sizeBytes / 1024).toFixed(0)} KB
               </p>
             </div>
@@ -337,7 +337,7 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
               href={getVideoUrl(metadata.video.swarmReference)}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/20 ring-1 ring-amber-500/30"
+              className="rounded-xl bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-300 ring-1 ring-amber-400/30 transition hover:bg-amber-400/20"
             >
               Verify on Swarm Gateway ↗
             </a>
@@ -347,26 +347,26 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
             src={getVideoPlaybackUrl(metadata.video.swarmReference)}
             controls
             playsInline
-            className="w-full max-h-80 rounded-lg bg-black object-contain"
+            className="w-full max-h-80 rounded-xl bg-black object-contain"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono text-gray-600 bg-gray-50 p-2.5 rounded-lg ring-1 ring-gray-200">
+          <div className="card-inset grid grid-cols-1 gap-2 p-3 font-mono text-[11px] text-slate-400 sm:grid-cols-2">
             <div className="truncate">
-              <span className="text-gray-400">Swarm Reference: </span>
-              <span className="font-semibold text-gray-800">{metadata.video.swarmReference}</span>
+              <span className="text-slate-500">Swarm Reference: </span>
+              <span className="font-semibold text-slate-200">{metadata.video.swarmReference}</span>
             </div>
             <div className="truncate">
-              <span className="text-gray-400">Video SHA-256: </span>
-              <span className="font-semibold text-gray-800">{metadata.video.videoSha256}</span>
+              <span className="text-slate-500">Video SHA-256: </span>
+              <span className="font-semibold text-slate-200">{metadata.video.videoSha256}</span>
             </div>
           </div>
         </div>
       )}
 
       {phase === "done" && (
-        <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
-          <p className="text-sm font-semibold text-gray-900">Tamper demonstration</p>
-          <p className="mt-1 text-xs text-gray-500">
+        <div className="card animate-rise p-6">
+          <p className="text-sm font-semibold text-white">Tamper demonstration</p>
+          <p className="mt-1 text-xs text-slate-400">
             Flips exactly one byte of the bundle <em>in memory only</em> (nothing is written back to
             Arkiv) and recomputes the SHA-256 — showing why the on-chain Arc hash check makes silent
             edits impossible.
@@ -374,14 +374,14 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               onClick={simulateTamper}
-              className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+              className="btn-danger"
             >
               Simulate Tamper (flip 1 byte)
             </button>
             {tamperResult && (
               <button
                 onClick={resetAndReverify}
-                className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 transition hover:bg-gray-50"
+                className="btn-ghost"
               >
                 Reset &amp; re-verify
               </button>
@@ -389,10 +389,10 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
           </div>
           {tamperResult && (
             <div
-              className={`mt-3 rounded-lg p-3 text-xs ring-1 ${
+              className={`mt-3 rounded-xl p-3.5 text-xs ring-1 ${
                 tamperResult.match
-                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                  : "bg-red-50 text-red-700 ring-red-200"
+                  ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
+                  : "bg-red-400/10 text-red-300 ring-red-400/30"
               }`}
             >
               <p className="font-semibold">
@@ -424,16 +424,16 @@ function Field({
 }) {
   return (
     <div
-      className={`rounded-lg px-3 py-2 ring-1 ${
+      className={`rounded-xl px-3.5 py-2.5 ring-1 ${
         highlight === undefined
-          ? "bg-gray-50 ring-gray-200"
+          ? "bg-black/30 ring-white/[0.06]"
           : highlight
-            ? "bg-emerald-50 ring-emerald-200"
-            : "bg-red-50 ring-red-200"
+            ? "bg-emerald-400/10 ring-emerald-400/30"
+            : "bg-red-400/10 ring-red-400/30"
       }`}
     >
-      <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
-      <p className="font-mono text-xs font-semibold text-gray-800">{value}</p>
+      <p className="label-micro">{label}</p>
+      <p className="font-mono text-xs font-semibold text-slate-200">{value}</p>
     </div>
   );
 }

@@ -22,13 +22,13 @@ export const STATUS_COLORS: Record<StatusName, string> = {
 };
 
 export const STATUS_TEXT_CLASSES: Record<StatusName, string> = {
-  Open: "text-emerald-600 bg-emerald-50 ring-emerald-200",
-  Claimed: "text-yellow-700 bg-yellow-50 ring-yellow-200",
-  Submitted: "text-violet-700 bg-violet-50 ring-violet-200",
-  InReview: "text-orange-700 bg-orange-50 ring-orange-200",
-  Approved: "text-blue-700 bg-blue-50 ring-blue-200",
-  Rejected: "text-red-700 bg-red-50 ring-red-200",
-  Refunded: "text-gray-700 bg-gray-100 ring-gray-200"
+  Open: "text-emerald-300 bg-emerald-400/10 ring-emerald-400/30",
+  Claimed: "text-amber-300 bg-amber-400/10 ring-amber-400/30",
+  Submitted: "text-violet-300 bg-violet-400/10 ring-violet-400/30",
+  InReview: "text-orange-300 bg-orange-400/10 ring-orange-400/30",
+  Approved: "text-blue-300 bg-blue-400/10 ring-blue-400/30",
+  Rejected: "text-red-300 bg-red-400/10 ring-red-400/30",
+  Refunded: "text-slate-300 bg-slate-400/10 ring-slate-400/30"
 };
 
 export function statusName(status: number): StatusName {

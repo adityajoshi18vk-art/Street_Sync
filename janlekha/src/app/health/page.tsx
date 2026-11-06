@@ -31,10 +31,10 @@ async function HealthDetails() {
   ];
 
   return (
-    <dl className="divide-y divide-neutral-200 rounded-lg border border-neutral-200">
+    <dl className="divide-y divide-white/[0.06] rounded-lg border border-white/[0.08]">
       {rows.map(([label, value]) => (
         <div key={label} className="grid grid-cols-3 gap-4 px-4 py-3 text-sm">
-          <dt className="font-medium text-neutral-600">{label}</dt>
+          <dt className="font-medium text-slate-300">{label}</dt>
           <dd className="col-span-2 break-all font-mono">{value}</dd>
         </div>
       ))}
@@ -45,11 +45,11 @@ async function HealthDetails() {
 export default function HealthPage() {
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <h1 className="text-2xl font-semibold">System health</h1>
-      <p className="mt-1 mb-6 text-sm text-neutral-600">
+      <h1 className="heading text-2xl">System health</h1>
+      <p className="mt-1 mb-6 text-sm text-slate-300">
         Machine-readable version: <code className="font-mono">/api/health</code>
       </p>
-      <Suspense fallback={<p className="text-sm text-neutral-500">Checking…</p>}>
+      <Suspense fallback={<p className="text-sm text-slate-400">Checking…</p>}>
         <HealthDetails />
       </Suspense>
     </div>

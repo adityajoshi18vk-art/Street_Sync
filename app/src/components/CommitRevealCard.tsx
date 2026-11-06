@@ -162,54 +162,54 @@ export default function CommitRevealCard({
   };
 
   return (
-    <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200">
+    <div className="card p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-900">
-          Commit-Reveal Vote <span className="text-gray-400">· round {reviewRound}</span>
+        <p className="heading text-sm">
+          Commit-Reveal Vote <span className="text-slate-500">· round {reviewRound}</span>
         </p>
         <span
           className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ${
             phase === "commit"
-              ? "bg-brand-50 text-brand-700 ring-brand-200"
+              ? "bg-brand-400/10 text-brand-300 ring-brand-400/30"
               : phase === "reveal"
-                ? "bg-orange-50 text-orange-700 ring-orange-200"
-                : "bg-red-50 text-red-700 ring-red-200"
+                ? "bg-orange-400/10 text-orange-300 ring-orange-400/30"
+                : "bg-red-400/10 text-red-300 ring-red-400/30"
           }`}
         >
           {phase === "commit" ? "COMMIT OPEN" : phase === "reveal" ? "REVEAL OPEN" : "WINDOW EXPIRED"}
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-gray-500">
+      <p className="mt-1 text-xs text-slate-400">
         Pool: {formatUsdcDisplay(totalPledged)} USDC · 90% to worker on approval, 10% + slashed
         stakes to majority reviewers.
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
-        <div className="rounded-lg bg-gray-50 p-2.5 ring-1 ring-gray-200">
-          <p className="text-gray-400">Commit ends</p>
-          <p className="font-mono text-sm font-semibold text-gray-800">
+        <div className="card-inset p-2.5">
+          <p className="text-slate-500">Commit ends</p>
+          <p className="font-mono text-sm font-semibold text-slate-200">
             {phase === "commit" ? countdown(commitSecondsLeft) : formatUtc(commitDeadline)}
           </p>
         </div>
-        <div className="rounded-lg bg-gray-50 p-2.5 ring-1 ring-gray-200">
-          <p className="text-gray-400">Reveal ends</p>
-          <p className="font-mono text-sm font-semibold text-gray-800">
+        <div className="card-inset p-2.5">
+          <p className="text-slate-500">Reveal ends</p>
+          <p className="font-mono text-sm font-semibold text-slate-200">
             {phase !== "commit" ? countdown(revealSecondsLeft) : formatUtc(revealDeadline)}
           </p>
         </div>
       </div>
 
       {storedVote && (
-        <div className="mt-3 rounded-lg bg-brand-50 p-3 text-[11px] ring-1 ring-brand-200">
-          <p className="font-semibold text-brand-800">
+        <div className="mt-3 rounded-xl bg-brand-400/10 p-3 text-[11px] ring-1 ring-brand-400/30">
+          <p className="font-semibold text-brand-200">
             Saved vote: {storedVote.approve ? "APPROVE" : "REJECT"}
           </p>
-          <p className="mt-0.5 font-mono text-brand-700">
+          <p className="mt-0.5 font-mono text-brand-300">
             salt {shortHash(storedVote.salt, 8)} · commit {shortHash(storedVote.commitHash, 8)}
           </p>
-          <p className="mt-0.5 text-brand-600">
-            Stored in localStorage under <code>{storageKey}</code>
+          <p className="mt-0.5 text-brand-300/80">
+            Stored in localStorage under <code className="code-pill">{storageKey}</code>
           </p>
         </div>
       )}
@@ -219,20 +219,20 @@ export default function CommitRevealCard({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setApprove(true)}
-              className={`rounded-lg py-2.5 text-sm font-semibold ring-1 transition ${
+              className={`rounded-xl py-2.5 text-sm font-semibold ring-1 transition ${
                 approve
-                  ? "bg-emerald-600 text-white ring-emerald-600"
-                  : "bg-white text-gray-600 ring-gray-300 hover:bg-gray-50"
+                  ? "bg-emerald-500 text-white ring-emerald-400/50 shadow-lg shadow-emerald-500/20"
+                  : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
               }`}
             >
               Approve work
             </button>
             <button
               onClick={() => setApprove(false)}
-              className={`rounded-lg py-2.5 text-sm font-semibold ring-1 transition ${
+              className={`rounded-xl py-2.5 text-sm font-semibold ring-1 transition ${
                 !approve
-                  ? "bg-red-600 text-white ring-red-600"
-                  : "bg-white text-gray-600 ring-gray-300 hover:bg-gray-50"
+                  ? "bg-red-500 text-white ring-red-400/50 shadow-lg shadow-red-500/20"
+                  : "bg-white/5 text-slate-300 ring-white/10 hover:bg-white/10"
               }`}
             >
               Reject work
@@ -241,7 +241,7 @@ export default function CommitRevealCard({
           <button
             onClick={handleCommit}
             disabled={isPending || busy !== null || !address || !!storedVote}
-            className="mt-2 w-full rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-40"
+            className="btn-primary mt-2 w-full py-2.5 text-sm"
           >
             {busy === "commit"
               ? "Committing…"
@@ -249,7 +249,7 @@ export default function CommitRevealCard({
                 ? "Vote committed"
                 : "1-click Commit Vote"}
           </button>
-          <p className="mt-1.5 text-[11px] text-gray-400">
+          <p className="mt-1.5 text-[11px] text-slate-500">
             A random 32-byte salt is generated in your browser and saved locally — only the
             keccak256 hash goes on-chain.
           </p>
@@ -260,7 +260,7 @@ export default function CommitRevealCard({
         <button
           onClick={handleReveal}
           disabled={isPending || busy !== null}
-          className="mt-4 w-full rounded-lg bg-orange-600 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:opacity-40"
+          className="btn-primary mt-4 w-full py-2.5 text-sm"
         >
           {busy === "reveal" ? "Revealing…" : "Reveal Vote"}
         </button>
@@ -270,14 +270,14 @@ export default function CommitRevealCard({
         <button
           onClick={handlePoke}
           disabled={isPending || busy !== null}
-          className="mt-4 w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-40"
+          className="btn-danger mt-4 w-full py-2.5 text-sm"
         >
           {busy === "poke" ? "Poking…" : "Slash / Replace Inactive Reviewers (pokeOrReplace)"}
         </button>
       )}
 
       {error && (
-        <p className="mt-3 rounded-lg bg-red-50 p-2.5 text-[11px] text-red-700 ring-1 ring-red-200">
+        <p className="mt-3 alert-error text-[11px]">
           {error}
         </p>
       )}

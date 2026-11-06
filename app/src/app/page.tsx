@@ -32,7 +32,7 @@ import type { MapViewProps } from "@/components/MapView";
 
 const MapView = dynamic<MapViewProps>(
   () => import("@/components/MapView").then((m) => m.default),
-  { ssr: false, loading: () => <div className="h-[420px] w-full animate-pulse rounded-xl bg-gray-200" /> }
+  { ssr: false, loading: () => <div className="skeleton h-[420px] w-full" /> }
 );
 
 const EXPIRY_OPTIONS = [
@@ -203,25 +203,46 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Hero */}
+      <section className="animate-rise space-y-3 pt-4 text-center sm:pt-8">
+        <p className="label-micro">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-glow-pulse" />
+            Live on {ACTIVE_CHAIN.name} · USDC escrow · World ID verified
+          </span>
+        </p>
+        <h1 className="heading mx-auto max-w-3xl text-3xl sm:text-5xl">
+          Fix your street.
+          <br />
+          <span className="text-gradient">Proven on-chain.</span>
+        </h1>
+        <p className="mx-auto max-w-xl text-sm text-slate-400 sm:text-base">
+          Neighbors fund it, a verified human fixes it, other verified humans confirm it —
+          USDC releases only when the community agrees.
+        </p>
+      </section>
+
       {!contractsDeployed && (
-        <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-200">
-          <p className="font-semibold">Contracts not configured on {ACTIVE_CHAIN.name}</p>
-          <p className="mt-1 text-xs">
-            Deploy with <code className="rounded bg-amber-100 px-1">npm run deploy:arc</code> (or
-            <code className="ml-1 rounded bg-amber-100 px-1">deploy:local</code> for Hardhat), then
-            set the addresses in <code className="rounded bg-amber-100 px-1">contracts/deployments/</code> or
+        <div className="alert-warn animate-rise stagger-1">
+          <p className="font-semibold text-amber-100">
+            Contracts not configured on {ACTIVE_CHAIN.name}
+          </p>
+          <p className="mt-1 text-xs text-amber-200/80">
+            Deploy with <code className="code-pill">npm run deploy:arc</code> (or
+            <code className="code-pill ml-1">deploy:local</code> for Hardhat), then
+            set the addresses in <code className="code-pill">contracts/deployments/</code> or
             via NEXT_PUBLIC_ESCROW_ADDRESS.
           </p>
         </div>
       )}
 
       {listError && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
+        <div className="alert-error flex flex-wrap items-center justify-between gap-2 animate-rise stagger-1">
           <span>Backend index unavailable — {listError}</span>
           <button
             onClick={() => void loadBounties()}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+            className="btn-danger px-3 py-1.5 text-xs"
           >
             Retry
           </button>
@@ -229,7 +250,7 @@ export default function HomePage() {
       )}
 
       {/* Map */}
-      <div className="overflow-hidden rounded-xl bg-white p-2 shadow-card ring-1 ring-gray-200">
+      <div className="card animate-rise stagger-2 overflow-hidden p-2">
         <MapView
           bounties={bounties}
           selectedId={selectedId}
@@ -244,22 +265,18 @@ export default function HomePage() {
             setSelectedId(null);
           }}
           center={mapCenter}
-          className="h-[420px] w-full sm:h-[480px]"
+          className="h-[420px] w-full overflow-hidden rounded-xl sm:h-[480px]"
         />
-        <p className="px-2 pb-1 pt-2 text-center text-[11px] text-gray-400">
+        <p className="px-2 pb-1 pt-2 text-center text-[11px] text-slate-500">
           Tap the map to drop a new bounty pin · pins are colored by lifecycle status
         </p>
       </div>
 
       {/* Status filter chips */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 animate-rise stagger-3">
         <button
           onClick={() => setStatusFilter(null)}
-          className={`rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${
-            statusFilter === null
-              ? "bg-gray-900 text-white ring-gray-900"
-              : "bg-white text-gray-600 ring-gray-300 hover:bg-gray-50"
-          }`}
+          className={`chip ${statusFilter === null ? "chip-active" : ""}`}
         >
           All ({bounties.length})
         </button>
@@ -269,15 +286,11 @@ export default function HomePage() {
             <button
               key={name}
               onClick={() => setStatusFilter(idx)}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition ${
-                statusFilter === idx
-                  ? "bg-gray-900 text-white ring-gray-900"
-                  : "bg-white text-gray-600 ring-gray-300 hover:bg-gray-50"
-              }`}
+              className={`chip ${statusFilter === idx ? "chip-active" : ""}`}
             >
               <span
                 className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: STATUS_COLORS[name] }}
+                style={{ backgroundColor: STATUS_COLORS[name], boxShadow: `0 0 5px ${STATUS_COLORS[name]}` }}
               />
               {name} ({count})
             </button>
@@ -287,21 +300,21 @@ export default function HomePage() {
 
       <div className="grid gap-5 lg:grid-cols-5">
         {/* Create bounty panel */}
-        <section className="rounded-xl bg-white p-5 shadow-card ring-1 ring-gray-200 lg:col-span-2">
-          <h2 className="text-sm font-bold text-gray-900">Create a bounty</h2>
-          <p className="mt-1 text-xs text-gray-500">
+        <section className="card animate-rise stagger-4 h-fit p-6 lg:col-span-2">
+          <h2 className="heading text-lg">Create a bounty</h2>
+          <p className="mt-1 text-xs text-slate-400">
             Fund a repair escrow in USDC. Tap the map first to set the location.
           </p>
 
-          <div className="mt-4 space-y-3">
-            <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs ring-1 ring-gray-200">
-              <p className="text-gray-400">Location</p>
+          <div className="mt-5 space-y-3">
+            <div className="card-inset px-3.5 py-2.5 text-xs">
+              <p className="label-micro">Location</p>
               {draftPin ? (
-                <p className="font-mono text-gray-800">
+                <p className="mt-0.5 font-mono text-slate-200">
                   {draftPin.lat.toFixed(5)}, {draftPin.lng.toFixed(5)}
                 </p>
               ) : (
-                <p className="text-gray-500">Tap the map to drop a pin</p>
+                <p className="mt-0.5 text-slate-500">Tap the map to drop a pin</p>
               )}
             </div>
 
@@ -310,7 +323,7 @@ export default function HomePage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g. Repave the broken sidewalk section near the north crosswalk"
               rows={3}
-              className="w-full rounded-lg border-gray-300 text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="field resize-none"
             />
 
             <div className="flex gap-2">
@@ -319,12 +332,12 @@ export default function HomePage() {
                 onChange={(e) => setAmount(e.target.value)}
                 inputMode="decimal"
                 placeholder="USDC amount (6 decimals enforced)"
-                className="w-full rounded-lg text-sm ring-1 ring-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="field"
               />
               <select
                 value={expiryIdx}
                 onChange={(e) => setExpiryIdx(Number(e.target.value))}
-                className="rounded-lg bg-white text-sm ring-1 ring-gray-300 focus:outline-none"
+                className="field w-auto shrink-0"
               >
                 {EXPIRY_OPTIONS.map((opt, i) => (
                   <option key={opt.label} value={i}>
@@ -335,12 +348,12 @@ export default function HomePage() {
             </div>
 
             {txStatus && (
-              <p className="rounded-lg bg-brand-50 p-2.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
+              <p className="alert-info p-2.5 text-xs font-medium">
                 {txStatus}
               </p>
             )}
             {txError && (
-              <p className="rounded-lg bg-red-50 p-2.5 text-xs text-red-700 ring-1 ring-red-200">
+              <p className="alert-error p-2.5 text-xs">
                 {txError}
               </p>
             )}
@@ -348,12 +361,12 @@ export default function HomePage() {
             <button
               onClick={handleCreateBounty}
               disabled={!draftPin || !isConnected || writing}
-              className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.99] disabled:opacity-40"
+              className="btn-primary w-full py-3"
             >
               {writing ? "Confirm in wallet…" : "Approve USDC & Create Bounty"}
             </button>
             {!isConnected && (
-              <p className="text-center text-[11px] text-gray-400">
+              <p className="text-center text-[11px] text-slate-500">
                 Connect a wallet to fund bounties.
               </p>
             )}
@@ -361,22 +374,24 @@ export default function HomePage() {
         </section>
 
         {/* Bounty list */}
-        <section className="space-y-3 lg:col-span-3">
+        <section className="animate-rise stagger-5 space-y-3 lg:col-span-3">
           {selectedBounty && (
-            <div className="rounded-xl bg-white p-5 shadow-card ring-1 ring-brand-200">
+            <div className="card border-brand-400/40 p-5 shadow-glow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-bold text-gray-900">
+                  <p className="heading text-sm">
                     Bounty #{selectedBounty.bountyId}
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-400">
                     {statusName(selectedBounty.status)} · escrow{" "}
-                    <strong>{formatUsdcDisplaySafe(selectedBounty.totalPledged)} USDC</strong>
+                    <strong className="text-slate-200">
+                      {formatUsdcDisplaySafe(selectedBounty.totalPledged)} USDC
+                    </strong>
                   </p>
                 </div>
                 <Link
                   href={`/bounty/${selectedBounty.bountyId}`}
-                  className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+                  className="btn-primary px-3 py-1.5 text-xs"
                 >
                   Details
                 </Link>
@@ -388,19 +403,19 @@ export default function HomePage() {
                     onChange={(e) => setPledgeAmount(e.target.value)}
                     inputMode="decimal"
                     placeholder="Add pledge (USDC)"
-                    className="w-full rounded-lg text-sm ring-1 ring-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="field"
                   />
                   <button
                     onClick={handlePledge}
                     disabled={!isConnected || writing || !pledgeAmount}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
+                    className="btn-success shrink-0 px-4 py-2 text-xs"
                   >
                     Pledge
                   </button>
                 </div>
               )}
               {pledgeStatus && (
-                <p className="mt-2 text-xs font-medium text-brand-700">{pledgeStatus}</p>
+                <p className="mt-2 text-xs font-medium text-brand-300">{pledgeStatus}</p>
               )}
             </div>
           )}
@@ -408,13 +423,13 @@ export default function HomePage() {
           {loading ? (
             <div className="space-y-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-200" />
+                <div key={i} className="skeleton h-20" />
               ))}
             </div>
           ) : bounties.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
-              <p className="text-sm font-semibold text-gray-700">No bounties indexed yet</p>
-              <p className="mt-1 text-xs text-gray-500">
+            <div className="card border-dashed p-10 text-center">
+              <p className="heading text-sm">No bounties indexed yet</p>
+              <p className="mt-1 text-xs text-slate-500">
                 Create the first bounty by tapping the map and funding the escrow.
               </p>
             </div>
@@ -426,23 +441,23 @@ export default function HomePage() {
                   setSelectedId(b.bountyId);
                   setMapCenter({ lat: b.lat, lng: b.lng });
                 }}
-                className={`flex w-full items-center justify-between gap-3 rounded-xl bg-white p-4 text-left shadow-card ring-1 transition hover:ring-brand-300 ${
-                  selectedId === b.bountyId ? "ring-brand-400" : "ring-gray-200"
+                className={`card card-hover flex w-full items-center justify-between gap-3 p-4 text-left ${
+                  selectedId === b.bountyId ? "border-brand-400/50 shadow-glow-sm" : ""
                 }`}
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-900">
+                  <p className="text-sm font-bold text-white">
                     Bounty #{b.bountyId}
                     {b.description && (
-                      <span className="ml-2 truncate text-xs font-normal text-gray-500">
+                      <span className="ml-2 truncate text-xs font-normal text-slate-500">
                         {b.description}
                       </span>
                     )}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                  <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
                     <span
                       className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: STATUS_COLORS[statusName(b.status)] }}
+                      style={{ backgroundColor: STATUS_COLORS[statusName(b.status)], boxShadow: `0 0 5px ${STATUS_COLORS[statusName(b.status)]}` }}
                     />
                     {statusName(b.status)}
                     {b.worker && <span>· worker {shortAddress(b.worker)}</span>}
@@ -450,10 +465,10 @@ export default function HomePage() {
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-sm font-bold text-gray-900">
+                  <p className="font-display text-sm font-bold text-white">
                     {formatUsdcDisplaySafe(b.totalPledged)}
                   </p>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400">USDC</p>
+                  <p className="label-micro">USDC</p>
                 </div>
               </button>
             ))

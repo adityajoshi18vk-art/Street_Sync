@@ -24,7 +24,7 @@ async function ProjectList() {
   if (!result.ok) return <ErrorPanel failure={result.failure} />;
   if (result.projects.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-600">
+      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.03] backdrop-blur-xl p-8 text-center text-sm text-slate-300">
         No projects have been recorded on this contract yet.
       </div>
     );
@@ -32,7 +32,7 @@ async function ProjectList() {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-slate-400">
         {result.total.toString()} project(s) on chain {result.ctx.cfg.chainId}, read live at block{" "}
         {result.ctx.blockNumber.toString()} ({formatTimestamp(result.ctx.chainTime)}).
       </p>
@@ -43,13 +43,13 @@ async function ProjectList() {
             <li key={p.id.toString()}>
               <Link
                 href={`/projects/${p.id}`}
-                className="block rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
+                className="block card p-4 transition hover:border-blue-400/50 hover:shadow-sm"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-neutral-500">Project #{p.id.toString()}</p>
-                    <p className="font-semibold text-neutral-900">{meta?.title ?? `Untitled project #${p.id}`}</p>
-                    <p className="mt-0.5 text-xs text-neutral-500">
+                    <p className="text-xs font-medium text-slate-400">Project #{p.id.toString()}</p>
+                    <p className="font-semibold text-white">{meta?.title ?? `Untitled project #${p.id}`}</p>
+                    <p className="mt-0.5 text-xs text-slate-400">
                       {meta ? `${meta.department} · ` : ""}department <code className="font-mono">{shortHex(p.department)}</code>
                     </p>
                   </div>
@@ -62,7 +62,7 @@ async function ProjectList() {
                     ["Paid (mock attested)", p.budget.paidPaise],
                   ].map(([label, value]) => (
                     <div key={label as string}>
-                      <dt className="text-xs text-neutral-500">{label as string}</dt>
+                      <dt className="text-xs text-slate-400">{label as string}</dt>
                       <dd className="font-medium tabular-nums">{formatPaise(value as bigint)}</dd>
                     </div>
                   ))}
@@ -80,14 +80,14 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Public projects</h1>
-        <p className="mt-1 text-sm text-neutral-600">
+        <h1 className="heading text-2xl">Public projects</h1>
+        <p className="mt-1 text-sm text-slate-300">
           Budget, tender and delivery records read directly from the JanLekha contract. No wallet needed.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <OnChain />
           <OffChain />
-          <span className="text-xs text-neutral-500">Titles and department names are off-chain demo metadata.</span>
+          <span className="text-xs text-slate-400">Titles and department names are off-chain demo metadata.</span>
         </div>
       </div>
       <CreateProjectPanel />
