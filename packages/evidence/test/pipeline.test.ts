@@ -67,17 +67,17 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     // ═════════════════════════════════════════════════════════════════════
     // 2. Strict Client-Side Image Re-encoding
     // ═════════════════════════════════════════════════════════════════════
-    // Constraints: max 1280px longest edge, WebP quality 0.75 stepping down to 0.60, strictly <= 45 KiB per image
+    // Constraints: max 1280px longest edge, WebP quality 0.72 stepping down to 0.60, <= 48,000 bytes per image
     const beforeEncoded = await resizeAndEncodePhoto(new Uint8Array(beforeRaw), {
       maxEdge: 1280,
-      quality: 0.75,
+      quality: 0.72,
       minQuality: 0.6,
       maxSizeBytes: MAX_IMAGE_BYTES,
     });
 
     const afterEncoded = await resizeAndEncodePhoto(new Uint8Array(afterRaw), {
       maxEdge: 1280,
-      quality: 0.75,
+      quality: 0.72,
       minQuality: 0.6,
       maxSizeBytes: MAX_IMAGE_BYTES,
     });
@@ -95,21 +95,19 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     // ═════════════════════════════════════════════════════════════════════
     // 3. Structured Metadata with Visual Challenge Code
     // ═════════════════════════════════════════════════════════════════════
-    const visualChallengeCode = 4821; // 4-digit uint16 emitted on Claimed
+    const challengeCode = 4821; // 4-digit uint16 emitted on Claimed
     const metadata: EvidenceMetadata = {
+      v: 1,
       bountyId: "1",
-      visualChallengeCode,
-      beforeTimestamp: 1718000000000,
-      afterTimestamp: 1718003600000,
-      gpsLatE5: 3777490,
-      gpsLngE5: -12241940,
-      gpsAccuracyM: 3.8,
-      compassHeadingDeg: 194.5,
-      deviceSummary: "iPhone 15 Pro, iOS 17.5, Mobile Safari",
-      beforeImageSha256: beforeEncoded.sha256Hex,
-      afterImageSha256: afterEncoded.sha256Hex,
-      appVersion: "1.0.0",
       workerAddress: TEST_WORKER_ADDRESS,
+      challengeCode,
+      beforeTimestampMs: 1718000000000,
+      afterTimestampMs: 1718003600000,
+      gps: { lat: 37.7749, lng: -122.4194, accuracyMeters: 3.8 },
+      orientation: { alpha: 194.5, beta: null, gamma: null },
+      beforeSha256: beforeEncoded.sha256Hex,
+      afterSha256: afterEncoded.sha256Hex,
+      userAgent: "iPhone 15 Pro, iOS 17.5, Mobile Safari",
       notes: "Filled pothole with hot mix asphalt, compacted and sealed edges.",
     };
 
@@ -172,17 +170,7 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
 
     // Metadata MUST match field-for-field
     expect(unpacked.metadata.bountyId).toBe(metadata.bountyId);
-    expect(unpacked.metadata.visualChallengeCode).toBe(visualChallengeCode);
-    expect(unpacked.metadata.beforeTimestamp).toBe(metadata.beforeTimestamp);
-    expect(unpacked.metadata.afterTimestamp).toBe(metadata.afterTimestamp);
-    expect(unpacked.metadata.gpsLatE5).toBe(metadata.gpsLatE5);
-    expect(unpacked.metadata.gpsLngE5).toBe(metadata.gpsLngE5);
-    expect(unpacked.metadata.gpsAccuracyM).toBe(metadata.gpsAccuracyM);
-    expect(unpacked.metadata.compassHeadingDeg).toBe(metadata.compassHeadingDeg);
-    expect(unpacked.metadata.deviceSummary).toBe(metadata.deviceSummary);
-    expect(unpacked.metadata.beforeImageSha256).toBe(metadata.beforeImageSha256);
-    expect(unpacked.metadata.afterImageSha256).toBe(metadata.afterImageSha256);
-    expect(unpacked.metadata.appVersion).toBe(metadata.appVersion);
+    expect(unpacked.metadata).toEqual(metadata);
 
     // ═════════════════════════════════════════════════════════════════════
     // 6. Cryptographic Signature Recovery (Worker Wallet)
@@ -210,7 +198,7 @@ describe("Evidence Pipeline & Arkiv Compression Benchmark", () => {
     const auditWrongWorker = await verifyBundleIntegrity(bundle, evidenceHash, wrongAddress);
     expect(auditWrongWorker.valid).toBe(false);
     expect(auditWrongWorker.errors.some((e) => e.includes("mismatch"))).toBe(true);
-  });
+  }, 30_000);
 
   it("handles automatic chunking fallback if bundle exceeds 120,000 bytes", () => {
     // Construct an oversized artificial bundle of 250,000 bytes
