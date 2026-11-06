@@ -17,7 +17,7 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
 
 2. **Arc Testnet (Circle - Chain ID `5042002`):**
    - EVM settlement layer with gas paid natively in USDC.
-   - All bounty escrows, top-up pledges, reviewer stakes (10.00 USDC), and settlement payouts strictly use **6-decimal ERC-20 USDC** (`1e6` base units) via OpenZeppelin `SafeERC20`.
+   - All bounty escrows, top-up pledges, reviewer stakes (2.00 USDC), and settlement payouts strictly use **6-decimal ERC-20 USDC** (`1e6` base units) via OpenZeppelin `SafeERC20`.
 
 3. **Arkiv Verifiable Entity Store:**
    - Single atomic entity writes (`<= 128,000 bytes`, target `< 120,000 bytes`).
@@ -54,11 +54,11 @@ StreetSync is a decentralized physical infrastructure and public-works platform 
 2. **Rule 2: Anti-Wash Trading & Self-Dealing Prevention**
    - `claim()` reverts with `CreatorCannotClaim` if `msg.sender == bounty.creator`, and reverts with `PledgerCannotClaim` if `pledges[bountyId][msg.sender] > 0`.
    - `assignPanel()` strictly excludes the creator, the worker, and any pledgers from being selected as reviewers.
-   - A 5% reviewer fee is deducted on settlement and awarded to majority reviewers, ensuring that wash-trading results in an immediate net financial loss.
+   - A 10% reviewer fee is deducted on settlement and awarded to majority reviewers, ensuring that wash-trading results in an immediate net financial loss.
 
 3. **Rule 3: Commit-Reveal Deadlock Recovery (`pokeOrReplace`)**
    - If selected reviewers fail to reveal their votes before `revealDeadline`, the bounty is never locked forever.
-   - Any caller can trigger `pokeOrReplace(bountyId)` after `revealDeadline`. It immediately slashes the 10 USDC stake of non-revealers, increments `reviewRound`, draws replacement reviewers, and restarts the commit/reveal timers without requiring the worker to re-upload evidence.
+   - Any caller can trigger `pokeOrReplace(bountyId)` after `revealDeadline`. It immediately slashes the 2 USDC stake of non-revealers, increments `reviewRound`, draws replacement reviewers, and restarts the commit/reveal timers without requiring the worker to re-upload evidence.
 
 4. **Rule 4: Two-Step Future Block Randomness**
    - Decouples submission from panel selection:
@@ -171,4 +171,49 @@ npm run dev
 3. **Deploying to Arc Testnet**:
    1. Place your funded deployer private key in `.env`: `DEPLOYER_PRIVATE_KEY=0x...`
    2. Run `npm run deploy:arc`
-   3. The script automatically updates `contracts/deployments/arcTestnet.json`, instantly configuring the frontend and backend.
+   3. The script updates `contracts/deployments/arcTestnet.json`. Rebuild/restart the app and backend to load the new addresses.
+
+
+## Arc configuration and the zero-address allowance error
+
+The original error combined an outdated RPC endpoint with undeployed placeholder
+contracts. Arc Testnet uses chain ID **5042002**, RPC
+`https://rpc.testnet.arc.io`, and the six-decimal USDC ERC-20 interface at
+`0x3600000000000000000000000000000000000000`.
+See [Arc connection details](https://docs.arc.io/arc/references/connect-to-arc)
+and [contract addresses](https://docs.arc.io/arc/references/contract-addresses).
+
+1. Configure deployment secrets securely in the root `.env` or `contracts/.env`:
+   `DEPLOYER_PRIVATE_KEY` (funded with testnet USDC) and `ATTESTER_ADDRESS`
+   (the address of the backend signer). Never commit private keys.
+2. Run `npm run deploy:arc`. Arc deployments use system USDC, not a mock token.
+   The checked-in zero escrow address deliberately means **not deployed**.
+3. Configure `backend/.env` using its example, including the matching
+   `ATTESTER_PRIVATE_KEY`, signer address, World ID app/actions, and chain.
+4. Configure `app/.env.local` using `app/.env.example`. Use the same World ID
+   app/actions as the backend. Normally use the generated deployment file;
+   explicit address overrides must be valid, nonzero, and on the selected chain.
+5. Rebuild packages and the frontend, then restart both services:
+   `npm run build && npm run build --workspace=streetsync-app`.
+
+The frontend defaults to same-origin `/api` requests. Next proxies them to
+`BACKEND_API_URL` (server-only, default `http://127.0.0.1:3001`).
+The backend uses `BACKEND_PORT=3001`, separate from Next's `PORT`.
+Do not point a hosted browser at `localhost:3001`.
+
+Before funding, the app rejects missing deployments, wrong-chain wallets,
+invalid amounts, absent escrow bytecode, and token/decimal mismatches.
+Approvals are exact amounts and reverted receipts are errors.
+
+### Verification and remaining live-service requirements
+
+Run `npm run test --workspace=streetsync-app` for configuration/approval
+regressions, plus the contract, pipeline, backend and end-to-end checks above.
+Local lifecycle tests do not prove live sponsor integrations: an actual escrow
+deployment, a configured World ID application and successful proof, and a
+working shared Arkiv storage integration must be verified separately.
+The existing `NEXT_PUBLIC_ARKIV_MODE=local` stores evidence only in one browser;
+it is not decentralized storage and cannot support cross-device review.
+The HTTP adapter requires a compatible entity gateway and is not evidence of
+a verified live Arkiv deployment. Do not use browser-local evidence for a live
+Arc bounty.
