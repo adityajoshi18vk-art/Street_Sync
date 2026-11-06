@@ -12,11 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Generated: Prisma client, Hardhat artifacts/cache, Ignition deployments
+    // Generated: Prisma client, Hardhat artifacts/cache, deployment artifacts
     "src/generated/**",
     "artifacts/**",
     "cache/**",
-    "ignition/deployments/**",
+    "deployments/**",
   ]),
 ]);
 

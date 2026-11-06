@@ -40,7 +40,7 @@
     "node_modules",
     "hardhat.config.ts",
     "test",
-    "ignition",
+    "scripts",
     "artifacts",
     "cache"
   ]

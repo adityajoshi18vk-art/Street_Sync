@@ -10,10 +10,17 @@
     "typecheck": "next typegen && tsc --noEmit && hardhat build --quiet && tsc -p tsconfig.hardhat.json",
     "contracts:build": "hardhat build",
     "contracts:test": "hardhat test",
-    "contracts:deploy:hedera": "hardhat ignition deploy ignition/modules/JanLekha.ts --network hederaTestnet",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "contracts:node": "hardhat node",
+    "contracts:deploy:hedera": "hardhat run scripts/deploy.ts --network hederaTestnet",
+    "contracts:roles:hedera": "hardhat run scripts/grant-roles.ts --network hederaTestnet",
+    "contracts:smoke:hedera": "hardhat run scripts/smoke-test.ts --network hederaTestnet",
+    "contracts:release:hedera": "npm run contracts:deploy:hedera && npm run contracts:roles:hedera && npm run contracts:smoke:hedera",
+    "contracts:deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "contracts:roles:local": "hardhat run scripts/grant-roles.ts --network localhost",
+    "contracts:smoke:local": "hardhat run scripts/smoke-test.ts --network localhost"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.6.1",

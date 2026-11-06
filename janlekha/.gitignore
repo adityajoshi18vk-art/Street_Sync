@@ -47,4 +47,6 @@ next-env.d.ts
 /artifacts
 /cache
 /types
-/ignition/deployments/chain-31337
+
+# local rehearsal deployments (chain resets on restart)
+/deployments/localhost.json

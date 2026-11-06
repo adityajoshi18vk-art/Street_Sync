@@ -1,13 +1,23 @@
 {
   "compilerOptions": {
-    "lib": ["es2023"],
+    "lib": [
+      "es2023"
+    ],
     "module": "node20",
     "target": "es2023",
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "verbatimModuleSyntax": true
   },
-  "include": ["hardhat.config.ts", "test/**/*.ts", "ignition/**/*.ts", "artifacts/artifacts.d.ts", "artifacts/**/*.d.ts"]
+  "include": [
+    "hardhat.config.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "artifacts/artifacts.d.ts",
+    "artifacts/**/*.d.ts"
+  ]
 }

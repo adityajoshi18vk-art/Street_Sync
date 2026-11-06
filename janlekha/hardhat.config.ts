@@ -17,9 +17,17 @@ export default defineConfig({
       type: "http",
       chainType: "generic",
       chainId: 296,
-      // Resolved lazily, so local compile/test never needs these values.
-      url: configVariable("HEDERA_TESTNET_RPC_URL"),
+      // The RPC URL is public; the key is a config variable, resolved only when this network is used,
+      // from the server-only env var or `npx hardhat keystore set HEDERA_TESTNET_PRIVATE_KEY`.
+      url: process.env.HEDERA_TESTNET_RPC_URL || "https://testnet.hashio.io/api",
       accounts: [configVariable("HEDERA_TESTNET_PRIVATE_KEY")],
+      timeout: 120_000,
+    },
+    // Rehearsal target for the deployment scripts: `npm run contracts:node` in another terminal.
+    localhost: {
+      type: "http",
+      chainType: "generic",
+      url: "http://127.0.0.1:8545",
     },
   },
 });
