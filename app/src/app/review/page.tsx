@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { IDKitWidget } from "@worldcoin/idkit";
-import type { ISuccessResult } from "@worldcoin/idkit";
+import WorldIdButton from "@/components/WorldIdButton";
 import {
   useAccount,
   useBlockNumber,
@@ -21,15 +20,13 @@ import {
   ESCROW_ADDRESS,
   USDC_ADDRESS,
   USDC_ABI,
-  WORLD_APP_ID,
-  WORLD_ACTION_REVIEWER,
   contractsDeployed,
   formatUsdc,
   formatUsdcDisplay,
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { getReviewerAssignments, requestAttestation, type Attestation } from "@/lib/api";
+import { getReviewerAssignments, type Attestation } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
 import { shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
 import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
@@ -45,7 +42,6 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
   const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const config = useConfig();
   const { writeContractAsync } = useWriteContract();
-  const attestationRef = useRef<Attestation | null>(null);
 
   const { data: reviewerTuple } = useReadContract({
     chainId: ACTIVE_CHAIN.id,
@@ -179,42 +175,15 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
               {txHash && (
                 <p className="break-all text-[11px] text-emerald-600">Registration tx: {txHash}</p>
               )}
-              <IDKitWidget
-                app_id={WORLD_APP_ID}
-                action={WORLD_ACTION_REVIEWER}
-                signal={address ?? undefined}
-                handleVerify={async (result: ISuccessResult) => {
-                  if (!address) throw new Error("Connect a wallet first");
-                  const attestation = await requestAttestation({
-                    wallet: address,
-                    role: "reviewer",
-                    bountyId: "0",
-                    action: WORLD_ACTION_REVIEWER,
-                    worldIdProof: {
-                      nullifier_hash: result.nullifier_hash,
-                      merkle_root: result.merkle_root,
-                      proof: result.proof,
-                      verification_level: result.verification_level
-                    }
-                  });
-                  attestationRef.current = attestation;
-                }}
-                onSuccess={() => {
-                  if (attestationRef.current) void register(attestationRef.current);
-                }}
-                onError={(err) => setError(`World ID error: ${err.code} — ${err.message}`)}
-              >
-                {({ open }) => (
-                  <button
-                    type="button"
-                    onClick={open}
-                    disabled={busy || !canWrite}
-                    className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:bg-gray-300"
-                  >
-                    {busy ? "Registering…" : "Verify & stake to become a reviewer"}
-                  </button>
-                )}
-              </IDKitWidget>
+              <WorldIdButton
+                role="reviewer"
+                bountyId="0"
+                wallet={address}
+                disabled={busy || !canWrite}
+                label={busy ? "Registering…" : "Verify & stake to become a reviewer"}
+                onAttestation={register}
+                onError={setError}
+              />
             </div>
           )}
         </>
