@@ -44,7 +44,7 @@ export default function StickersPage() {
         <div className="mx-auto w-full max-w-md card border-dashed p-10 text-center">
           <p className="text-5xl">🏅</p>
           <h1 className="heading mt-4 text-2xl">Your Sticker Book</h1>
-          <p className="mx-auto mt-2 max-w-xs text-[15px] leading-5 text-slate-400">
+          <p className="mx-auto mt-2 max-w-xs text-[15px] leading-5 text-zinc-400">
             Connect your wallet to see the stickers you&apos;ve collected by funding,
             fixing, and reviewing civic repairs.
           </p>
@@ -72,7 +72,7 @@ export default function StickersPage() {
             <h1 className="heading text-3xl">
               {profile?.level.title ?? "Sticker Book"}
             </h1>
-            <p className="mt-1 flex items-center gap-2 text-sm text-slate-300">
+            <p className="mt-1 flex items-center gap-2 text-sm text-zinc-300">
               {profile ? (
                 `${profile.earnedCount} of ${profile.totalCount} stickers collected · ${profile.xp} XP`
               ) : (
@@ -84,7 +84,7 @@ export default function StickersPage() {
             </p>
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-xs">
-            <div className="flex justify-between text-[11px] font-semibold text-slate-300">
+            <div className="flex justify-between text-[11px] font-semibold text-zinc-300">
               <span>{profile?.level.minXp ?? 0} XP</span>
               <span>{profile?.level.nextXp != null ? `${profile.level.nextXp} XP` : "MAX"}</span>
             </div>
@@ -151,7 +151,7 @@ export default function StickersPage() {
         </div>
       ) : null}
 
-      <p className="text-center text-xs text-slate-500">
+      <p className="text-center text-xs text-zinc-500">
         Stickers are earned automatically from your on-chain activity — fund a bounty,
         fix a street, or review a repair to grow your collection.
       </p>

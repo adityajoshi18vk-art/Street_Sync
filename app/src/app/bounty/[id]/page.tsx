@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useParams } from "next/navigation";
 import {
   useAccount,
@@ -77,6 +78,43 @@ export default function BountyDetailPage() {
     query: { enabled: !!ESCROW_ADDRESS && contractsDeployed }
   });
 
+  // Hooks must run before the early returns below, so derive the key from the raw read.
+  const evidenceKey = (bounty as { arkivEntityKey?: string } | undefined)?.arkivEntityKey;
+
+  useEffect(() => {
+    if (!evidenceKey || isZeroHash(evidenceKey)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = getArkivClient();
+        const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        const candidates = [
+          lookupStoredEntityKey(evidenceKey),
+          lookupBountyEntityKey(bountyId ?? ""),
+          evidenceKey
+        ].filter((k): k is string => !!k && k !== ZERO_KEY);
+
+        for (const k of candidates) {
+          try {
+            const res = await readEvidenceBundle(client, k);
+            const unpacked = await unpackBundle(res.bundle);
+            if (!cancelled && unpacked.metadata?.video) {
+              setVideoEvidence(unpacked.metadata.video);
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [evidenceKey, bountyId]);
+
   if (!contractsDeployed) {
     return (
       <div className="alert-warn p-6">
@@ -113,39 +151,6 @@ export default function BountyDetailPage() {
   const isWorker = !!address && address.toLowerCase() === b.worker?.toLowerCase();
   const nowSeconds = Math.floor(Date.now() / 1000);
 
-  useEffect(() => {
-    if (!hasEvidence || !b?.arkivEntityKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const client = getArkivClient();
-        const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
-        const candidates = [
-          lookupStoredEntityKey(b.arkivEntityKey),
-          lookupBountyEntityKey(bountyId ?? ""),
-          b.arkivEntityKey
-        ].filter((k): k is string => !!k && k !== ZERO_KEY);
-
-        for (const k of candidates) {
-          try {
-            const res = await readEvidenceBundle(client, k);
-            const unpacked = await unpackBundle(res.bundle);
-            if (!cancelled && unpacked.metadata?.video) {
-              setVideoEvidence(unpacked.metadata.video);
-              break;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hasEvidence, b?.arkivEntityKey, bountyId]);
 
   const handlePledge = async () => {
     if (!address) return;
@@ -185,15 +190,16 @@ export default function BountyDetailPage() {
   return (
     <div className="space-y-5">
       <div className="animate-rise flex items-center justify-between">
-        <Link href="/" className="text-sm font-medium text-brand-300 transition hover:text-brand-200">
-          ← Map
+        <Link href="/" className="btn-ghost btn-sm">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Map
         </Link>
         <StatusBadge status={b.status} />
       </div>
 
       <div className="card animate-rise stagger-1 p-6">
         <h1 className="heading text-2xl">Bounty #{b.id.toString()}</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           {lat.toFixed(5)}, {lng.toFixed(5)} · region cell {b.regionCell}
         </p>
 
@@ -221,7 +227,7 @@ export default function BountyDetailPage() {
                 {String(b.visualChallengeCode).padStart(4, "0")}
               </p>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-zinc-400">
               Anti-spoofing code burned into evidence photos by the worker&apos;s camera.
             </p>
           </div>
@@ -276,7 +282,7 @@ export default function BountyDetailPage() {
               value={revealDeadline ? formatUtc(revealDeadline as bigint) : "—"}
             />
             {commitDeadline ? (
-              <p className="col-span-3 text-[11px] text-slate-500">
+              <p className="col-span-3 text-[11px] text-zinc-500">
                 Commit window ends {formatUtc(commitDeadline as bigint)} · reveal{" "}
                 {revealDeadline ? formatUtc(revealDeadline as bigint) : "—"}
                 {nowSeconds > Number(revealDeadline ?? 0n) && " (expired — pokeOrReplace available)"}
@@ -304,7 +310,7 @@ export default function BountyDetailPage() {
                 disabled={!isConnected || !pledgeAmount || pledging}
                 className="btn-success shrink-0 px-5"
               >
-                {pledging && <span className="spinner spinner-sm border-white/30 border-t-white" aria-hidden />}
+                {pledging && <span className="spinner spinner-sm spinner-inherit" aria-hidden />}
                 {pledging ? "Pledging…" : "Pledge"}
               </button>
             </div>
@@ -360,7 +366,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="card-inset px-3 py-2.5">
       <p className="label-micro">{label}</p>
-      <p className="mt-0.5 font-mono text-xs font-semibold text-slate-200">{value}</p>
+      <p className="mt-0.5 font-mono text-xs font-semibold text-zinc-200">{value}</p>
     </div>
   );
 }
@@ -379,7 +385,7 @@ function ActionCard({
   return (
     <div className="card card-hover flex flex-col p-5">
       <p className="heading text-base">{title}</p>
-      <p className="mt-1 flex-1 text-xs text-slate-400">{description}</p>
+      <p className="mt-1 flex-1 text-xs text-zinc-400">{description}</p>
       <Link
         href={href}
         className="btn-primary mt-4"

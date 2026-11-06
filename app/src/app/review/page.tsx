@@ -29,7 +29,7 @@ import {
 import { approveUsdcExact } from "@/lib/tx";
 import { getReviewerAssignments, requestAttestation, type Attestation } from "@/lib/api";
 import { getArkivClient, lookupBountyEntityKey, lookupStoredEntityKey } from "@/lib/arkiv";
-import { shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
+import { readBountyStruct, shortAddress, statusName, type ReviewerAssignment } from "@/lib/types";
 import type { ArkivVerificationResult } from "@streetsync/arkiv-client";
 import BeforeAfterSlider from "@/components/BeforeAfterSlider";
 import CommitRevealCard from "@/components/CommitRevealCard";
@@ -129,9 +129,9 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
     <section className="card p-5 animate-rise">
       <h2 className="heading text-sm">Reviewer registration</h2>
       {registered ? (
-        <div className="mt-3 space-y-1 text-sm text-slate-300">
+        <div className="mt-3 space-y-1 text-sm text-zinc-300">
           <p className="font-semibold text-emerald-300">Active reviewer ✓</p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-zinc-400">
             Region cell {reviewer?.regionCell} · stake{" "}
             {reviewer ? formatUsdcDisplay(reviewer.stakedAmount) : "—"} USDC · rewards{" "}
             {reviewer ? formatUsdcDisplay(reviewer.rewardBalance) : "—"} USDC
@@ -139,7 +139,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
         </div>
       ) : (
         <>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-zinc-400">
             Verify with World ID, approve exactly {formatUsdcDisplay(stake)} USDC of stake, and
             register. Stakes are slashed if you sit on a panel and fail to reveal.
           </p>
@@ -149,11 +149,11 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between card-inset p-3 text-xs text-slate-400">
+              <div className="flex items-center justify-between card-inset p-3 text-xs text-zinc-400">
                 <span>
                   Region: <span className="font-semibold">{gps ? regionCellFromLatLng(gps.lat, gps.lng) : "—"}</span>
                   {gps && (
-                    <span className="ml-1 text-slate-500">
+                    <span className="ml-1 text-zinc-500">
                       ({gps.lat.toFixed(4)}, {gps.lng.toFixed(4)})
                     </span>
                   )}
@@ -205,7 +205,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                   >
                     {busy ? (
                       <>
-                        <span className="spinner spinner-sm border-white/40 border-t-white" />
+                        <span className="spinner spinner-sm spinner-inherit" />
                         Registering…
                       </>
                     ) : (
@@ -347,7 +347,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
             >
               {verification.signatureValid ? "Worker signature valid" : "Signature invalid"}
             </span>
-            <span className="rounded-full bg-white/5 px-2 py-0.5 text-slate-300 ring-1 ring-white/10">
+            <span className="rounded-full bg-white/5 px-2 py-0.5 text-zinc-300 ring-1 ring-white/10">
               {bundleSize ? `${(bundleSize / 1024).toFixed(1)} KiB bundle` : ""}
             </span>
           </div>
@@ -355,7 +355,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
           {beforeUrl && afterUrl ? (
             <BeforeAfterSlider beforeUrl={beforeUrl} afterUrl={afterUrl} />
           ) : (
-            <p className="text-xs text-slate-500">Photos unavailable in bundle.</p>
+            <p className="text-xs text-zinc-500">Photos unavailable in bundle.</p>
           )}
 
           {verification.metadata?.video && (
@@ -392,9 +392,9 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
           )}
 
           {verification.metadata && (
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-400">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-zinc-400">
               <dt>Challenge code</dt>
-              <dd className="font-mono font-semibold text-slate-200">
+              <dd className="font-mono font-semibold text-zinc-200">
                 {String(verification.metadata.visualChallengeCode).padStart(4, "0")}
               </dd>
               <dt>GPS accuracy</dt>
@@ -421,7 +421,7 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
         </div>
       )}
       {!verification && !loading && !error && (
-        <p className="mt-2 text-xs text-slate-500">Press Re-fetch to pull the bundle.</p>
+        <p className="mt-2 text-xs text-zinc-500">Press Re-fetch to pull the bundle.</p>
       )}
     </section>
   );
@@ -487,14 +487,14 @@ function AssignmentCard({
     query: { enabled: contractsDeployed }
   });
 
-  const b = raw as unknown[] | undefined;
-  const status = b ? Number(b[16]) : (assignment.bountyStatus ?? -1);
-  const worker = b && typeof b[9] === "string" ? (b[9] as string) : assignment.worker;
-  const arkivKey = b && typeof b[11] === "string" ? (b[11] as string) : null;
-  const evidenceHash = b && typeof b[12] === "string" ? (b[12] as string) : null;
-  const selectionBlock = b ? BigInt(b[13] as bigint) : null;
-  const reviewRound = b ? Number(b[14]) : assignment.reviewRound;
-  const totalPledged = b ? (b[6] as bigint) : BigInt(assignment.totalPledged || "0");
+  const b = readBountyStruct(raw);
+  const status = b ? b.status : (assignment.bountyStatus ?? -1);
+  const worker = b ? b.worker : assignment.worker;
+  const arkivKey = b ? b.arkivEntityKey : null;
+  const evidenceHash = b ? b.evidenceHash : null;
+  const selectionBlock = b ? BigInt(b.selectionBlock) : null;
+  const reviewRound = b ? b.reviewRound : assignment.reviewRound;
+  const totalPledged = b ? b.totalPledged : BigInt(assignment.totalPledged || "0");
 
   const panelMembers = (panel as unknown as string[] | undefined) ?? [];
   const onPanel = !!address && panelMembers.some((m) => m.toLowerCase() === address.toLowerCase());
@@ -548,11 +548,11 @@ function AssignmentCard({
         >
           Bounty #{assignment.bountyId}
         </Link>
-        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-slate-300 ring-1 ring-white/10">
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-zinc-300 ring-1 ring-white/10">
           {statusName(status)} · round {reviewRound}
         </span>
       </div>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-zinc-400">
         Pool {formatUsdcDisplay(totalPledged)} USDC · panel{" "}
         {panelMembers.filter((m) => m !== "0x0000000000000000000000000000000000000000").length}/3
         {myVote?.committed ? ` · committed${myVote.revealed ? " & revealed" : ""}` : ""}
@@ -560,7 +560,7 @@ function AssignmentCard({
 
       {status === 2 && (
         <div className="card-inset p-3">
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-zinc-300">
             {panelReady
               ? "Selection block reached — you can assign the panel now."
               : `Waiting for randomness: ${blocksRemaining !== null && blocksRemaining > 0 ? `${blocksRemaining} more block${blocksRemaining === 1 ? "" : "s"}` : "confirming…"} (needs block > ${selectionBlock?.toString()})`}
@@ -595,10 +595,10 @@ function AssignmentCard({
                 onTxSuccess={onTx}
               />
             ) : (
-              <p className="text-xs text-slate-500">Loading voting windows…</p>
+              <p className="text-xs text-zinc-500">Loading voting windows…</p>
             )
           ) : (
-            <p className="card-inset p-3 text-xs text-slate-400">
+            <p className="card-inset p-3 text-xs text-zinc-400">
               You are not on this panel (3 reviewers were drawn from your region pool). You can
               still inspect the evidence above and settle once the window closes.
             </p>
@@ -678,7 +678,7 @@ export default function ReviewPage() {
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <header className="mb-8 animate-rise">
         <h1 className="heading text-3xl">Reviewer dashboard</h1>
-        <p className="mt-1.5 text-[15px] leading-5 text-slate-400">
+        <p className="mt-1.5 text-[15px] leading-5 text-zinc-400">
           Stake, inspect evidence, commit-reveal your vote, and keep panels honest.
         </p>
       </header>
@@ -693,7 +693,7 @@ export default function ReviewPage() {
         )}
 
         {assignments && assignments.length === 0 && (
-          <p className="card border-dashed p-5 text-sm text-slate-400">
+          <p className="card border-dashed p-5 text-sm text-zinc-400">
             No panel assignments yet. Once registered, panels are drawn from your region pool
             after a worker submits evidence.
           </p>
@@ -707,9 +707,9 @@ export default function ReviewPage() {
           />
         ))}
 
-        <p className="pt-4 text-center text-xs text-slate-500">
+        <p className="pt-4 text-center text-xs text-zinc-500">
           Escrow {shortAddress(ESCROW_ADDRESS, 4)} ·{" "}
-          <Link href="/audit/1" className="text-slate-400 underline hover:text-slate-200">
+          <Link href="/audit/1" className="text-zinc-400 underline hover:text-zinc-200">
             try the public audit
           </Link>
         </p>

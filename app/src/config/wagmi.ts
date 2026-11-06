@@ -9,6 +9,9 @@ export const SUPPORTED_CHAINS = [ARC_TESTNET, HARDHAT_LOCAL] as const;
 export const wagmiConfig = createConfig({
   chains: SUPPORTED_CHAINS,
   connectors: [injected({ shimDisconnect: true })],
+  // Restore the saved wallet connection after hydration, so a reload while connected
+  // doesn't render the address on the client where the server rendered "Connect Wallet".
+  ssr: true,
   transports: {
     [ARC_TESTNET.id]: http(ARC_RPC_URL),
     [HARDHAT_LOCAL.id]: http(process.env.NEXT_PUBLIC_LOCALHOST_RPC_URL)

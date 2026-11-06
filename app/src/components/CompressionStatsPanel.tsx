@@ -21,7 +21,7 @@ export default function CompressionStatsPanel({
     return (
       <div className="card border-dashed p-5">
         <p className="text-sm font-semibold text-white">Live Compression Benchmark</p>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-zinc-400">
           {busy
             ? "Running pipeline — resize → WebP → CBOR → Zstd…"
             : "Capture the before and after photos, then build the bundle to see the live benchmark."}
@@ -63,7 +63,7 @@ export default function CompressionStatsPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="heading text-base">Live Compression Benchmark</p>
-          <p className="text-xs text-slate-400">Rule 7 — single atomic Arkiv entity write</p>
+          <p className="text-xs text-zinc-400">Rule 7 — single atomic Arkiv entity write</p>
         </div>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${
@@ -97,10 +97,10 @@ export default function CompressionStatsPanel({
             key={row.label}
             className="card-inset flex items-baseline justify-between gap-3 px-3.5 py-2.5 text-xs"
           >
-            <span className="text-slate-400">{row.label}</span>
+            <span className="text-zinc-400">{row.label}</span>
             <span className="text-right">
-              <span className="font-mono font-semibold text-slate-200">{row.value}</span>
-              {row.detail && <span className="ml-1.5 text-slate-500">{row.detail}</span>}
+              <span className="font-mono font-semibold text-zinc-200">{row.value}</span>
+              {row.detail && <span className="ml-1.5 text-zinc-500">{row.detail}</span>}
             </span>
           </div>
         ))}
@@ -108,10 +108,10 @@ export default function CompressionStatsPanel({
 
       <div className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
-          <span className="font-semibold text-slate-200">
+          <span className="font-semibold text-zinc-200">
             Final bundle: {formatBytes(stats.totalBundleBytes)}
           </span>
-          <span className="text-slate-400">
+          <span className="text-zinc-400">
             {formatBytes(stats.rawTotalBytes)} raw → {stats.overallCompressionRatio.toFixed(1)}×
             smaller ({stats.overallSavingsPercent.toFixed(1)}% saved)
           </span>
@@ -129,7 +129,7 @@ export default function CompressionStatsPanel({
             title="120 KiB safe budget"
           />
         </div>
-        <div className="mt-1.5 flex justify-between text-[10px] text-slate-500">
+        <div className="mt-1.5 flex justify-between text-[10px] text-zinc-500">
           <span>0</span>
           <span className="text-amber-300">120 KiB safe budget</span>
           <span>128 KiB Arkiv hard limit ({MAX_ARKIV_PAYLOAD.toLocaleString()} B)</span>

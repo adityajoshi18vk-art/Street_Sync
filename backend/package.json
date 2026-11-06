@@ -5,20 +5,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file-if-exists=.env.arc src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node --env-file-if-exists=.env.arc dist/server.js",
     "test": "tsx --test test/backend.test.ts",
-    "db:reset": "rm -f data/streetsync.db && tsx src/server.ts"
+    "db:reset": "rm -f data/streetsync.db && tsx src/server.ts",
+    "dev:arc": "tsx watch --env-file=.env.arc src/server.ts",
+    "start:arc": "node --env-file=.env.arc dist/server.js"
   },
   "dependencies": {
+    "@fastify/cors": "^11.0.0",
     "@streetsync/arkiv-client": "^1.0.0",
     "@streetsync/evidence": "^1.0.0",
+    "@worldcoin/idkit-core": "^2.1.0",
+    "dotenv": "^16.4.0",
     "fastify": "^5.2.0",
-    "@fastify/cors": "^11.0.0",
     "pino-pretty": "^13.0.0",
-    "viem": "^2.21.0",
-    "dotenv": "^16.4.0"
+    "viem": "^2.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

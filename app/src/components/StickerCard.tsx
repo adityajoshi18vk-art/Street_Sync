@@ -13,10 +13,10 @@ const TIER_STYLES: Record<
     labelClass: "bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/30"
   },
   silver: {
-    disc: "bg-gradient-to-br from-slate-100 via-slate-300 to-slate-500",
-    ring: "ring-slate-300",
+    disc: "bg-gradient-to-br from-zinc-100 via-zinc-300 to-zinc-500",
+    ring: "ring-zinc-300",
     label: "Silver",
-    labelClass: "bg-slate-300/10 text-slate-200 ring-1 ring-slate-300/30"
+    labelClass: "bg-zinc-300/10 text-zinc-200 ring-1 ring-zinc-300/30"
   },
   gold: {
     disc: "bg-gradient-to-br from-yellow-200 via-amber-300 to-yellow-500",
@@ -66,10 +66,10 @@ export function StickerCard({ sticker, index }: { sticker: StickerStatus; index:
         </span>
       </div>
 
-      <p className={`mt-3 text-sm font-bold ${sticker.earned ? "text-white" : "text-slate-500"}`}>
+      <p className={`mt-3 text-sm font-bold ${sticker.earned ? "text-white" : "text-zinc-500"}`}>
         {sticker.name}
       </p>
-      <p className="mt-1 min-h-[2rem] text-[11px] leading-snug text-slate-400">
+      <p className="mt-1 min-h-[2rem] text-[11px] leading-snug text-zinc-400">
         {sticker.description}
       </p>
 
@@ -97,7 +97,7 @@ export function StickerCard({ sticker, index }: { sticker: StickerStatus; index:
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="mt-1 text-[10px] font-medium text-slate-500">
+          <p className="mt-1 text-[10px] font-medium text-zinc-500">
             {sticker.progress} / {sticker.target}
           </p>
         </div>

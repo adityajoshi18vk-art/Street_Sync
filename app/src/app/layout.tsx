@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Bricolage_Grotesque, Inter } from "next/font/google";
+import { Route } from "lucide-react";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ConnectButton";
-import { ACTIVE_CHAIN, isLocalNetwork, JANLEKHA_URL } from "@/config/contracts";
+import { DesktopNav, MobileTabBar } from "@/components/layout/SiteNav";
+import { ACTIVE_CHAIN, isLocalNetwork } from "@/config/contracts";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-display" });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display" });
 
 export const metadata: Metadata = {
   title: {
@@ -29,78 +31,59 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#000000"
+  themeColor: "#050506"
 };
-
-const NAV_LINKS = [
-  { href: "/", label: "Map" },
-  { href: "/review", label: "Review" },
-  { href: "/stickers", label: "Stickers" }
-];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+    <html lang="en" className={`${inter.variable} ${bricolage.variable}`}>
       <body className="min-h-dvh font-sans">
         <Providers>
-          <header className="sticky top-0 z-[600] border-b border-white/10 bg-black/65 backdrop-blur-md">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
-              <Link href="/" className="group flex items-center gap-2.5">
-                <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-sm font-black text-white shadow-glow-sm transition group-hover:shadow-glow">
-                  SS
-                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent-400 animate-glow-pulse" />
+          <header className="sticky top-0 z-[600] border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
+            <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-[1fr_auto_1fr]">
+              <Link href="/" className="group flex w-fit items-center gap-2.5" aria-label="StreetSync home">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-400 text-ink-950 shadow-glow-sm transition group-hover:rotate-[-6deg] group-hover:shadow-glow">
+                  <Route className="h-5 w-5" strokeWidth={2.5} aria-hidden />
                 </span>
                 <span className="font-display text-lg font-extrabold tracking-tight text-white">
-                  Street<span className="text-brand-400">Sync</span>
+                  Street<span className="text-brand-300">Sync</span>
                 </span>
                 <span
-                  className={`hidden rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider sm:inline ${
+                  className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider lg:inline-flex ${
                     isLocalNetwork
                       ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                      : "border-brand-400/30 bg-brand-400/10 text-brand-300"
+                      : "border-brand-300/25 bg-brand-400/10 text-brand-300"
                   }`}
                 >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-glow-pulse" />
                   {ACTIVE_CHAIN.name}
                 </span>
               </Link>
-              <nav className="hidden items-center gap-1 md:flex">
-                {NAV_LINKS.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    className="rounded-full px-3.5 py-1.5 text-[15px] font-semibold text-slate-400 transition hover:bg-white/10 hover:text-white"
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-                <a
-                  href={JANLEKHA_URL}
-                  className="ml-2 rounded-full border border-white/15 px-3.5 py-1.5 text-[15px] font-semibold text-slate-400 transition hover:bg-white/10 hover:text-accent-300"
-                >
-                  JanLekha · Spending
-                </a>
-              </nav>
-              <ConnectButton />
+              <DesktopNav />
+              <div className="flex justify-end">
+                <ConnectButton />
+              </div>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-6xl px-4 pb-24 pt-6 safe-bottom">
+          <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-6 md:pb-16">
             {children}
           </main>
-          <footer className="border-t border-white/[0.06] py-8">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-slate-500">
-              <p>
-                <span className="font-display font-bold text-slate-300">StreetSync</span> · verified
-                humans fixing real streets
+          <footer className="border-t border-white/[0.06] pb-28 pt-8 md:pb-8">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 text-xs text-zinc-500">
+              <p className="flex items-center gap-2">
+                <Route className="h-4 w-4 text-brand-300" aria-hidden />
+                <span className="font-display font-bold text-zinc-200">StreetSync</span> · verified humans fixing real streets
               </p>
-              <p className="flex items-center gap-3">
+              <p className="flex flex-wrap items-center gap-3">
                 <span>Arc Testnet · USDC escrow</span>
-                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span className="h-1 w-1 rounded-full bg-zinc-700" />
                 <span>World ID v4</span>
-                <span className="h-1 w-1 rounded-full bg-slate-600" />
+                <span className="h-1 w-1 rounded-full bg-zinc-700" />
                 <span>Arkiv + Swarm evidence</span>
               </p>
             </div>
           </footer>
+          <MobileTabBar />
         </Providers>
       </body>
     </html>

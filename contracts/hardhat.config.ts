@@ -2,7 +2,7 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "dotenv/config";
 
-const ARC_RPC_URL = process.env.ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz";
+const ARC_RPC_URL = process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io";
 const DEPLOYER_PK = process.env.DEPLOYER_PRIVATE_KEY ?? "0x" + "00".repeat(32); // placeholder
 
 const config: HardhatUserConfig = {

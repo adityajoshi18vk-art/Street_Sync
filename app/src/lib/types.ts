@@ -28,7 +28,7 @@ export const STATUS_TEXT_CLASSES: Record<StatusName, string> = {
   InReview: "text-orange-300 bg-orange-400/10 ring-orange-400/30",
   Approved: "text-blue-300 bg-blue-400/10 ring-blue-400/30",
   Rejected: "text-red-300 bg-red-400/10 ring-red-400/30",
-  Refunded: "text-slate-300 bg-slate-400/10 ring-slate-400/30"
+  Refunded: "text-zinc-300 bg-zinc-400/10 ring-zinc-400/30"
 };
 
 export function statusName(status: number): StatusName {
@@ -115,6 +115,36 @@ export interface OnChainBounty {
   reviewRound: number;
   reworkCount: number;
   status: number;
+}
+
+const BOUNTY_FIELDS = [
+  "id", "creator", "descriptionHash", "latE5", "lngE5", "regionCell", "totalPledged", "createdAt",
+  "claimDeadline", "worker", "visualChallengeCode", "arkivEntityKey", "evidenceHash", "selectionBlock",
+  "reviewRound", "reworkCount", "status"
+] as const satisfies readonly (keyof OnChainBounty)[];
+
+/**
+ * getBounty() returns a named tuple, which viem decodes as an object; ABIs without
+ * component names decode to an array. Accept both shapes.
+ */
+export function readBountyStruct(raw: unknown): OnChainBounty | null {
+  if (!raw || typeof raw !== "object") return null;
+  const src = raw as Record<string, unknown> & unknown[];
+  const named = "status" in src;
+  const out = {} as Record<string, unknown>;
+  BOUNTY_FIELDS.forEach((field, i) => {
+    out[field] = named ? src[field] : src[i];
+  });
+  return {
+    ...(out as unknown as OnChainBounty),
+    latE5: Number(out.latE5),
+    lngE5: Number(out.lngE5),
+    regionCell: Number(out.regionCell),
+    visualChallengeCode: Number(out.visualChallengeCode),
+    reviewRound: Number(out.reviewRound),
+    reworkCount: Number(out.reworkCount),
+    status: Number(out.status)
+  };
 }
 
 export interface ReviewerInfo {

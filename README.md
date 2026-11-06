@@ -176,10 +176,15 @@ npm run dev
 2. **World ID Staging Verification**:
    - In staging mode, test using the **[World ID Simulator](https://simulator.worldcoin.org)** without needing a physical Orb.
 
-3. **Deploying to Arc Testnet**:
-   1. Place your funded deployer private key in `.env`: `DEPLOYER_PRIVATE_KEY=0x...`
-   2. Run `npm run deploy:arc`
-   3. The script automatically updates `contracts/deployments/arcTestnet.json`, instantly configuring the frontend and backend.
+3. **Deploying to Arc Testnet** (RPC `https://rpc.testnet.arc.io`, explorer `https://explorer.testnet.arc.io`):
+   1. Create a private attester key (any fresh wallet; it needs no funds) and put it in `backend/.env.arc`
+      with `CHAIN_ID=5042002` and `DEPLOYMENTS_PATH=../contracts/deployments/arcTestnet.json` (see `backend/.env.example`).
+      The backend refuses Hardhat's public test key on non-local chains.
+   2. In `contracts/.env` set `DEPLOYER_PRIVATE_KEY` (funded from https://faucet.circle.com) and `ATTESTER_ADDRESS` (the address of that key).
+   3. Run `npm run deploy:arc`. It writes `contracts/deployments/arcTestnet.json` (addresses, ABIs, deployment block), which configures the app and backend.
+   4. Run `npm run smoke:arc` for a live lifecycle check (create → claim → review → settle → indexed); it takes about 6 minutes because the commit window is real time.
+
+   The current Arc deployment uses a publicly mintable MockUSDC; the app shows a **Get 100 test USDC** button so visitors can fund bounties (gas still comes from the Circle faucet).
 
 ---
 
@@ -212,7 +217,7 @@ npm run dev
 
 | Process | Port | Notes |
 | :--- | :--- | :--- |
-| StreetSync backend API | 3001 | `BACKEND_PORT`; reads Arc Testnet by default (`backend/.env`) |
+| StreetSync backend API | 3001 | `BACKEND_PORT`; uses Arc Testnet when `backend/.env.arc` exists, otherwise the local Hardhat chain (`backend/.env`) |
 | StreetSync app | 3000 | |
 | JanLekha app | 3100 | Starts its own local demo chain on 8547, deploys `JanLekha.sol` and seeds three synthetic projects. Nothing to configure. |
 
@@ -249,6 +254,11 @@ npm --prefix janlekha run test:e2e                                              
 ### Public testnet deployment
 
 - StreetSync: `npm run deploy:arc` (see section 6).
-- JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
+- JanLekha is deployed on Hedera Testnet at `0xb2e4942feac916fa6b8a94d9bd51adf73789fdab` (contract `0.0.11346873`,
+  [HashScan](https://hashscan.io/testnet/contract/0xb2e4942feac916fa6b8a94d9bd51adf73789fdab)); details in
+  `janlekha/deployments/hederaTestnet.json`. To point the app at it, put the `NEXT_PUBLIC_*` Hedera values from
+  `janlekha/.env.example` in `janlekha/.env` with that address and `NEXT_PUBLIC_JANLEKHA_DEPLOYMENT_BLOCK=42757755`,
+  delete `janlekha/.env.development.local`, and run `npm run dev` in `janlekha/`.
+- To redeploy JanLekha: set `HEDERA_TESTNET_PRIVATE_KEY` (a faucet-funded **ECDSA** testnet account) in `janlekha/.env`, then run
   `npm run deploy:janlekha:hedera` (deploy → grant roles → smoke test). Copy the printed address into
   `janlekha/.env` as `NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS`. See `janlekha/README.md` for details.

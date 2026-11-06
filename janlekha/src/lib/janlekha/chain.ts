@@ -47,7 +47,8 @@ export function publicClient(cfg: ChainConfig) {
       rpcUrls: { default: { http: [cfg.rpcUrl] } },
     }),
     // Fail fast so an unavailable RPC produces an error state instead of a hung page.
-    transport: http(cfg.rpcUrl, { timeout: 8_000, retryCount: 1 }),
+    // Hashio (Hedera's public relay) regularly takes ~5 s under load, so give it more headroom.
+    transport: http(cfg.rpcUrl, cfg.isHedera ? { timeout: 15_000, retryCount: 2 } : { timeout: 8_000, retryCount: 1 }),
   });
 }
 

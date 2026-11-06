@@ -52,7 +52,7 @@ const deployments: Record<number, DeploymentFile> = {
 };
 
 export const ARC_RPC_URL =
-  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz";
+  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.io";
 
 export const ARC_TESTNET = defineChain({
   id: ARC_CHAIN_ID,
@@ -68,7 +68,7 @@ export const ARC_TESTNET = defineChain({
   blockExplorers: {
     default: {
       name: "Arc Explorer",
-      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.arc-testnet.circlelabs.xyz"
+      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.testnet.arc.io"
     }
   },
   testnet: true
@@ -113,6 +113,9 @@ export const USDC_ADDRESS: Address | null =
   deploymentForChain.contracts.USDC?.address ??
   null;
 
+/** True when the active deployment uses the publicly mintable MockUSDC (demo/testnet). */
+export const usesMockUsdc = !envUsdc && !!deploymentForChain.contracts.MockUSDC?.address;
+
 export const contractsDeployed =
   ESCROW_ADDRESS !== null &&
   USDC_ADDRESS !== null &&
@@ -136,12 +139,18 @@ export const BACKEND_API_URL =
 /** JanLekha, the spending-transparency feature of this project (separate app, see README). */
 export const JANLEKHA_URL = process.env.NEXT_PUBLIC_JANLEKHA_URL ?? "http://localhost:3100";
 
+// StreetSync's production World ID app (public identifier; also in backend/.env).
 export const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ??
-  "app_staging_streetsync") as `app_${string}`;
+  "app_401e8c235a6b3bbd1bc62df14d5c021d") as `app_${string}`;
 export const WORLD_ACTION_WORKER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_WORKER ?? "claim-bounty";
 export const WORLD_ACTION_REVIEWER =
   process.env.NEXT_PUBLIC_WORLD_ACTION_REVIEWER ?? "register-reviewer";
+
+/** Worker claims verify against a per-bounty action: one human, one claim per bounty. Must match the backend. */
+export function workerActionFor(bountyId: string | number): string {
+  return `${WORLD_ACTION_WORKER}-${bountyId}`;
+}
 
 /**
  * parseUnits(amount, 6) — the ONLY sanctioned way to turn a human USDC amount

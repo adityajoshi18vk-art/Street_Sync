@@ -20,13 +20,13 @@ export default function AuditPage() {
             no wallet required
           </span>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-slate-400">
+        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
           Anyone can verify the evidence: fetch the raw SSYN bundle from Arkiv, recompute the
           SHA-256 commitment in your browser, and check the worker&apos;s EIP-191 signature
           against what the escrow stored on Arc. Flip one byte with &quot;Simulate Tamper&quot;
           to see the on-chain hash check fail.
         </p>
-        <p className="mt-2 font-mono text-xs text-slate-500">
+        <p className="mt-2 font-mono text-xs text-zinc-500">
           Escrow {shortAddress(ESCROW_ADDRESS, 4)}
         </p>
       </header>

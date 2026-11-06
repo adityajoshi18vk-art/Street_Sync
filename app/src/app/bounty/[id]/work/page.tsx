@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { IDKitWidget } from "@worldcoin/idkit";
 import type { ISuccessResult } from "@worldcoin/idkit";
 import { useAccount, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
@@ -16,14 +17,14 @@ import {
   USDC_ADDRESS,
   USDC_ABI,
   WORLD_APP_ID,
-  WORLD_ACTION_WORKER,
+  workerActionFor,
   contractsDeployed,
   formatUsdcDisplay
 } from "@/config/contracts";
 import { requestAttestation, type Attestation, type WorldIdSuccessResult } from "@/lib/api";
 import { getArkivClient, rememberEntityMapping } from "@/lib/arkiv";
 import { buildSignedBundle, type CompressionStats, type EvidenceMetadata } from "@/lib/evidence";
-import { statusName } from "@/lib/types";
+import { readBountyStruct, statusName } from "@/lib/types";
 import CameraCapture, { type CaptureResult } from "@/components/CameraCapture";
 import CompressionStatsPanel from "@/components/CompressionStatsPanel";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -91,12 +92,12 @@ export default function WorkerPage() {
     query: { enabled: contractsDeployed && !!address }
   });
 
-  const raw = bounty as unknown[] | undefined;
-  const status = raw ? Number(raw[16]) : -1;
-  const worker = raw && typeof raw[9] === "string" ? (raw[9] as string) : undefined;
-  const challengeCode = raw ? Number(raw[10]) : 0;
+  const onChain = readBountyStruct(bounty);
+  const status = onChain ? onChain.status : -1;
+  const worker = onChain?.worker;
+  const challengeCode = onChain ? onChain.visualChallengeCode : 0;
   const isWorker = !!address && !!worker && worker.toLowerCase() === address.toLowerCase();
-  const evidenceHash = raw && typeof raw[12] === "string" ? (raw[12] as string) : null;
+  const evidenceHash = onChain?.evidenceHash ?? null;
 
   const deviceSummary = useMemo(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return "unknown";
@@ -151,13 +152,13 @@ export default function WorkerPage() {
         wallet: address,
         role: "worker",
         bountyId,
-        action: WORLD_ACTION_WORKER,
+        action: workerActionFor(bountyId),
         worldIdProof: proof
       });
       attestationRef.current = attestation;
       await runClaim(attestation);
     },
-    [address, bountyId, runClaim, WORLD_ACTION_WORKER]
+    [address, bountyId, runClaim]
   );
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
@@ -302,8 +303,9 @@ export default function WorkerPage() {
     return (
       <main className="mx-auto max-w-xl px-4 py-10">
         <p className="text-sm text-red-300">Invalid bounty id: {bountyId}</p>
-        <Link href="/" className="mt-4 inline-block text-sm font-semibold text-brand-300 hover:text-brand-200">
-          ← Back to the map
+        <Link href="/" className="btn-ghost btn-sm mt-4">
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Back to the map
         </Link>
       </main>
     );
@@ -316,7 +318,7 @@ export default function WorkerPage() {
           <h1 className="heading text-2xl">Work bounty #{bountyId}</h1>
           <StatusBadge status={status} />
         </div>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           Verify → claim → before/after photos → Arkiv → submitEvidence
         </p>
       </header>
@@ -336,7 +338,7 @@ export default function WorkerPage() {
       {phase === "verify" && (
         <section className="card animate-rise stagger-1 p-6">
           <h2 className="heading text-base">1 · Verify with World ID</h2>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-zinc-400">
             Prove humanity once with World ID v4. The backend countersigns an EIP-712
             attestation which this page submits to <code>claim()</code>.
           </p>
@@ -349,7 +351,7 @@ export default function WorkerPage() {
             <div className="mt-4">
               <IDKitWidget
                 app_id={WORLD_APP_ID}
-                action={WORLD_ACTION_WORKER}
+                action={workerActionFor(bountyId)}
                 signal={address}
                 handleVerify={handleWorldIdVerify}
                 onSuccess={() => {
@@ -370,7 +372,7 @@ export default function WorkerPage() {
             </div>
           )}
           {status !== 0 && (
-            <p className="mt-3 text-xs text-slate-400">
+            <p className="mt-3 text-xs text-zinc-400">
               This bounty is no longer open for claims (status {statusName(status)}).
             </p>
           )}
@@ -394,7 +396,7 @@ export default function WorkerPage() {
             </h2>
             {challengeCode > 0 ? (
               <>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-zinc-400">
                   Emitted deterministically by the contract on claim. It is burned into
                   every photo frame by the camera HUD — keep it visible while shooting.
                 </p>
@@ -413,7 +415,7 @@ export default function WorkerPage() {
                 </div>
               </>
             ) : (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-zinc-400">
                 No challenge code yet — it appears after claim().
               </p>
             )}
@@ -440,8 +442,8 @@ export default function WorkerPage() {
                   <div key={i} className="card overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={cap.previewUrl} alt={`${cap.slot} capture`} className="h-40 w-full object-cover" />
-                    <div className="p-2.5 text-[11px] text-slate-400">
-                      <span className="font-semibold capitalize text-slate-200">{cap.slot}</span>
+                    <div className="p-2.5 text-[11px] text-zinc-400">
+                      <span className="font-semibold capitalize text-zinc-200">{cap.slot}</span>
                       {cap.telemetry.lat !== null && (
                         <>
                           {" · "}
@@ -458,7 +460,7 @@ export default function WorkerPage() {
                     </div>
                   </div>
                 ) : (
-                  <div key={i} className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02] text-xs text-slate-500">
+                  <div key={i} className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02] text-xs text-zinc-500">
                     {i === 0 ? "Before photo" : "After photo"}
                   </div>
                 )
@@ -506,7 +508,7 @@ export default function WorkerPage() {
             >
               {phase === "building" ? (
                 <>
-                  <span className="spinner spinner-sm border-white/30 border-t-white" aria-hidden />
+                  <span className="spinner spinner-sm spinner-inherit" aria-hidden />
                   Building bundle…
                 </>
               ) : (
@@ -583,12 +585,12 @@ export default function WorkerPage() {
       )}
 
       {evidenceHash && evidenceHash !== "0x" + "0".repeat(64) && (
-        <p className="card-inset mt-6 break-all p-3 font-mono text-[11px] text-slate-400">
+        <p className="card-inset mt-6 break-all p-3 font-mono text-[11px] text-zinc-400">
           On-chain evidence hash: {evidenceHash}
         </p>
       )}
 
-      <p className="mt-8 text-center text-xs text-slate-500">
+      <p className="mt-8 text-center text-xs text-zinc-500">
         Escrow {(ESCROW_ADDRESS ?? "").slice(0, 10)}… · USDC{" "}
         {(typeof usdcBalance === "bigint" ? formatUsdcDisplay(usdcBalance) : "—")} available
       </p>
