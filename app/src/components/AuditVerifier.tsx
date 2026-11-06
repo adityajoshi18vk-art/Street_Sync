@@ -222,7 +222,8 @@ export default function AuditVerifier({ bountyId }: { bountyId: string }) {
       )}
 
       {phase === "loading" && (
-        <div className="card p-6 text-center text-sm text-slate-400">
+        <div className="card flex flex-col items-center gap-3 p-6 text-center text-sm text-slate-400">
+          <span className="spinner" aria-hidden />
           Fetching raw entity bytes from Arkiv and recomputing SHA-256…
         </div>
       )}

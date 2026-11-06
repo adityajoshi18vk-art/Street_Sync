@@ -40,13 +40,15 @@ export default function StickersPage() {
 
   if (!target) {
     return (
-      <div className="mx-auto max-w-md card animate-rise border-dashed p-10 text-center">
-        <p className="text-4xl">🏅</p>
-        <h1 className="heading mt-3 text-xl">Your Sticker Book</h1>
-        <p className="mt-2 text-sm text-slate-400">
-          Connect your wallet to see the stickers you&apos;ve collected by funding,
-          fixing, and reviewing civic repairs.
-        </p>
+      <div className="flex min-h-[55vh] items-center justify-center animate-rise">
+        <div className="mx-auto w-full max-w-md card border-dashed p-10 text-center">
+          <p className="text-5xl">🏅</p>
+          <h1 className="heading mt-4 text-2xl">Your Sticker Book</h1>
+          <p className="mx-auto mt-2 max-w-xs text-[15px] leading-5 text-slate-400">
+            Connect your wallet to see the stickers you&apos;ve collected by funding,
+            fixing, and reviewing civic repairs.
+          </p>
+        </div>
       </div>
     );
   }
@@ -70,10 +72,15 @@ export default function StickersPage() {
             <h1 className="heading text-3xl">
               {profile?.level.title ?? "Sticker Book"}
             </h1>
-            <p className="mt-1 text-sm text-slate-300">
-              {profile
-                ? `${profile.earnedCount} of ${profile.totalCount} stickers collected · ${profile.xp} XP`
-                : "Loading your collection…"}
+            <p className="mt-1 flex items-center gap-2 text-sm text-slate-300">
+              {profile ? (
+                `${profile.earnedCount} of ${profile.totalCount} stickers collected · ${profile.xp} XP`
+              ) : (
+                <>
+                  <span className="spinner spinner-sm" />
+                  Loading your collection…
+                </>
+              )}
             </p>
           </div>
           <div className="min-w-[180px] flex-1 sm:max-w-xs">

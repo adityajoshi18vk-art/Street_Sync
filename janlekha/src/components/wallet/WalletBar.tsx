@@ -26,9 +26,16 @@ export function WalletBar() {
             type="button"
             onClick={() => connect.mutate({ connector: c, chainId: appChain.id })}
             disabled={connect.isPending}
-            className="btn-ghost !px-3 !py-1.5 !text-xs"
+            className="btn-white btn-sm"
           >
-            {connect.isPending ? "Connecting…" : `Connect ${c.name === "Injected" ? "wallet" : c.name}`}
+            {connect.isPending ? (
+              <>
+                <span className="spinner !size-4" aria-hidden="true" />
+                Connecting…
+              </>
+            ) : (
+              `Connect ${c.name === "Injected" ? "wallet" : c.name}`
+            )}
           </button>
         ))}
         {connect.error && (
@@ -61,7 +68,7 @@ export function WalletBar() {
               ? "Roles unavailable"
               : CONTRACT_ADDRESS ? "Checking roles…" : ""}
         </span>
-        <button type="button" onClick={() => disconnect.mutate()} className="text-slate-400 underline underline-offset-2">
+        <button type="button" onClick={() => disconnect.mutate()} className="rounded-full px-3 py-1 font-bold text-slate-400 transition hover:bg-white/10 hover:text-white">
           Disconnect
         </button>
       </div>
@@ -72,7 +79,7 @@ export function WalletBar() {
             type="button"
             onClick={() => switchChain.mutate({ chainId: appChain.id })}
             disabled={switchChain.isPending}
-            className="rounded-md bg-gradient-to-b from-red-500 to-red-700 px-2 py-1 font-medium text-white disabled:opacity-50"
+            className="btn-danger btn-sm !text-xs"
           >
             {switchChain.isPending ? "Switching…" : `Switch to ${appChain.name}`}
           </button>

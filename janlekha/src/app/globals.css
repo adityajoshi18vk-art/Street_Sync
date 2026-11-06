@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink-950: #05070d;
-  --color-ink-900: #090d17;
-  --color-ink-800: #0d1322;
+  --color-ink-950: #000000;
+  --color-ink-900: #0a0a0a;
+  --color-ink-800: #16181c;
   --color-ink-700: #141c30;
-  --color-brand-200: #bcdeff;
-  --color-brand-300: #8ec9ff;
-  --color-brand-400: #59abff;
-  --color-brand-500: #338aff;
-  --color-brand-600: #1b6bf5;
-  --color-brand-700: #1554e1;
+  --color-brand-200: #bfe3fa;
+  --color-brand-300: #8ecdf8;
+  --color-brand-400: #4db1f3;
+  --color-brand-500: #1d9bf0;
+  --color-brand-600: #1a8cd8;
+  --color-brand-700: #177cc0;
   --color-accent-300: #67e8f9;
   --color-accent-400: #22d3ee;
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 8px 30px -12px rgb(0 0 0 / 0.6);
-  --shadow-glow: 0 0 0 1px rgb(51 138 255 / 0.25), 0 8px 32px -8px rgb(27 107 245 / 0.55);
-  --shadow-glow-sm: 0 4px 20px -6px rgb(27 107 245 / 0.5);
+  --shadow-glow: 0 0 0 1px rgb(29 155 240 / 0.25), 0 8px 32px -8px rgb(29 155 240 / 0.45);
+  --shadow-glow-sm: 0 4px 20px -6px rgb(29 155 240 / 0.4);
   --animate-rise: rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   @keyframes rise {
     from { opacity: 0; transform: translateY(14px); }
@@ -33,12 +33,12 @@ html {
 }
 
 body {
-  @apply bg-ink-950 text-slate-300 antialiased;
+  @apply bg-ink-950 text-slate-300 text-[15px] leading-5 antialiased;
   font-family: ui-sans-serif, system-ui, sans-serif;
   background-image:
-    radial-gradient(900px 480px at 15% -10%, rgb(27 107 245 / 0.16), transparent 62%),
-    radial-gradient(760px 420px at 88% -6%, rgb(6 182 212 / 0.1), transparent 60%),
-    radial-gradient(900px 600px at 70% 110%, rgb(124 58 237 / 0.08), transparent 55%);
+    radial-gradient(900px 480px at 15% -10%, rgb(29 155 240 / 0.07), transparent 62%),
+    radial-gradient(760px 420px at 88% -6%, rgb(29 155 240 / 0.04), transparent 60%),
+    radial-gradient(900px 600px at 70% 110%, rgb(255 255 255 / 0.02), transparent 55%);
   background-attachment: fixed;
 }
 
@@ -56,7 +56,7 @@ body::before {
 }
 
 ::selection {
-  background: rgb(51 138 255 / 0.35);
+  background: rgb(29 155 240 / 0.35);
 }
 
 *::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -70,7 +70,7 @@ body::before {
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-white/[0.08] bg-white/[0.03] shadow-card backdrop-blur-xl;
+    @apply rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl;
   }
   .card-hover {
     @apply transition-all duration-300 hover:-translate-y-0.5 hover:border-white/[0.16] hover:bg-white/[0.05];
@@ -79,20 +79,41 @@ body::before {
   .btn,
   .btn-primary,
   .btn-ghost,
-  .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40;
+  .btn-danger,
+  .btn-white {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-full px-5 py-2 text-[15px] font-bold leading-5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply bg-gradient-to-b from-brand-500 to-brand-700 px-4 py-2.5 text-white shadow-glow-sm hover:from-brand-400 hover:to-brand-600 hover:shadow-glow;
+    @apply bg-brand-500 text-white hover:bg-brand-600;
   }
   .btn-ghost {
-    @apply border border-white/10 bg-white/[0.04] px-4 py-2.5 text-slate-200 hover:border-white/20 hover:bg-white/[0.08];
+    @apply border border-white/25 bg-transparent text-white hover:bg-white/10;
   }
   .btn-danger {
-    @apply bg-gradient-to-b from-red-500 to-red-700 text-white hover:from-red-400 hover:to-red-600;
+    @apply bg-red-600 text-white hover:bg-red-500;
+  }
+  .btn-white {
+    @apply bg-white text-black hover:bg-white/90;
+  }
+  .btn-sm {
+    @apply min-h-8 px-4 py-1.5;
+  }
+  .spinner {
+    @apply inline-block size-6 shrink-0 animate-spin rounded-full border-2 border-white/20 border-t-brand-500;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-white/[0.06];
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.04), transparent);
+    animation: skeleton-shimmer 1.4s infinite;
   }
   .field {
-    @apply block w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 transition focus:border-brand-400/60 focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-brand-400/60;
+    @apply block w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-[15px] text-slate-100 placeholder:text-slate-500 transition focus:border-brand-400/60 focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-brand-400/60;
   }
   select.field option {
     @apply bg-ink-800 text-slate-100;
@@ -101,7 +122,7 @@ body::before {
     @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500;
   }
   .heading {
-    @apply font-bold tracking-tight text-white;
+    @apply font-extrabold tracking-tight text-white;
   }
   .text-gradient {
     @apply bg-gradient-to-r from-brand-300 via-accent-300 to-brand-400 bg-clip-text text-transparent;
@@ -115,6 +136,10 @@ input[type="file"]::file-selector-button {
 .stagger-1 { animation-delay: 60ms; }
 .stagger-2 { animation-delay: 120ms; }
 .stagger-3 { animation-delay: 180ms; }
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

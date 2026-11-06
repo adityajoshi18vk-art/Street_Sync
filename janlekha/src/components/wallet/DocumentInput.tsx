@@ -71,7 +71,7 @@ export function DocumentInput({
   }
 
   return (
-    <div className="rounded-lg border border-white/[0.08] p-3" data-testid={testId}>
+    <div className="rounded-lg border border-white/10 p-3" data-testid={testId}>
       <label htmlFor={id} className="text-sm font-medium text-slate-100">
         {label}
       </label>

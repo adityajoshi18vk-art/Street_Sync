@@ -96,7 +96,7 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
         <>
           <p className="text-sm text-slate-200">Your sealed bid is recorded (commitment <code className="font-mono text-xs">{shortHex(myBid.commitment, 10)}</code>).</p>
           {stored && (
-            <button type="button" onClick={() => downloadBidBackup(stored)} className="text-sm text-blue-300 underline underline-offset-2">
+            <button type="button" onClick={() => downloadBidBackup(stored)} className="text-sm text-brand-400 hover:underline">
               Download bid backup again
             </button>
           )}
@@ -139,7 +139,7 @@ function CommitBid({ s, now }: { s: ActionState; now: bigint }) {
                   downloadBidBackup(sealed);
                   setSealedState({ key: inputKey, backup: sealed, backedUp: true });
                 }}
-                className="mt-2 btn-ghost !px-3 !py-1.5"
+                className="mt-3 btn-ghost btn-sm"
               >
                 {backedUp ? "Backup downloaded ✓ (download again)" : "Download bid backup (required)"}
               </button>

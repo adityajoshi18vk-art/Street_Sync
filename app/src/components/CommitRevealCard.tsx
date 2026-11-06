@@ -241,13 +241,18 @@ export default function CommitRevealCard({
           <button
             onClick={handleCommit}
             disabled={isPending || busy !== null || !address || !!storedVote}
-            className="btn-primary mt-2 w-full py-2.5 text-sm"
+            className="btn-primary mt-2 w-full"
           >
-            {busy === "commit"
-              ? "Committing…"
-              : storedVote
-                ? "Vote committed"
-                : "1-click Commit Vote"}
+            {busy === "commit" ? (
+              <>
+                <span className="spinner spinner-sm border-white/40 border-t-white" />
+                Committing…
+              </>
+            ) : storedVote ? (
+              "Vote committed"
+            ) : (
+              "1-click Commit Vote"
+            )}
           </button>
           <p className="mt-1.5 text-[11px] text-slate-500">
             A random 32-byte salt is generated in your browser and saved locally — only the
@@ -260,9 +265,16 @@ export default function CommitRevealCard({
         <button
           onClick={handleReveal}
           disabled={isPending || busy !== null}
-          className="btn-primary mt-4 w-full py-2.5 text-sm"
+          className="btn-primary mt-4 w-full"
         >
-          {busy === "reveal" ? "Revealing…" : "Reveal Vote"}
+          {busy === "reveal" ? (
+            <>
+              <span className="spinner spinner-sm border-white/40 border-t-white" />
+              Revealing…
+            </>
+          ) : (
+            "Reveal Vote"
+          )}
         </button>
       )}
 
@@ -270,7 +282,7 @@ export default function CommitRevealCard({
         <button
           onClick={handlePoke}
           disabled={isPending || busy !== null}
-          className="btn-danger mt-4 w-full py-2.5 text-sm"
+          className="btn-danger mt-4 w-full"
         >
           {busy === "poke" ? "Poking…" : "Slash / Replace Inactive Reviewers (pokeOrReplace)"}
         </button>
