@@ -5,7 +5,11 @@
  * Covers the complete lifecycle:
  *   1. Contract unit tests (hardhat test)
  *   2. Local deploy (MockUSDC 6-decimal + StreetSyncEscrow) via in-process Hardhat node
- *   3. Funder1 creates bounty 50 USDC + Funder2 pledges 25 USDC → escrow = 75_000_000
+ *   3. Problem report: real WebP photo → packReport bundle → Funder1 creates the bounty
+ *      (50 USDC, descriptionHash + reportHash, status Proposed) + Funder2 pledges 25 USDC
+ *      → escrow = 75_000_000; unpackReport + reportHashOf match the on-chain getBounty fields
+ *   3b. Two Neighbour attestations (role=3) signed by the REAL backend signer → voteProblem
+ *      → status Proposed → Open
  *   4. Worker attestation (role=1) signed by the REAL backend signer → claim() → 4-digit code
  *   5. Evidence pipeline: before/after photos + GPS metadata → @streetsync/evidence
  *      CBOR + Zstd WASM compression → benchmark (<128,000 bytes) → Arkiv write (in-memory
@@ -26,7 +30,14 @@ import os from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { ethers } from "ethers";
 import sharp from "sharp";
-import { packBundle, resizeAndEncodePhoto } from "@streetsync/evidence";
+import {
+  packBundle,
+  resizeAndEncodePhoto,
+  packReport,
+  unpackReport,
+  reportHashOf,
+  descriptionHashOf,
+} from "@streetsync/evidence";
 import {
   writeEvidenceBundle,
   verifyEvidenceBundle,
@@ -40,6 +51,9 @@ const RPC_PORT = 18545 + (process.pid % 500);
 const RPC_URL = `http://127.0.0.1:${RPC_PORT}`;
 const USDC_6 = (n: number) => BigInt(Math.round(n * 1e6));
 
+// Contract Status enum (v2)
+const ST = { Open: 0, Claimed: 1, Submitted: 2, InReview: 3, Approved: 4, Rejected: 5, Refunded: 6, Proposed: 7 } as const;
+
 let passed = 0;
 let failed = 0;
 const failures: string[] = [];
@@ -52,6 +66,31 @@ function check(name: string, cond: boolean, detail = ""): void {
     failures.push(name + (detail ? ` — ${detail}` : ""));
   }
   console.log(`  [${tag}] ${name}${detail && !cond ? ` — ${detail}` : ""}`);
+}
+
+const ESCROW_ERRORS = new ethers.Interface(
+  JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "contracts/artifacts/src/StreetSyncEscrow.sol/StreetSyncEscrow.json"), "utf8")).abi,
+);
+
+/** Resolves true when `fn` reverts with the named custom error. */
+async function revertsWith(fn: () => Promise<unknown>, errorName: string): Promise<boolean> {
+  try {
+    await fn();
+    return false;
+  } catch (e) {
+    if (process.env.E2E_DEBUG) console.log(e);
+    const err = e as { revert?: { name?: string }; data?: string; shortMessage?: string; message?: string };
+    if (err.revert?.name === errorName) return true;
+    // Revert data from estimateGas is not decoded by ethers; decode it against the escrow ABI.
+    if (typeof err.data === "string" && err.data.length >= 10) {
+      try {
+        if (ESCROW_ERRORS.parseError(err.data)?.name === errorName) return true;
+      } catch {
+        // not an escrow error selector
+      }
+    }
+    return `${err.shortMessage ?? ""} ${err.message ?? ""}`.includes(errorName);
+  }
 }
 
 function section(title: string): void {
@@ -201,8 +240,8 @@ async function main(): Promise<void> {
 
     const MNEMONIC = "test test test test test test test test test test test junk";
     const base = ethers.HDNodeWallet.fromPhrase(MNEMONIC, undefined, "m/44'/60'/0'/0");
-    const accts = Array.from({ length: 10 }, (_, i) => patchNonce(base.deriveChild(i).connect(provider), RPC_URL));
-    const [attesterNode, funder1, funder2, worker, rev1, rev2, rev3, anyone] = accts;
+    const accts = Array.from({ length: 12 }, (_, i) => patchNonce(base.deriveChild(i).connect(provider), RPC_URL));
+    const [attesterNode, funder1, funder2, worker, rev1, rev2, rev3, anyone, neighbour1, neighbour2] = accts;
     const attesterKey = attesterNode.privateKey as `0x${string}`;
 
     const MockUsdcAbi = loadArtifact("MockUSDC");
@@ -218,6 +257,8 @@ async function main(): Promise<void> {
     const COMMIT_WINDOW = 3600n;
     const REVEAL_WINDOW = 3600n;
     const CLAIM_DURATION = 3600n;
+    const VALIDATION_WINDOW = 3600n;
+    const VALIDATION_QUORUM = 2;
 
     const escrow = await new ethers.ContractFactory(EscrowAbi.abi, EscrowAbi.bytecode, attesterNode).deploy(
       usdcAddress,
@@ -225,6 +266,8 @@ async function main(): Promise<void> {
       COMMIT_WINDOW,
       REVEAL_WINDOW,
       CLAIM_DURATION,
+      VALIDATION_WINDOW,
+      VALIDATION_QUORUM,
     );
     await escrow.waitForDeployment();
     const escrowAddress = await escrow.getAddress();
@@ -233,6 +276,8 @@ async function main(): Promise<void> {
     check("Escrow REVIEWER_STAKE = 2 USDC", (await escrow.REVIEWER_STAKE()) === REVIEWER_STAKE);
     check("Escrow REVIEWER_CUT_BPS = 1000 (10%)", (await escrow.REVIEWER_CUT_BPS()) === 1000n);
     check("Escrow attester matches backend signer key", (await escrow.attester()) === attesterNode.address);
+    check("Escrow validationQuorum = 2, validationWindow = 3600",
+      (await escrow.validationQuorum()) === 2n && (await escrow.validationWindow()) === VALIDATION_WINDOW);
 
     // Fund actors
     const actors = [funder1, funder2, worker, rev1, rev2, rev3, anyone];
@@ -251,33 +296,14 @@ async function main(): Promise<void> {
     signer.setVerifyingContract(escrowAddress);
     check("Backend signer attester address == on-chain attester", signer.getAttesterAddress() === attesterNode.address);
 
-    // ─── Step 3: Funding ────────────────────────────────────────────────────
-    section("STEP 3 — Funding: bounty 50 USDC + pledge 25 USDC");
+    // ─── Step 3: Problem report + funding ───────────────────────────────────
+    section("STEP 3 — Problem report (WebP + packReport) → createBounty 50 USDC + pledge 25 USDC");
     const LAT = 40.012;
     const LNG = -75.13;
+    const LAT_E5 = 4001200;
+    const LNG_E5 = -7513000;
     const cell = regionCellFromLatLng(LAT, LNG);
-    const descHash = ethers.keccak256(ethers.toUtf8Bytes("e2e: pothole on main street"));
-    const deadline = BigInt(Math.floor(Date.now() / 1000)) + 86400n;
 
-    await (await escrow.connect(funder1).createBounty(descHash, 4001200, -7513000, cell, USDC_6(50), deadline)).wait();
-    const bountyId = 0n;
-    await (await escrow.connect(funder2).pledge(bountyId, USDC_6(25))).wait();
-
-    const escrowBalAfterPledge = await usdc.balanceOf(escrowAddress);
-    check("escrow holds 75_000_000 (50 + 25 USDC)", escrowBalAfterPledge === 75_000_000n, `got ${escrowBalAfterPledge}`);
-
-    // ─── Step 4: Worker attestation + claim ─────────────────────────────────
-    section("STEP 4 — Worker attestation (role=1) + claim()");
-    const workerAtt = await signer.signAttestation(worker.address, signer.RoleEnum.Worker, bountyId);
-    check("attestation role == 1 (Worker)", workerAtt.role === 1);
-    await (await escrow.connect(worker).claim(bountyId, workerAtt.nonce, workerAtt.expiry, workerAtt.signature)).wait();
-    const bAfterClaim = await escrow.getBounty(bountyId);
-    const challengeCode = Number(bAfterClaim[10]);
-    check("bounty claimed by worker", bAfterClaim[9] === worker.address);
-    check("4-digit challenge code (1000-9999)", challengeCode >= 1000 && challengeCode <= 9999, `got ${challengeCode}`);
-
-    // ─── Step 5: Evidence pipeline + Arkiv + submitEvidence ─────────────────
-    section("STEP 5 — Evidence pipeline (WebP + CBOR + Zstd WASM) → Arkiv → submitEvidence");
     const makePhoto = async (label: string, r: number, g: number, b: number) => {
       const raw = await sharp({
         create: { width: 1280, height: 960, channels: 3, background: { r, g, b } },
@@ -287,6 +313,128 @@ async function main(): Promise<void> {
         .toBuffer();
       return resizeAndEncodePhoto(new Uint8Array(raw));
     };
+
+    const problemPhoto = await makePhoto("PROBLEM", 90, 90, 100);
+    check("problem photo ≤ 48,000 bytes WebP", problemPhoto.webpBytes.length <= 48_000, `${problemPhoto.webpBytes.length} bytes`);
+
+    const description = "e2e: pothole on main street";
+    const report = await packReport({
+      creator: funder1.address as `0x${string}`,
+      description,
+      latE5: LAT_E5,
+      lngE5: LNG_E5,
+      capturedAtMs: Date.now(),
+      photo: problemPhoto.webpBytes,
+    });
+    check("report bundle ≤ 64,000 bytes", report.bundle.length <= 64_000, `${report.bundle.length} bytes`);
+    check("packReport hashes are 0x+64 hex",
+      /^0x[0-9a-f]{64}$/.test(report.reportHash) && /^0x[0-9a-f]{64}$/.test(report.descriptionHash));
+    check("descriptionHash == descriptionHashOf(description)", report.descriptionHash === descriptionHashOf(description));
+
+    const latestTs = BigInt((await provider.getBlock("latest"))!.timestamp);
+    const deadline = latestTs + 7n * 86400n;
+
+    check("createBounty rejects a zero reportHash (InvalidReport)",
+      await revertsWith(
+        () => escrow.connect(funder1).createBounty(report.descriptionHash, ethers.ZeroHash, LAT_E5, LNG_E5, cell, USDC_6(50), deadline),
+        "InvalidReport",
+      ));
+    check("createBounty rejects claimDeadline inside the validation window (InvalidDeadline)",
+      await revertsWith(
+        () => escrow.connect(funder1).createBounty(report.descriptionHash, report.reportHash, LAT_E5, LNG_E5, cell, USDC_6(50), latestTs + 60n),
+        "InvalidDeadline",
+      ));
+
+    await (await escrow.connect(funder1).createBounty(
+      report.descriptionHash, report.reportHash, LAT_E5, LNG_E5, cell, USDC_6(50), deadline,
+    )).wait();
+    const bountyId = 0n;
+
+    const bProposed = await escrow.getBounty(bountyId);
+    check("new bounty starts Proposed", Number(bProposed.status) === ST.Proposed, `status=${bProposed.status}`);
+    check("validationDeadline = createdAt + validationWindow",
+      bProposed.validationDeadline === bProposed.createdAt + VALIDATION_WINDOW);
+    check("claimDeadline stored as supplied", bProposed.claimDeadline === deadline);
+
+    // The on-chain commitments authenticate the off-chain bundle
+    const unpacked = await unpackReport(report.bundle);
+    check("unpackReport: description round-trips", unpacked.description === description);
+    check("unpackReport: creator == funder1", unpacked.creator === funder1.address);
+    check("unpackReport: coordinates match on-chain latE5/lngE5",
+      BigInt(unpacked.latE5) === bProposed.latE5 && BigInt(unpacked.lngE5) === bProposed.lngE5);
+    check("unpackReport: photo bytes + sha256 match",
+      unpacked.photo.length === problemPhoto.webpBytes.length &&
+      unpacked.photoSha256 === ethers.sha256(problemPhoto.webpBytes));
+    check("reportHashOf(bundle) == on-chain reportHash", (await reportHashOf(report.bundle)) === bProposed.reportHash);
+    check("descriptionHashOf(unpacked.description) == on-chain descriptionHash",
+      descriptionHashOf(unpacked.description) === bProposed.descriptionHash);
+    const tamperedBundle = report.bundle.slice();
+    tamperedBundle[tamperedBundle.length - 5] ^= 0xff;
+    check("tampered report bundle no longer matches on-chain reportHash",
+      (await reportHashOf(tamperedBundle)) !== bProposed.reportHash);
+
+    // Pledging is allowed while the report is still being validated
+    await (await escrow.connect(funder2).pledge(bountyId, USDC_6(25))).wait();
+
+    const escrowBalAfterPledge = await usdc.balanceOf(escrowAddress);
+    check("escrow holds 75_000_000 (50 + 25 USDC)", escrowBalAfterPledge === 75_000_000n, `got ${escrowBalAfterPledge}`);
+    check("bounty still Proposed after pledge", Number((await escrow.getBounty(bountyId)).status) === ST.Proposed);
+
+    // ─── Step 3b: Neighbour validation ──────────────────────────────────────
+    section("STEP 3b — Neighbour attestations (role=3) signed by backend signer → voteProblem → Open");
+    const nbAtt1 = await signer.signAttestation(neighbour1.address, signer.RoleEnum.Neighbour, bountyId);
+    const nbAtt2 = await signer.signAttestation(neighbour2.address, signer.RoleEnum.Neighbour, bountyId);
+    check("attestation role == 3 (Neighbour)", nbAtt1.role === 3 && nbAtt2.role === 3);
+
+    const creatorAtt = await signer.signAttestation(funder1.address, signer.RoleEnum.Neighbour, bountyId);
+    check("creator cannot vote on own report (CreatorCannotVote)",
+      await revertsWith(
+        () => escrow.connect(funder1).voteProblem(bountyId, true, creatorAtt.nonce, creatorAtt.expiry, creatorAtt.signature),
+        "CreatorCannotVote",
+      ));
+
+    await (await escrow.connect(neighbour1).voteProblem(bountyId, true, nbAtt1.nonce, nbAtt1.expiry, nbAtt1.signature)).wait();
+    const bOneVote = await escrow.getBounty(bountyId);
+    check("1 of 2 confirmations: still Proposed",
+      Number(bOneVote.status) === ST.Proposed && bOneVote.confirmations === 1n);
+    check("problemVote(neighbour1) == 1 (real)", (await escrow.problemVote(bountyId, neighbour1.address)) === 1n);
+
+    check("neighbour cannot vote twice (AlreadyVoted)",
+      await revertsWith(
+        async () => {
+          const again = await signer.signAttestation(neighbour1.address, signer.RoleEnum.Neighbour, bountyId);
+          return escrow.connect(neighbour1).voteProblem(bountyId, false, again.nonce, again.expiry, again.signature);
+        },
+        "AlreadyVoted",
+      ));
+
+    await (await escrow.connect(neighbour2).voteProblem(bountyId, true, nbAtt2.nonce, nbAtt2.expiry, nbAtt2.signature)).wait();
+    const bValidated = await escrow.getBounty(bountyId);
+    check("2 of 2 confirmations: status Proposed → Open",
+      Number(bValidated.status) === ST.Open && bValidated.confirmations === 2n, `status=${bValidated.status}`);
+
+    // ─── Step 4: Worker attestation + claim ─────────────────────────────────
+    section("STEP 4 — Worker attestation (role=1) + claim()");
+    check("neighbour who voted cannot claim (VoterCannotClaim)",
+      await revertsWith(
+        async () => {
+          const att = await signer.signAttestation(neighbour1.address, signer.RoleEnum.Worker, bountyId);
+          return escrow.connect(neighbour1).claim(bountyId, att.nonce, att.expiry, att.signature);
+        },
+        "VoterCannotClaim",
+      ));
+    const workerAtt = await signer.signAttestation(worker.address, signer.RoleEnum.Worker, bountyId);
+    check("attestation role == 1 (Worker)", workerAtt.role === 1);
+    await (await escrow.connect(worker).claim(bountyId, workerAtt.nonce, workerAtt.expiry, workerAtt.signature)).wait();
+    const bAfterClaim = await escrow.getBounty(bountyId);
+    const challengeCode = Number(bAfterClaim.visualChallengeCode);
+    check("bounty claimed by worker", bAfterClaim.worker === worker.address);
+    check("claim keeps claimDeadline and sets workDeadline in the future",
+      bAfterClaim.claimDeadline === deadline && bAfterClaim.workDeadline > BigInt((await provider.getBlock("latest"))!.timestamp));
+    check("4-digit challenge code (1000-9999)", challengeCode >= 1000 && challengeCode <= 9999, `got ${challengeCode}`);
+
+    // ─── Step 5: Evidence pipeline + Arkiv + submitEvidence ─────────────────
+    section("STEP 5 — Evidence pipeline (WebP + CBOR + Zstd WASM) → Arkiv → submitEvidence");
     const before = await makePhoto("BEFORE", 130, 84, 40);
     const after = await makePhoto("AFTER", 60, 140, 70);
     check("before photo ≤ 48,000 bytes WebP", before.webpBytes.length <= 48_000, `${before.webpBytes.length} bytes`);
@@ -337,7 +485,7 @@ async function main(): Promise<void> {
     await (await escrow.connect(worker).submitEvidence(bountyId, keyBytes32, evidenceHash)).wait();
     const bAfterSubmit = await escrow.getBounty(bountyId);
     check("submitEvidence stored bytes32 key + hash on-chain",
-      bAfterSubmit[11] === keyBytes32 && bAfterSubmit[12] === evidenceHash);
+      bAfterSubmit.arkivEntityKey === keyBytes32 && bAfterSubmit.evidenceHash === evidenceHash);
 
     // ─── Step 6: Reviewer registration ──────────────────────────────────────
     section("STEP 6 — 3 reviewers register (2 USDC stake each)");
@@ -356,13 +504,13 @@ async function main(): Promise<void> {
     // ─── Step 7: Advance blocks + assignPanel ───────────────────────────────
     section("STEP 7 — Advance 2+ blocks → assignPanel (Rule 4)");
     const bSubmitted = await escrow.getBounty(bountyId);
-    const selBlock = bSubmitted[13];
+    const selBlock = bSubmitted.selectionBlock;
     const curBlock = BigInt(await provider.getBlockNumber());
     await mineBlocks(provider, Number(selBlock - curBlock) + 1);
     await (await escrow.connect(anyone).assignPanel(bountyId)).wait();
     const bInReview = await escrow.getBounty(bountyId);
-    check("panel assigned, status InReview", Number(bInReview[16]) === 3);
-    const round = Number(bInReview[14]);
+    check("panel assigned, status InReview", Number(bInReview.status) === ST.InReview);
+    const round = Number(bInReview.reviewRound);
     const panel: string[] = await escrow.getPanel(bountyId, round);
     check("panel has 3 distinct reviewers",
       panel.length === 3 && new Set(panel).size === 3 && panel.every((p) => p !== ethers.ZeroAddress));
@@ -388,7 +536,7 @@ async function main(): Promise<void> {
     const majBalancesPre = [await usdc.balanceOf(panel[0]), await usdc.balanceOf(panel[1])];
     await (await escrow.connect(anyone).settle(bountyId)).wait();
     const bSettled = await escrow.getBounty(bountyId);
-    check("bounty Approved", Number(bSettled[16]) === 4, `status=${bSettled[16]}`);
+    check("bounty Approved", Number(bSettled.status) === ST.Approved, `status=${bSettled.status}`);
 
     // ─── Step 9: Settlement assertions + evidence audit + tamper ────────────
     section("STEP 9 — Settlement math, evidence audit, tamper detection");
@@ -405,6 +553,11 @@ async function main(): Promise<void> {
       await (await escrow.connect(signerMap.get(panel[i])!).withdrawReward()).wait();
       check(`majority reviewer[${i}] withdrawReward pays ${perMajority}`,
         (await usdc.balanceOf(panel[i])) - pre === perMajority);
+    }
+    for (let i = 0; i < 2; i++) {
+      const rv = await escrow.reviewers(panel[i]);
+      check(`majority reviewer[${i}] deactivated after settle (stake 0, inactive, reward kept until withdrawn)`,
+        rv[2] === 0n && rv[3] === false);
     }
     const minority = await escrow.reviewers(panel[2]);
     check("minority reviewer slashed (stake 0, inactive)", minority[2] === 0n && minority[3] === false);
