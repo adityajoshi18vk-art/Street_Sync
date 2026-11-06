@@ -71,8 +71,11 @@ if (!(await rpcReady())) fail("Local chain did not start within 90 seconds.");
 
 const env = { ...process.env, JANLEKHA_LOCAL_RPC_URL: RPC_URL };
 rmSync(path.join(ROOT, "deployments", "localhost.json"), { force: true }); // the in-memory chain is new every run
-for (const script of ["scripts/deploy.ts", "scripts/seed-demo.ts"]) {
-  const r = spawnSync(process.execPath, [HARDHAT, "run", script, "--network", "localhost"], { cwd: ROOT, stdio: "inherit", env });
+// demo-documents first: regenerates the hashed PDFs byte-exact, repairing checkouts whose
+// line endings were converted (Windows core.autocrlf) before seed-demo verifies them.
+for (const script of ["scripts/demo-documents.ts", "scripts/deploy.ts", "scripts/seed-demo.ts"]) {
+  const args = script.endsWith("demo-documents.ts") ? [] : ["--network", "localhost"];
+  const r = spawnSync(process.execPath, [HARDHAT, "run", script, ...args], { cwd: ROOT, stdio: "inherit", env });
   if (r.error) fail(`Could not run ${script}: ${r.error.message}`);
   if (r.status !== 0) fail(`${script} failed (exit ${r.status}). See the output above.`);
 }
