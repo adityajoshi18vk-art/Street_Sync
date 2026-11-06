@@ -172,3 +172,4 @@ npm run dev
    1. Place your funded deployer private key in `.env`: `DEPLOYER_PRIVATE_KEY=0x...`
    2. Run `npm run deploy:arc`
    3. The script automatically updates `contracts/deployments/arcTestnet.json`, instantly configuring the frontend and backend.
+
