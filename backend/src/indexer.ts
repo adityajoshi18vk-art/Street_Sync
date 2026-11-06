@@ -32,10 +32,10 @@ const arcTestnet = defineChain({
   name: "Arc Testnet",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   rpcUrls: {
-    default: { http: [process.env.ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz"] },
+    default: { http: [process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io"] },
   },
   blockExplorers: {
-    default: { name: "Arc Explorer", url: "https://explorer.arc-testnet.circlelabs.xyz" },
+    default: { name: "ArcScan", url: "https://testnet.arcscan.app" },
   },
 });
 
@@ -99,7 +99,7 @@ function createClient() {
   const chain = CHAIN_ID === 31337 ? hardhatLocal : arcTestnet;
   const rpcUrl = CHAIN_ID === 31337
     ? (process.env.LOCAL_RPC_URL ?? "http://127.0.0.1:8545")
-    : (process.env.ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz");
+    : (process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io");
 
   return createPublicClient({
     chain,
