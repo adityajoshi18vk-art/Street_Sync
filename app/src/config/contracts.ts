@@ -133,6 +133,9 @@ export const QUORUM = deploymentForChain.parameters.quorum;
 export const BACKEND_API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
+/** JanLekha, the spending-transparency feature of this project (separate app, see README). */
+export const JANLEKHA_URL = process.env.NEXT_PUBLIC_JANLEKHA_URL ?? "http://localhost:3100";
+
 export const WORLD_APP_ID = (process.env.NEXT_PUBLIC_WORLD_APP_ID ??
   "app_staging_streetsync") as `app_${string}`;
 export const WORLD_ACTION_WORKER =

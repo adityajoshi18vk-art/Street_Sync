@@ -7,6 +7,8 @@ const schema = z.object({
   NEXT_PUBLIC_HEDERA_CHAIN_ID: z.preprocess(blank, z.coerce.number().int().positive().default(296)),
   NEXT_PUBLIC_HEDERA_RPC_URL: z.preprocess(blank, z.url().default("https://testnet.hashio.io/api")),
   NEXT_PUBLIC_HASHSCAN_URL: z.preprocess(blank, z.url().default("https://hashscan.io/testnet")),
+  // StreetSync, the civic-repair feature of the same project.
+  NEXT_PUBLIC_STREETSYNC_URL: z.preprocess(blank, z.url().default("http://localhost:3000")),
   NEXT_PUBLIC_HEDERA_MIRROR_NODE_URL: z.preprocess(
     blank,
     z.url().default("https://testnet.mirrornode.hedera.com"),
@@ -27,6 +29,7 @@ const parsed = schema.safeParse({
   NEXT_PUBLIC_HEDERA_CHAIN_ID: process.env.NEXT_PUBLIC_HEDERA_CHAIN_ID,
   NEXT_PUBLIC_HEDERA_RPC_URL: process.env.NEXT_PUBLIC_HEDERA_RPC_URL,
   NEXT_PUBLIC_HASHSCAN_URL: process.env.NEXT_PUBLIC_HASHSCAN_URL,
+  NEXT_PUBLIC_STREETSYNC_URL: process.env.NEXT_PUBLIC_STREETSYNC_URL,
   NEXT_PUBLIC_HEDERA_MIRROR_NODE_URL: process.env.NEXT_PUBLIC_HEDERA_MIRROR_NODE_URL,
   NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS: process.env.NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS,
   NEXT_PUBLIC_JANLEKHA_DEPLOYMENT_BLOCK: process.env.NEXT_PUBLIC_JANLEKHA_DEPLOYMENT_BLOCK,
