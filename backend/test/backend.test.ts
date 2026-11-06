@@ -7,6 +7,7 @@
  *   4. REST API endpoints via Fastify inject
  */
 
+import "./test-env.js";
 import { describe, it, before } from "node:test";
 import assert from "node:assert/strict";
 import { recoverTypedDataAddress, type Address, type Hex } from "viem";

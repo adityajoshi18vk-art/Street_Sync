@@ -77,6 +77,43 @@ export default function BountyDetailPage() {
     query: { enabled: !!ESCROW_ADDRESS && contractsDeployed }
   });
 
+  // Hooks must run before the early returns below, so derive the key from the raw read.
+  const evidenceKey = (bounty as { arkivEntityKey?: string } | undefined)?.arkivEntityKey;
+
+  useEffect(() => {
+    if (!evidenceKey || isZeroHash(evidenceKey)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const client = getArkivClient();
+        const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
+        const candidates = [
+          lookupStoredEntityKey(evidenceKey),
+          lookupBountyEntityKey(bountyId ?? ""),
+          evidenceKey
+        ].filter((k): k is string => !!k && k !== ZERO_KEY);
+
+        for (const k of candidates) {
+          try {
+            const res = await readEvidenceBundle(client, k);
+            const unpacked = await unpackBundle(res.bundle);
+            if (!cancelled && unpacked.metadata?.video) {
+              setVideoEvidence(unpacked.metadata.video);
+              break;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [evidenceKey, bountyId]);
+
   if (!contractsDeployed) {
     return (
       <div className="alert-warn p-6">
@@ -113,39 +150,6 @@ export default function BountyDetailPage() {
   const isWorker = !!address && address.toLowerCase() === b.worker?.toLowerCase();
   const nowSeconds = Math.floor(Date.now() / 1000);
 
-  useEffect(() => {
-    if (!hasEvidence || !b?.arkivEntityKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const client = getArkivClient();
-        const ZERO_KEY = "0x0000000000000000000000000000000000000000000000000000000000000000";
-        const candidates = [
-          lookupStoredEntityKey(b.arkivEntityKey),
-          lookupBountyEntityKey(bountyId ?? ""),
-          b.arkivEntityKey
-        ].filter((k): k is string => !!k && k !== ZERO_KEY);
-
-        for (const k of candidates) {
-          try {
-            const res = await readEvidenceBundle(client, k);
-            const unpacked = await unpackBundle(res.bundle);
-            if (!cancelled && unpacked.metadata?.video) {
-              setVideoEvidence(unpacked.metadata.video);
-              break;
-            }
-          } catch {
-            // ignore
-          }
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hasEvidence, b?.arkivEntityKey, bountyId]);
 
   const handlePledge = async () => {
     if (!address) return;

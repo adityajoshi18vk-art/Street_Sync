@@ -1,7 +1,6 @@
 import { ethers } from "hardhat";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 
 /**
  * StreetSync Deploy Script – Arc Testnet (Chain ID: 5042002) or local node
@@ -88,7 +87,8 @@ async function main() {
 
   // ── 6. Write deployments JSON ───────────────────────────────────────────
   const networkName = chainId === 31337 ? "localhost" : "arcTestnet";
-  const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+  // CommonJS project (Hardhat 2 + ts-node): import.meta would make Node load this file as ESM.
+  const rootDir = join(__dirname, "..");
   const outPath = join(rootDir, "deployments", `${networkName}.json`);
 
   const readAbi = (contractName: string) => {
