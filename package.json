@@ -16,7 +16,8 @@
     "test:e2e": "npm run build && tsx scripts/e2e-verify.ts",
     "dev": "concurrently -n backend,app -c blue,green \"npm run dev --workspace=streetsync-backend\" \"npm run dev --workspace=streetsync-app\"",
     "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",
-    "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts"
+    "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts",
+    "abi:sync": "npm run abi:sync --workspace=streetsync-contracts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
