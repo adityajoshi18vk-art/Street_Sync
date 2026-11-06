@@ -190,7 +190,7 @@ event VoteRevealed(
 event BountySettled(
     uint256 indexed bountyId,
     bool    approved,
-    uint256 workerPayout,   // 6-decimal USDC (95% if approved, else 0)
+    uint256 workerPayout,   // 6-decimal USDC (90% if approved, else 0)
     uint256 reviewerCut     // 6-decimal USDC per majority reviewer
 );
 
