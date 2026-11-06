@@ -52,8 +52,20 @@ export function Basemap({ onReady, onFailed }: { onReady: () => void; onFailed: 
         lib.once("load", () => {
           loaded = true;
           clearTimeout(timer);
-          if (!cancelled) onReady();
+          if (!cancelled) {
+            try {
+              lib.resize();
+              map.invalidateSize();
+            } catch {}
+            onReady();
+          }
         });
+        const onResize = () => {
+          try {
+            lib.resize();
+          } catch {}
+        };
+        map.on("resize", onResize);
         lib.on("error", fallback);
       })
       .catch(fallback);

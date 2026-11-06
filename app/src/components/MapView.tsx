@@ -29,7 +29,18 @@ export interface MapViewProps {
   className?: string;
 }
 
-const DEFAULT_CENTER: [number, number] = [40.7128, -74.006];
+export const MUMBAI_CENTER: [number, number] = [19.0760, 72.8777];
+const DEFAULT_CENTER: [number, number] = MUMBAI_CENTER;
+
+export const MUMBAI_PRESETS = [
+  { label: "Mumbai Central", lat: 19.0760, lng: 72.8777, zoom: 12 },
+  { label: "Bandra West", lat: 19.0596, lng: 72.8295, zoom: 14 },
+  { label: "Andheri", lat: 19.1136, lng: 72.8697, zoom: 14 },
+  { label: "BKC", lat: 19.0657, lng: 72.8687, zoom: 14 },
+  { label: "Marine Drive / Colaba", lat: 18.9220, lng: 72.8346, zoom: 14 },
+  { label: "Powai", lat: 19.1176, lng: 72.9060, zoom: 14 },
+  { label: "Dadar", lat: 19.0178, lng: 72.8478, zoom: 14 }
+];
 
 const draftIcon = L.divIcon({
   className: "",
@@ -88,12 +99,37 @@ export default function MapView({
   const [notice, setNotice] = useState<string | null>(null);
   const fittedOnce = useRef(false);
 
-  // Frame all bounties the first time they arrive.
+  // Invalidate map size on mount and container resizing to eliminate white/blank voids
+  useEffect(() => {
+    if (!map) return;
+    map.invalidateSize();
+    const t1 = setTimeout(() => map.invalidateSize(), 150);
+    const t2 = setTimeout(() => map.invalidateSize(), 600);
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    const c = map.getContainer();
+    if (c) ro.observe(c);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      ro.disconnect();
+    };
+  }, [map]);
+
+  // Frame bounties only if there are local bounties near India/Mumbai; otherwise stay at Mumbai
   useEffect(() => {
     if (!map || fittedOnce.current || bounties.length === 0) return;
     fittedOnce.current = true;
-    const bounds = L.latLngBounds(bounties.map((b) => [b.lat, b.lng] as [number, number]));
-    map.fitBounds(bounds.pad(0.35), { maxZoom: 14, animate: false });
+    const localBounties = bounties.filter(
+      (b) => Math.abs(b.lat - MUMBAI_CENTER[0]) < 3 && Math.abs(b.lng - MUMBAI_CENTER[1]) < 3
+    );
+    if (localBounties.length > 0) {
+      const bounds = L.latLngBounds(localBounties.map((b) => [b.lat, b.lng] as [number, number]));
+      map.fitBounds(bounds.pad(0.35), { maxZoom: 14, animate: false });
+    } else {
+      map.setView(MUMBAI_CENTER, 12);
+    }
   }, [map, bounties]);
 
   useEffect(() => {
@@ -186,7 +222,10 @@ export default function MapView({
       <MapContainer
         ref={setMap}
         center={DEFAULT_CENTER}
-        zoom={13}
+        zoom={12}
+        minZoom={3}
+        maxBounds={[[-85, -180], [85, 180]]}
+        maxBoundsViscosity={1.0}
         scrollWheelZoom
         zoomControl={false}
         className="h-full w-full rounded-xl"
@@ -313,6 +352,28 @@ export default function MapView({
             <Maximize2 className="h-4 w-4" aria-hidden />
           </ControlButton>
         )}
+      </div>
+
+      {/* Quick location selector for Mumbai */}
+      <div className="absolute bottom-3 left-3 z-[500] flex max-w-[calc(100%-80px)] items-center gap-1.5 overflow-x-auto rounded-xl border border-white/10 bg-ink-900/90 p-1 shadow-card backdrop-blur-md">
+        <span className="shrink-0 pl-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-300">
+          🇮🇳 Mumbai:
+        </span>
+        {MUMBAI_PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => {
+              if (map) {
+                map.flyTo([p.lat, p.lng], p.zoom, { duration: 0.8 });
+                onMapClick(p.lat, p.lng, `${p.label}, Mumbai, Maharashtra`);
+              }
+            }}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] hover:text-white"
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
 
       {notice && (

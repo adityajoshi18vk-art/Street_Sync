@@ -98,7 +98,7 @@ export function HomeClient({ glyphs }: { glyphs: HeroGlyphs }) {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => undefined,
+      () => setMapCenter({ lat: 19.0760, lng: 72.8777 }),
       { enableHighAccuracy: false, timeout: 5000 }
     );
   }, []);

@@ -197,7 +197,11 @@ input[type="number"]::-webkit-inner-spin-button {
 
 /* Leaflet dark theming */
 .leaflet-container {
-  @apply bg-ink-900 font-sans;
+  background: #09090b !important;
+  font-family: inherit;
+}
+.ss-map {
+  background: #09090b;
 }
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
