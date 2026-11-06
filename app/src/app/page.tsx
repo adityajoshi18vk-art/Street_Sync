@@ -4,20 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAccount, useConfig, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useConfig, useWriteContract } from "wagmi";
 import { decodeEventLog, keccak256, toHex } from "viem";
-import { waitForTransactionReceipt, readContract } from "wagmi/actions";
+import { waitForTransactionReceipt } from "wagmi/actions";
 import {
   ESCROW_ABI,
   ESCROW_ADDRESS,
-  USDC_ADDRESS,
   ACTIVE_CHAIN,
   contractsDeployed,
   latLngToE5,
   parseUsdc,
   regionCellFromLatLng
 } from "@/config/contracts";
-import { approveUsdcExact } from "@/lib/tx";
+import { approveUsdcExact, waitTx } from "@/lib/tx";
 import { listBounties } from "@/lib/api";
 import {
   normalizeBounty,
@@ -45,6 +44,8 @@ const EXPIRY_OPTIONS = [
 export default function HomePage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id;
   const config = useConfig();
   const { writeContractAsync, isPending: writing } = useWriteContract();
 
@@ -98,7 +99,7 @@ export default function HomePage() {
   );
 
   const handleCreateBounty = async () => {
-    if (!draftPin || !address || !ESCROW_ADDRESS) return;
+    if (!canWrite || !draftPin || !address || !ESCROW_ADDRESS) return;
     setTxError(null);
     const trimmed = description.trim();
     if (trimmed.length < 8) {
@@ -107,8 +108,8 @@ export default function HomePage() {
     }
     let amountUsdc: string;
     try {
-      amountUsdc = String(Number(amount));
-      if (Number(amount) <= 0) throw new Error("positive");
+      amountUsdc = amount.trim();
+      if (parseUsdc(amountUsdc) <= 0n) throw new Error("positive");
     } catch {
       setTxError("Enter a valid USDC amount.");
       return;
@@ -135,10 +136,14 @@ export default function HomePage() {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "createBounty",
-        args: [descHash, latE5, lngE5, regionCell, initialAmount, claimDeadline]
+        args: [descHash, latE5, lngE5, regionCell, initialAmount, claimDeadline],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
       });
       setTxStatus("Waiting for confirmation…");
-      const receipt = await waitForTransactionReceipt(config, { hash });
+      const receipt = await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
+      if (receipt.status !== "success") throw new Error("Transaction reverted. No bounty was created.");
 
       let newId: string | null = null;
       for (const log of receipt.logs) {
@@ -170,11 +175,11 @@ export default function HomePage() {
   };
 
   const handlePledge = async () => {
-    if (!selectedBounty || !address || !ESCROW_ADDRESS) return;
+    if (!canWrite || !selectedBounty || !address || !ESCROW_ADDRESS) return;
     setPledgeStatus(null);
     try {
-      const amountUsdc = String(Number(pledgeAmount));
-      if (Number(pledgeAmount) <= 0) throw new Error("Enter a valid USDC amount.");
+      const amountUsdc = pledgeAmount.trim();
+      if (parseUsdc(amountUsdc) <= 0n) throw new Error("Enter a valid USDC amount.");
 
       await approveUsdcExact({
         config,
@@ -190,9 +195,12 @@ export default function HomePage() {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "pledge",
-        args: [BigInt(selectedBounty.bountyId), parseUsdc(amountUsdc)]
+        args: [BigInt(selectedBounty.bountyId), parseUsdc(amountUsdc)],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
       });
-      await waitForTransactionReceipt(config, { hash });
+      await waitTx(config, hash);
       setPledgeAmount("");
       setPledgeStatus("Pledge confirmed");
       void loadBounties();
@@ -204,18 +212,6 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      {!contractsDeployed && (
-        <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-amber-200">
-          <p className="font-semibold">Contracts not configured on {ACTIVE_CHAIN.name}</p>
-          <p className="mt-1 text-xs">
-            Deploy with <code className="rounded bg-amber-100 px-1">npm run deploy:arc</code> (or
-            <code className="ml-1 rounded bg-amber-100 px-1">deploy:local</code> for Hardhat), then
-            set the addresses in <code className="rounded bg-amber-100 px-1">contracts/deployments/</code> or
-            via NEXT_PUBLIC_ESCROW_ADDRESS.
-          </p>
-        </div>
-      )}
-
       {listError && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
           <span>Backend index unavailable — {listError}</span>
@@ -347,11 +343,16 @@ export default function HomePage() {
 
             <button
               onClick={handleCreateBounty}
-              disabled={!draftPin || !isConnected || writing}
+              disabled={!draftPin || !isConnected || !canWrite || writing}
               className="w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 active:scale-[0.99] disabled:opacity-40"
             >
               {writing ? "Confirm in wallet…" : "Approve USDC & Create Bounty"}
             </button>
+            {isConnected && !canWrite && (
+              <p className="text-center text-[11px] text-amber-700">
+                Connect to {ACTIVE_CHAIN.name} with deployed contracts to create or fund bounties.
+              </p>
+            )}
             {!isConnected && (
               <p className="text-center text-[11px] text-gray-400">
                 Connect a wallet to fund bounties.
@@ -392,7 +393,7 @@ export default function HomePage() {
                   />
                   <button
                     onClick={handlePledge}
-                    disabled={!isConnected || writing || !pledgeAmount}
+                    disabled={!isConnected || !canWrite || writing || !pledgeAmount}
                     className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-40"
                   >
                     Pledge

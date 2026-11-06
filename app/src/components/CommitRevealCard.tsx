@@ -1,13 +1,16 @@
 "use client";
 
+import { waitTx } from "@/lib/tx";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   useAccount,
+  useChainId,
   useConfig,
   useWriteContract
 } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
-import { ESCROW_ABI, ESCROW_ADDRESS, formatUsdcDisplay } from "@/config/contracts";
+import { ACTIVE_CHAIN, contractsDeployed, ESCROW_ABI, ESCROW_ADDRESS, formatUsdcDisplay } from "@/config/contracts";
 import {
   computeVoteHash,
   generateSalt,
@@ -45,6 +48,8 @@ export default function CommitRevealCard({
   onTxSuccess
 }: CommitRevealCardProps) {
   const { address } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const config = useConfig();
   const { writeContractAsync, isPending } = useWriteContract();
 
@@ -75,6 +80,10 @@ export default function CommitRevealCard({
   const revealSecondsLeft = Math.max(0, Number(revealDeadline) - now);
 
   const handleCommit = async () => {
+    if (!canWrite || !ESCROW_ADDRESS) {
+      setError("Connect a wallet on the configured contract network before voting.");
+      return;
+    }
     if (!address || !storageKey) return;
     setError(null);
     setBusy("commit");
@@ -96,12 +105,15 @@ export default function CommitRevealCard({
       };
 
       const hash = await writeContractAsync({
-        address: ESCROW_ADDRESS!,
+        address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "commitVote",
-        args: [bountyId, voteHash]
+        args: [bountyId, voteHash],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
       });
-      await waitForTransactionReceipt(config, { hash });
+      await waitTx(config, hash);
 
       // Salt is saved ONLY after the commit tx confirms, keyed by
       // bountyId + round + wallet so re-votes in later rounds never collide.
@@ -116,6 +128,10 @@ export default function CommitRevealCard({
   };
 
   const handleReveal = async () => {
+    if (!canWrite || !ESCROW_ADDRESS) {
+      setError("Connect a wallet on the configured contract network before voting.");
+      return;
+    }
     if (!storageKey) return;
     const vote = loadVote(storageKey);
     if (!vote) {
@@ -128,12 +144,15 @@ export default function CommitRevealCard({
     setBusy("reveal");
     try {
       const hash = await writeContractAsync({
-        address: ESCROW_ADDRESS!,
+        address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "revealVote",
-        args: [bountyId, vote.approve, vote.salt]
+        args: [bountyId, vote.approve, vote.salt],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
       });
-      await waitForTransactionReceipt(config, { hash });
+      await waitTx(config, hash);
       onTxSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -143,16 +162,23 @@ export default function CommitRevealCard({
   };
 
   const handlePoke = async () => {
+    if (!canWrite || !ESCROW_ADDRESS) {
+      setError("Connect a wallet on the configured contract network before taking this action.");
+      return;
+    }
     setError(null);
     setBusy("poke");
     try {
       const hash = await writeContractAsync({
-        address: ESCROW_ADDRESS!,
+        address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "pokeOrReplace",
-        args: [bountyId]
+        args: [bountyId],
+        chain: ACTIVE_CHAIN,
+        chainId: ACTIVE_CHAIN.id,
+        account: address
       });
-      await waitForTransactionReceipt(config, { hash });
+      await waitTx(config, hash);
       onTxSuccess?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -240,7 +266,7 @@ export default function CommitRevealCard({
           </div>
           <button
             onClick={handleCommit}
-            disabled={isPending || busy !== null || !address || !!storedVote}
+            disabled={!canWrite || isPending || busy !== null || !!storedVote}
             className="mt-2 w-full rounded-lg bg-gray-900 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-40"
           >
             {busy === "commit"
@@ -259,7 +285,7 @@ export default function CommitRevealCard({
       {phase === "reveal" && (
         <button
           onClick={handleReveal}
-          disabled={isPending || busy !== null}
+          disabled={!canWrite || isPending || busy !== null}
           className="mt-4 w-full rounded-lg bg-orange-600 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:opacity-40"
         >
           {busy === "reveal" ? "Revealing…" : "Reveal Vote"}
@@ -269,7 +295,7 @@ export default function CommitRevealCard({
       {phase === "expired" && (
         <button
           onClick={handlePoke}
-          disabled={isPending || busy !== null}
+          disabled={!canWrite || isPending || busy !== null}
           className="mt-4 w-full rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-40"
         >
           {busy === "poke" ? "Poking…" : "Slash / Replace Inactive Reviewers (pokeOrReplace)"}
