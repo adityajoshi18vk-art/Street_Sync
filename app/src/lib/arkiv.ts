@@ -1,5 +1,6 @@
 "use client";
 
+import { isLocalNetwork } from "../config/contracts";
 import type { IArkivClient } from "@streetsync/arkiv-client";
 
 /**
@@ -208,6 +209,10 @@ export class LocalArkivClient implements IArkivClient {
 }
 
 export function getArkivClient(): IArkivClient {
-  if (ARKIV_MODE === "local") return new LocalArkivClient();
+  if (ARKIV_MODE === "local") {
+    if (!isLocalNetwork) throw new Error("Browser-local evidence is only available on the local test network. Configure shared Arkiv storage for Arc Testnet.");
+    return new LocalArkivClient();
+  }
+  if (ARKIV_MODE !== "http") throw new Error("Unsupported Arkiv storage mode.");
   return new HttpArkivClient(ARKIV_URL, process.env.NEXT_PUBLIC_ARKIV_API_KEY);
 }
