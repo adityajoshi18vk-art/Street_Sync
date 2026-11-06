@@ -22,7 +22,9 @@ import { erc20Abi } from "viem";
 import HowItWorks from "@/components/HowItWorks";
 import { reportReadiness } from "@/lib/readiness";
 import { approveUsdcExact, waitTx } from "@/lib/tx";
-import { listBounties, uploadBountyReport } from "@/lib/api";
+import { uploadBountyReport } from "@/lib/api";
+import { loadBounties as fetchBounties } from "@/lib/bounty-source";
+import { IndexStatusBanner } from "@/components/IndexStatusBanner";
 import { friendlyError } from "@/lib/errors";
 import { availableExpiryChoices, canPledge, formatDuration } from "@/lib/lifecycle";
 import { bountyDisplayStatus } from "@/lib/map-utils";
@@ -69,6 +71,7 @@ export default function HomePage() {
 
   const [bounties, setBounties] = useState<BountyMapItem[]>([]);
   const [listError, setListError] = useState<string | null>(null);
+  const [fromChain, setFromChain] = useState(false);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<number | null>(null);
 
@@ -98,14 +101,17 @@ export default function HomePage() {
     setLoading(true);
     setListError(null);
     try {
-      const raw = await listBounties({ limit: 200, status: statusFilter ?? undefined });
-      setBounties(raw.map(normalizeBounty).filter((b) => b.lat !== 0 || b.lng !== 0));
+      const res = await fetchBounties(config, { limit: 200, status: statusFilter ?? undefined });
+      setBounties(res.rows.map(normalizeBounty).filter((b) => b.lat !== 0 || b.lng !== 0));
+      setFromChain(res.source === "chain");
+      setListError(res.backendError);
     } catch (e) {
+      setFromChain(false);
       setListError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [config, statusFilter]);
 
   useEffect(() => {
     void loadBounties();
@@ -354,17 +360,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      {listError && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
-          <span>Backend index unavailable — {listError}</span>
-          <button
-            onClick={() => void loadBounties()}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {listError && <IndexStatusBanner error={listError} fallback={fromChain} onRetry={() => void loadBounties()} />}
 
       <HowItWorks />
 
