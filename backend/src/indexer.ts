@@ -17,6 +17,7 @@ import {
   type Address,
   type Log,
   parseAbiItem,
+  parseEventLogs,
   defineChain,
 } from "viem";
 import { ESCROW_ABI } from "./abi.js";
@@ -32,10 +33,10 @@ const arcTestnet = defineChain({
   name: "Arc Testnet",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   rpcUrls: {
-    default: { http: [process.env.ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz"] },
+    default: { http: [process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io"] },
   },
   blockExplorers: {
-    default: { name: "Arc Explorer", url: "https://explorer.arc-testnet.circlelabs.xyz" },
+    default: { name: "Arc Explorer", url: "https://explorer.testnet.arc.io" },
   },
 });
 
@@ -52,8 +53,25 @@ const hardhatLocal = defineChain({
 
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
 const POLL_INTERVAL_MS = 3_000; // 3 seconds between polls
+const CONFIRMATION_LAG = BigInt(process.env.INDEXER_CONFIRMATION_LAG ?? (CHAIN_ID === 31337 ? 0 : 5));
 
 // ─── Resolve contract address from deployment artifacts or env ────────────────
+
+function deploymentArtifactPath(): string {
+  const networkName = CHAIN_ID === 31337 ? "localhost" : "arcTestnet";
+  return path.resolve(process.env.DEPLOYMENTS_PATH ?? `../contracts/deployments/${networkName}.json`);
+}
+
+/** Block the escrow was deployed in, if the artifact records it (written by deploy.ts). */
+function resolveDeploymentBlock(): bigint | null {
+  if (process.env.ESCROW_DEPLOYMENT_BLOCK) return BigInt(process.env.ESCROW_DEPLOYMENT_BLOCK);
+  try {
+    const block = JSON.parse(fs.readFileSync(deploymentArtifactPath(), "utf-8")).deploymentBlock;
+    return block == null ? null : BigInt(block);
+  } catch {
+    return null;
+  }
+}
 
 function resolveContractAddress(): Address {
   // 1. Try env var first
@@ -99,7 +117,7 @@ function createClient() {
   const chain = CHAIN_ID === 31337 ? hardhatLocal : arcTestnet;
   const rpcUrl = CHAIN_ID === 31337
     ? (process.env.LOCAL_RPC_URL ?? "http://127.0.0.1:8545")
-    : (process.env.ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz");
+    : (process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io");
 
   return createPublicClient({
     chain,
@@ -412,10 +430,14 @@ export async function startIndexer(): Promise<void> {
   // Resume from last cursor
   let lastBlock = dbAccess.getCursor(chainId);
   if (lastBlock === 0n) {
-    // Start from a recent block (avoid scanning from genesis on testnet)
+    // Start just before the escrow's deployment block so no early bounty is missed;
+    // fall back to a recent window (avoid scanning from genesis on testnet).
+    const deploymentBlock = resolveDeploymentBlock();
     try {
       const currentBlock = await client.getBlockNumber();
-      lastBlock = currentBlock > 1000n ? currentBlock - 1000n : 0n;
+      lastBlock = deploymentBlock !== null && deploymentBlock > 0n
+        ? deploymentBlock - 1n
+        : currentBlock > 1000n ? currentBlock - 1000n : 0n;
       console.log(`[indexer] No cursor found, starting from block ${lastBlock}`);
     } catch {
       lastBlock = 0n;
@@ -428,7 +450,10 @@ export async function startIndexer(): Promise<void> {
     if (!isRunning) return;
 
     try {
-      const currentBlock = await client.getBlockNumber();
+      // Public RPCs are load-balanced: the newest blocks reported by eth_blockNumber may not be
+      // queryable via eth_getLogs yet ("requested data not available"), so stay a few behind.
+      // Hardhat only mines on transactions, so the local chain must not lag.
+      const currentBlock = (await client.getBlockNumber()) - CONFIRMATION_LAG;
 
       if (currentBlock <= lastBlock) {
         // No new blocks
@@ -443,12 +468,10 @@ export async function startIndexer(): Promise<void> {
         ? fromBlock + batchSize
         : currentBlock;
 
-      const logs = await client.getLogs({
-        address: escrowAddress,
-        fromBlock,
-        toBlock,
-        events: ESCROW_ABI.filter((item) => item.type === "event") as any,
-      });
+      // Filter by address only and decode locally: some public RPCs (Arc Testnet) reject
+      // eth_getLogs with an OR-list of event topics as "requested range too large".
+      const rawLogs = await client.getLogs({ address: escrowAddress, fromBlock, toBlock });
+      const logs = parseEventLogs({ abi: ESCROW_ABI as any, logs: rawLogs });
 
       // Process each log
       for (const log of logs) {

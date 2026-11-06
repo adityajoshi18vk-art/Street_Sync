@@ -22,7 +22,7 @@ import { computeStickerProfile, STICKER_CATALOG } from "../src/stickers.js";
 
 // Mock environment for test
 const MOCK_ESCROW = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as Address;
-const CHAIN_ID = 5042002;
+const CHAIN_ID = Number(process.env.CHAIN_ID);
 
 describe("StreetSync Backend Test Suite", () => {
   before(() => {

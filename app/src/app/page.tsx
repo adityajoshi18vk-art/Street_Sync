@@ -18,6 +18,7 @@ import {
   regionCellFromLatLng
 } from "@/config/contracts";
 import { approveUsdcExact } from "@/lib/tx";
+import { TestUsdcFaucet } from "@/components/TestUsdcFaucet";
 import { listBounties } from "@/lib/api";
 import {
   normalizeBounty,
@@ -377,6 +378,7 @@ export default function HomePage() {
                 Connect a wallet to fund bounties.
               </p>
             )}
+            <TestUsdcFaucet />
           </div>
         </section>
 

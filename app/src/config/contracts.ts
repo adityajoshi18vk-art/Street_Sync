@@ -52,7 +52,7 @@ const deployments: Record<number, DeploymentFile> = {
 };
 
 export const ARC_RPC_URL =
-  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.arc-testnet.circlelabs.xyz";
+  process.env.NEXT_PUBLIC_ARC_RPC_URL ?? "https://rpc.testnet.arc.io";
 
 export const ARC_TESTNET = defineChain({
   id: ARC_CHAIN_ID,
@@ -68,7 +68,7 @@ export const ARC_TESTNET = defineChain({
   blockExplorers: {
     default: {
       name: "Arc Explorer",
-      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.arc-testnet.circlelabs.xyz"
+      url: process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ?? "https://explorer.testnet.arc.io"
     }
   },
   testnet: true
@@ -112,6 +112,9 @@ export const USDC_ADDRESS: Address | null =
   deploymentForChain.contracts.MockUSDC?.address ??
   deploymentForChain.contracts.USDC?.address ??
   null;
+
+/** True when the active deployment uses the publicly mintable MockUSDC (demo/testnet). */
+export const usesMockUsdc = !envUsdc && !!deploymentForChain.contracts.MockUSDC?.address;
 
 export const contractsDeployed =
   ESCROW_ADDRESS !== null &&

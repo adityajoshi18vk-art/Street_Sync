@@ -21,7 +21,8 @@
     "deploy:local": "npm run deploy:local --workspace=streetsync-contracts",
     "deploy:arc": "npm run deploy:arc --workspace=streetsync-contracts",
     "test:janlekha": "npm --prefix janlekha run contracts:test && npm --prefix janlekha run test:documents",
-    "deploy:janlekha:hedera": "npm --prefix janlekha run contracts:release:hedera"
+    "deploy:janlekha:hedera": "npm --prefix janlekha run contracts:release:hedera",
+    "smoke:arc": "tsx scripts/arc-smoke.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

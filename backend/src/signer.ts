@@ -25,8 +25,18 @@ import dbAccess from "./db.js";
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
-const ATTESTER_PRIVATE_KEY = (process.env.ATTESTER_PRIVATE_KEY ||
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80") as Hex;
+const HARDHAT_DEFAULT_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+const ATTESTER_PRIVATE_KEY = (process.env.ATTESTER_PRIVATE_KEY || HARDHAT_DEFAULT_KEY) as Hex;
+
+// Hardhat account #0's key is public; on a real network anyone could forge attestations with it.
+if (
+  Number(process.env.CHAIN_ID ?? "5042002") !== 31337 &&
+  ATTESTER_PRIVATE_KEY.toLowerCase() === HARDHAT_DEFAULT_KEY
+) {
+  throw new Error(
+    "ATTESTER_PRIVATE_KEY is Hardhat's public test key. Set a private attester key for non-local chains.",
+  );
+}
 
 export function getChainId(): number {
   return Number(process.env.CHAIN_ID ?? "5042002");
