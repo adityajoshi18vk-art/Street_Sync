@@ -37,7 +37,7 @@ async function HealthDetails() {
 
 export default function HealthPage() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-12">
+    <div className="mx-auto w-full max-w-2xl">
       <h1 className="text-2xl font-semibold">System health</h1>
       <p className="mt-1 mb-6 text-sm text-neutral-600">
         Machine-readable version: <code className="font-mono">/api/health</code>
@@ -45,6 +45,6 @@ export default function HealthPage() {
       <Suspense fallback={<p className="text-sm text-neutral-500">Checking…</p>}>
         <HealthDetails />
       </Suspense>
-    </main>
+    </div>
   );
 }

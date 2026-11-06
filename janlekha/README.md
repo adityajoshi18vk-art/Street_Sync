@@ -44,3 +44,22 @@ transaction ID, ABI path (`deployments/abi/JanLekha.json`), timestamps, role gra
 readback. Copy the address into `NEXT_PUBLIC_JANLEKHA_CONTRACT_ADDRESS`.
 
 Rehearse locally: `npm run contracts:node` in one terminal, then the `contracts:*:local` scripts.
+
+## Public pages and local demo
+
+Public pages read contract state directly over JSON-RPC, with no wallet and no database:
+`/projects`, `/projects/[id]` (budget, tender, bids, award, milestones and event timeline) and `/verify`
+(computes a PDF's SHA-256 in the browser and compares it with the on-chain hash). On Hedera, the timeline
+comes from the mirror node, because the relay limits `eth_getLogs` ranges.
+
+Synthetic local demo with three projects at different stages:
+
+```bash
+npm run contracts:node                                       # terminal 1
+npm run contracts:deploy:local && npm run contracts:seed:local
+# copy the printed NEXT_PUBLIC_* lines into .env.local, then:
+npm run build && npm start
+```
+
+`npm run demo:documents` regenerates the deterministic synthetic PDFs in `public/demo-documents/`
+and the off-chain catalog (titles and download links keyed by on-chain hash).
