@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { IDKitWidget } from "@worldcoin/idkit";
 import type { ISuccessResult } from "@worldcoin/idkit";
-import { useAccount, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
+import { useAccount, useChainId, useConfig, useReadContract, useSignMessage, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "wagmi/actions";
 import { decodeEventLog, type Hash } from "viem";
 
@@ -46,6 +46,8 @@ export default function WorkerPage() {
   const router = useRouter();
   const config = useConfig();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const canWrite = contractsDeployed && chainId === ACTIVE_CHAIN.id && !!address;
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
 
@@ -70,6 +72,7 @@ export default function WorkerPage() {
   }, [bountyId]);
 
   const { data: bounty, refetch: refetchBounty } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (ESCROW_ADDRESS as `0x${string}`) : undefined,
     abi: ESCROW_ABI,
     functionName: "getBounty",
@@ -78,6 +81,7 @@ export default function WorkerPage() {
   });
 
   const { data: usdcBalance } = useReadContract({
+    chainId: ACTIVE_CHAIN.id,
     address: contractsDeployed ? (USDC_ADDRESS as `0x${string}`) : undefined,
     abi: USDC_ABI,
     functionName: "balanceOf",
@@ -103,7 +107,10 @@ export default function WorkerPage() {
 
   const runClaim = useCallback(
     async (attestation: Attestation) => {
-      if (!address || !bountyIdBig) return;
+      if (!canWrite || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+        setError("Connect a wallet on the configured contract network to claim this bounty.");
+        return;
+      }
       setPhase("claiming");
       setError(null);
       try {
@@ -121,7 +128,7 @@ export default function WorkerPage() {
           account: address
         });
         setTxHash(hash);
-        await waitForTransactionReceipt(config, { hash });
+        await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
         await refetchBounty();
         setPhase("work");
       } catch (err) {
@@ -129,12 +136,12 @@ export default function WorkerPage() {
         setPhase("verify");
       }
     },
-    [address, bountyIdBig, config, refetchBounty, writeContractAsync]
+    [address, bountyIdBig, canWrite, config, refetchBounty, writeContractAsync]
   );
 
   const handleWorldIdVerify = useCallback(
     async (result: ISuccessResult) => {
-      if (!address) throw new Error("Connect a wallet first");
+      if (!canWrite || !address) throw new Error("Connect a wallet on the configured contract network first");
       const proof: WorldIdSuccessResult = {
         nullifier_hash: result.nullifier_hash,
         merkle_root: result.merkle_root,
@@ -151,7 +158,7 @@ export default function WorkerPage() {
       attestationRef.current = attestation;
       await runClaim(attestation);
     },
-    [address, bountyId, runClaim, WORLD_ACTION_WORKER]
+    [address, bountyId, canWrite, runClaim, WORLD_ACTION_WORKER]
   );
 
   // ─── Step 2: Build the evidence bundle (resize → WebP → CBOR → Zstd → sign) ─
@@ -225,7 +232,10 @@ export default function WorkerPage() {
   // ─── Step 3: Write to Arkiv → submitEvidence() ─────────────────────────────
 
   const publishAndSubmit = useCallback(async () => {
-    if (!bundleResult || !address || !bountyIdBig) return;
+    if (!canWrite || !bundleResult || !address || !bountyIdBig || !ESCROW_ADDRESS) {
+      setError("Connect a wallet on the configured contract network before submitting evidence.");
+      return;
+    }
     setPhase("publishing");
     setError(null);
     try {
@@ -266,14 +276,14 @@ export default function WorkerPage() {
         account: address
       });
       setTxHash(hash);
-      await waitForTransactionReceipt(config, { hash });
+      await waitForTransactionReceipt(config, { hash, chainId: ACTIVE_CHAIN.id });
       await refetchBounty();
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setPhase("work");
     }
-  }, [address, bountyId, bountyIdBig, bundleResult, config, refetchBounty, writeContractAsync]);
+  }, [address, bountyId, bountyIdBig, bundleResult, canWrite, config, refetchBounty, writeContractAsync]);
 
   const resetCaptures = useCallback(() => {
     setBeforeCapture(null);
@@ -352,6 +362,7 @@ export default function WorkerPage() {
                   <button
                     type="button"
                     onClick={open}
+                    disabled={!canWrite || phase === "claiming"}
                     className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.99]"
                   >
                     Verify with World ID &amp; claim
@@ -480,7 +491,7 @@ export default function WorkerPage() {
             <button
               type="button"
               onClick={publishAndSubmit}
-              disabled={phase === "done"}
+              disabled={phase === "done" || !canWrite}
               className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:bg-gray-300"
             >
               {phase === "done"
