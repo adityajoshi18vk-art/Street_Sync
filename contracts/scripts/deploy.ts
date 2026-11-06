@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+
 
 /**
  * StreetSync Deploy Script – Arc Testnet (Chain ID: 5042002) or local node
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
  * Environment variables (see root .env.example):
  *   DEPLOYER_PRIVATE_KEY  – deployer wallet
  *   ATTESTER_ADDRESS      – backend EIP-712 signer
- *   USDC_ADDRESS          – (optional) Arc Testnet USDC; omit to deploy MockUSDC
+ *   USDC_ADDRESS          – Arc USDC system address; local networks may use MockUSDC
  *
  * Writes contracts/deployments/<network>.json with addresses + ABIs in the
  * shape consumed by app/src/config/contracts.ts.
@@ -22,12 +22,21 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const network = await ethers.provider.getNetwork();
   const chainId = Number(network.chainId);
+  if (![31337, 5042002].includes(chainId)) throw new Error("Unsupported deployment chain");
+  if (!deployer) throw new Error("Configure a funded DEPLOYER_PRIVATE_KEY before deploying.");
+  const attesterAddress = process.env.ATTESTER_ADDRESS;
+  if (!attesterAddress || !ethers.isAddress(attesterAddress) || attesterAddress === ethers.ZeroAddress) {
+    throw new Error("ATTESTER_ADDRESS must be a valid nonzero backend signer address");
+  }
   console.log("=== StreetSync Deployment ===");
   console.log("Deployer:", deployer.address);
   console.log("Chain ID:", chainId.toString());
 
   // ── 1. USDC ──────────────────────────────────────────────────────────────
-  let usdcAddress = process.env.USDC_ADDRESS ?? "";
+  let usdcAddress = process.env.USDC_ADDRESS ?? (chainId === 5042002 ? "0x3600000000000000000000000000000000000000" : "");
+  if (chainId === 5042002 && usdcAddress.toLowerCase() !== "0x3600000000000000000000000000000000000000") {
+    throw new Error("Arc Testnet must use the native six-decimal USDC ERC-20 interface");
+  }
   let usdcDeployTx: string | null = null;
   let deployedMock = false;
 
@@ -46,14 +55,13 @@ async function main() {
     await tx.wait();
     console.log("Minted 10,000 USDC to deployer");
   } else {
+    if (!ethers.isAddress(usdcAddress) || usdcAddress === ethers.ZeroAddress) throw new Error("Invalid USDC_ADDRESS");
+    const token = new ethers.Contract(usdcAddress, ["function decimals() view returns (uint8)"], ethers.provider);
+    if (await token.decimals() !== 6n) throw new Error("USDC must have 6 decimals");
     console.log("Using existing USDC at:", usdcAddress);
   }
 
   // ── 2. Attester ──────────────────────────────────────────────────────────
-  const attesterAddress = process.env.ATTESTER_ADDRESS;
-  if (!attesterAddress) {
-    throw new Error("ATTESTER_ADDRESS env var is required");
-  }
   console.log("Attester:", attesterAddress);
 
   // ── 3. Window parameters ────────────────────────────────────────────────
@@ -83,12 +91,12 @@ async function main() {
 
   if (usdcOnChain.toLowerCase() !== usdcAddress.toLowerCase()) throw new Error("USDC mismatch");
   if (attesterOnChain.toLowerCase() !== attesterAddress.toLowerCase()) throw new Error("attester mismatch");
-  if (stakeOnChain !== 10_000_000n) throw new Error("stake must be 10.00 USDC");
-  if (cutOnChain !== 500n) throw new Error("cut must be 5%");
+  if (stakeOnChain !== 2_000_000n) throw new Error("stake must be 2.00 USDC");
+  if (cutOnChain !== 1000n) throw new Error("cut must be 10%");
 
   // ── 6. Write deployments JSON ───────────────────────────────────────────
   const networkName = chainId === 31337 ? "localhost" : "arcTestnet";
-  const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const rootDir = join(__dirname, "..");
   const outPath = join(rootDir, "deployments", `${networkName}.json`);
 
   const readAbi = (contractName: string) => {
@@ -104,9 +112,9 @@ async function main() {
     deployedAt: new Date().toISOString(),
     note: `Deployed by contracts/scripts/deploy.ts. Attester: ${attesterAddress}.`,
     parameters: {
-      reviewerStakeUsdc: "10.00",
-      reviewerStakeRaw: "10000000",
-      reviewerCutBps: 500,
+      reviewerStakeUsdc: "2.00",
+      reviewerStakeRaw: "2000000",
+      reviewerCutBps: 1000,
       panelSize: 3,
       quorum: 2,
       commitWindowSeconds: Number(commitWindow),
