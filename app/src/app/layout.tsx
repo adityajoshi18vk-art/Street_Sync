@@ -29,7 +29,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#05070d"
+  themeColor: "#000000"
 };
 
 const NAV_LINKS = [
@@ -43,17 +43,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="min-h-dvh font-sans">
         <Providers>
-          <header className="sticky top-0 z-[600] border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
-            {/* hairline gradient accent under the glass header */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/60 to-transparent" />
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <header className="sticky top-0 z-[600] border-b border-white/10 bg-black/65 backdrop-blur-md">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
               <Link href="/" className="group flex items-center gap-2.5">
-                <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-700 text-sm font-black text-white shadow-glow-sm transition group-hover:shadow-glow">
+                <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-brand-500 text-sm font-black text-white shadow-glow-sm transition group-hover:shadow-glow">
                   SS
                   <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent-400 animate-glow-pulse" />
                 </span>
-                <span className="font-display text-lg font-bold tracking-tight text-white">
-                  Street<span className="text-gradient">Sync</span>
+                <span className="font-display text-lg font-extrabold tracking-tight text-white">
+                  Street<span className="text-brand-400">Sync</span>
                 </span>
                 <span
                   className={`hidden rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider sm:inline ${
@@ -70,14 +68,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <Link
                     key={l.href}
                     href={l.href}
-                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                    className="rounded-full px-3.5 py-1.5 text-[15px] font-semibold text-slate-400 transition hover:bg-white/10 hover:text-white"
                   >
                     {l.label}
                   </Link>
                 ))}
                 <a
                   href={JANLEKHA_URL}
-                  className="ml-2 rounded-lg border-l border-white/10 px-3 py-2 pl-5 text-sm font-medium text-slate-400 transition hover:text-accent-300"
+                  className="ml-2 rounded-full border border-white/15 px-3.5 py-1.5 text-[15px] font-semibold text-slate-400 transition hover:bg-white/10 hover:text-accent-300"
                 >
                   JanLekha · Spending
                 </a>

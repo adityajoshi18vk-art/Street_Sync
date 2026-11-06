@@ -378,8 +378,9 @@ export default function WorkerPage() {
       )}
 
       {phase === "claiming" && (
-        <div className="alert-info animate-rise p-5">
-          Submitting claim() — confirm the transaction in your wallet…
+        <div className="alert-info animate-rise flex items-center gap-3 p-5">
+          <span className="spinner spinner-sm" aria-hidden />
+          <span>Submitting claim() — confirm the transaction in your wallet…</span>
         </div>
       )}
 
@@ -503,7 +504,14 @@ export default function WorkerPage() {
               onClick={buildBundle}
               className="btn-primary flex-1 py-3"
             >
-              {phase === "building" ? "Building bundle…" : "Build evidence bundle"}
+              {phase === "building" ? (
+                <>
+                  <span className="spinner spinner-sm border-white/30 border-t-white" aria-hidden />
+                  Building bundle…
+                </>
+              ) : (
+                "Build evidence bundle"
+              )}
             </button>
             {(beforeCapture || afterCapture) && phase === "work" && (
               <button
@@ -532,10 +540,13 @@ export default function WorkerPage() {
           )}
 
           {(phase === "publishing" || phase === "submitting") && (
-            <div className="alert-info">
-              {phase === "publishing"
-                ? "Writing the SSYN bundle to Arkiv…"
-                : "Calling submitEvidence(bountyId, arkivKey, evidenceHash) — confirm in your wallet…"}
+            <div className="alert-info flex items-center gap-3">
+              <span className="spinner spinner-sm" aria-hidden />
+              <span>
+                {phase === "publishing"
+                  ? "Writing the SSYN bundle to Arkiv…"
+                  : "Calling submitEvidence(bountyId, arkivKey, evidenceHash) — confirm in your wallet…"}
+              </span>
             </div>
           )}
 

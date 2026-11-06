@@ -106,7 +106,7 @@ export function VerifyForm({ options, initialKey }: { options: VerifyOption[]; i
       </div>
 
       {outcome.state === "hashing" && (
-        <p className="text-sm text-slate-300">Computing SHA-256 of {outcome.fileName}…</p>
+        <p role="status" className="flex items-center gap-3 text-[15px] text-slate-500"><span className="spinner" aria-hidden="true" />Computing SHA-256 of {outcome.fileName}…</p>
       )}
       {outcome.state === "error" && (
         <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-300">

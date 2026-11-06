@@ -462,7 +462,14 @@ export default function CameraCapture({
                 disabled={capturing || recordingVideo}
                 className="btn-primary flex-1"
               >
-                {capturing ? "Capturing…" : `Capture ${slot} photo`}
+                {capturing ? (
+                  <>
+                    <span className="spinner spinner-sm border-white/40 border-t-white" />
+                    Capturing…
+                  </>
+                ) : (
+                  `Capture ${slot} photo`
+                )}
               </button>
               <button
                 onClick={stopCamera}
@@ -478,15 +485,18 @@ export default function CameraCapture({
               type="button"
               onClick={recordingVideo ? stopVideoRecording : startVideoRecording}
               disabled={capturing || videoUploading}
-              className={`btn w-full py-2 text-xs text-white ${
+              className={`btn btn-sm w-full text-white ${
                 recordingVideo
                   ? "bg-red-600 animate-pulse hover:bg-red-500"
                   : "bg-amber-600 hover:bg-amber-500"
               } disabled:opacity-50`}
             >
-              {videoUploading
-                ? "Uploading Walkthrough to Swarm…"
-                : recordingVideo
+              {videoUploading ? (
+                <>
+                  <span className="spinner spinner-sm border-white/40 border-t-white" />
+                  Uploading Walkthrough to Swarm…
+                </>
+              ) : recordingVideo
                 ? `Recording Walkthrough (${countdown}s remaining — Stop)`
                 : "Record 10s Video Walkthrough (Swarm)"}
             </button>
@@ -503,7 +513,7 @@ export default function CameraCapture({
 
         <div className="grid grid-cols-2 gap-2">
           {/* capture="environment" opens the camera directly — no gallery picker */}
-          <label className="btn-ghost cursor-pointer py-2 text-xs">
+          <label className="btn-ghost btn-sm cursor-pointer">
             system camera
             <input
               type="file"
@@ -519,7 +529,7 @@ export default function CameraCapture({
           </label>
 
           {/* upload video walkthrough */}
-          <label className="btn-ghost cursor-pointer py-2 text-xs !text-amber-300">
+          <label className="btn-ghost btn-sm cursor-pointer !text-amber-300">
             {videoUploading ? "uploading…" : "upload video"}
             <input
               type="file"

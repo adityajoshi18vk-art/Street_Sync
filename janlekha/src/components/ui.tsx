@@ -57,7 +57,7 @@ export function TxLink({ hash, explorerUrl }: { hash: Hex; explorerUrl: string |
   const url = txUrl(explorerUrl, hash);
   const label = <code className="font-mono text-xs">{shortHex(hash, 10)}</code>;
   return url ? (
-    <a href={url} target="_blank" rel="noreferrer" className="text-blue-300 underline underline-offset-2" title={hash}>
+    <a href={url} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline" title={hash}>
       {label}
     </a>
   ) : (
@@ -69,7 +69,7 @@ export function AddressText({ address, explorerUrl }: { address: Address; explor
   const url = addressUrl(explorerUrl, address);
   const label = <code className="font-mono text-xs">{shortHex(address)}</code>;
   return url ? (
-    <a href={url} target="_blank" rel="noreferrer" className="text-blue-300 underline underline-offset-2" title={address}>
+    <a href={url} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline" title={address}>
       {label}
     </a>
   ) : (
@@ -91,7 +91,7 @@ export function NotFoundPanel({ reason }: { reason: string }) {
     <div role="alert" className="rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-6">
       <p className="font-semibold text-white">Project not found</p>
       <p className="mt-1 text-sm text-slate-300">{reason}</p>
-      <Link href="/projects" className="mt-3 inline-block text-sm text-blue-300 underline underline-offset-2">
+      <Link href="/projects" className="mt-3 inline-block text-sm text-brand-400 hover:underline">
         Browse all projects
       </Link>
     </div>
@@ -100,6 +100,16 @@ export function NotFoundPanel({ reason }: { reason: string }) {
 
 export function LoadingPanel({ label }: { label: string }) {
   return (
-    <div className="animate-pulse card p-6 text-sm text-slate-400">{label}</div>
+    <div role="status" aria-live="polite" className="card p-6">
+      <div className="flex items-center gap-3 text-[15px] text-slate-500">
+        <span className="spinner" aria-hidden="true" />
+        {label}
+      </div>
+      <div className="mt-5 space-y-3" aria-hidden="true">
+        <div className="skeleton h-4 w-3/4" />
+        <div className="skeleton h-4 w-full" />
+        <div className="skeleton h-4 w-1/2" />
+      </div>
+    </div>
   );
 }

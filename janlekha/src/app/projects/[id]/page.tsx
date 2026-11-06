@@ -28,12 +28,12 @@ export const metadata: Metadata = { title: "Project" };
 async function DocumentHash({ projectId, docKey, label, hash }: { projectId: bigint; docKey: string; label: string; hash: Hex }) {
   const offChain = await findOffChainCopy(hash);
   return (
-    <div className="rounded-lg border border-white/[0.08] p-3">
+    <div className="rounded-lg border border-white/10 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium text-slate-300">{label} · SHA-256</p>
         <Link
           href={`/verify?project=${projectId}&doc=${encodeURIComponent(docKey)}`}
-          className="text-xs font-medium text-blue-300 underline underline-offset-2"
+          className="text-xs font-medium text-brand-400 hover:underline"
         >
           Verify a copy
         </Link>
@@ -72,7 +72,7 @@ const STEP_LABEL: Record<(typeof MILESTONE_STEPS)[number], string> = {
 function MilestoneCard({ m, projectId, explorerUrl }: { m: MilestoneView; projectId: bigint; explorerUrl: string | null }) {
   const reached = MILESTONE_STEPS.indexOf(m.status as (typeof MILESTONE_STEPS)[number]);
   return (
-    <div className="rounded-lg border border-white/[0.08] p-4">
+    <div className="rounded-lg border border-white/10 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-semibold">
           Milestone {m.id} · <span className="tabular-nums">{formatPaise(m.amountPaise)}</span>
@@ -159,7 +159,7 @@ function Timeline({ project, explorerUrl, isHedera }: { project: ProjectDetail; 
   if (!project.timeline.ok) return <ErrorPanel failure={project.timeline.failure} />;
   if (project.timeline.events.length === 0) return <p className="text-sm text-slate-400">No events found for this project.</p>;
   return (
-    <ol className="relative space-y-4 border-l border-white/[0.08] pl-5">
+    <ol className="relative space-y-4 border-l border-white/10 pl-5">
       {project.timeline.events.map((e) => {
         const d = describe(e, explorerUrl);
         return (

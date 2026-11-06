@@ -161,7 +161,7 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                 <button
                   type="button"
                   onClick={requestGps}
-                  className="btn-ghost px-2.5 py-1 text-xs"
+                  className="btn-ghost btn-sm"
                 >
                   {gps ? "Refresh" : "Use my GPS"}
                 </button>
@@ -201,9 +201,16 @@ function RegistrationCard({ onRegistered }: { onRegistered: () => void }) {
                     type="button"
                     onClick={open}
                     disabled={busy}
-                    className="btn-primary w-full px-4 py-3 text-sm"
+                    className="btn-primary w-full py-3"
                   >
-                    {busy ? "Registering…" : "Verify & stake to become a reviewer"}
+                    {busy ? (
+                      <>
+                        <span className="spinner spinner-sm border-white/40 border-t-white" />
+                        Registering…
+                      </>
+                    ) : (
+                      "Verify & stake to become a reviewer"
+                    )}
                   </button>
                 )}
               </IDKitWidget>
@@ -305,9 +312,16 @@ function EvidencePanel({ bountyId, arkivKey, evidenceHash, worker }: EvidencePan
         <button
           type="button"
           onClick={() => void load()}
-          className="btn-ghost px-2.5 py-1 text-xs"
+          className="btn-ghost btn-sm"
         >
-          {loading ? "Fetching…" : "Re-fetch"}
+          {loading ? (
+            <>
+              <span className="spinner spinner-sm" />
+              Fetching…
+            </>
+          ) : (
+            "Re-fetch"
+          )}
         </button>
       </div>
       {error && <p className="mt-2 text-xs text-red-300">{error}</p>}
@@ -555,7 +569,7 @@ function AssignmentCard({
             type="button"
             disabled={!panelReady || busy}
             onClick={() => void runTx("assignPanel")}
-            className="btn-primary mt-2 w-full px-3 py-2 text-xs"
+            className="btn-primary btn-sm mt-2 w-full"
           >
             Assign panel
           </button>
@@ -594,7 +608,7 @@ function AssignmentCard({
               type="button"
               disabled={!revealExpired || busy}
               onClick={() => void runTx("pokeOrReplace")}
-              className="rounded-xl bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-300 ring-1 ring-amber-400/30 transition hover:bg-amber-400/20 disabled:opacity-40"
+              className="btn btn-sm w-full bg-amber-400/10 text-amber-300 ring-1 ring-amber-400/30 hover:bg-amber-400/20"
               title="Slash & replace reviewers who missed the reveal window"
             >
               Slash / replace inactive
@@ -603,9 +617,16 @@ function AssignmentCard({
               type="button"
               disabled={!revealExpired || busy || justSettled}
               onClick={() => void runTx("settle")}
-              className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-400/30 transition hover:bg-emerald-400/20 disabled:opacity-40"
+              className="btn btn-sm w-full bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/30 hover:bg-emerald-400/20"
             >
-              {justSettled ? "Settling…" : "Settle bounty"}
+              {justSettled ? (
+                <>
+                  <span className="spinner spinner-sm border-emerald-300/30 border-t-emerald-300" />
+                  Settling…
+                </>
+              ) : (
+                "Settle bounty"
+              )}
             </button>
           </div>
         </>
@@ -656,8 +677,8 @@ export default function ReviewPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <header className="mb-8 animate-rise">
-        <h1 className="heading text-2xl">Reviewer dashboard</h1>
-        <p className="mt-1.5 text-sm text-slate-400">
+        <h1 className="heading text-3xl">Reviewer dashboard</h1>
+        <p className="mt-1.5 text-[15px] leading-5 text-slate-400">
           Stake, inspect evidence, commit-reveal your vote, and keep panels honest.
         </p>
       </header>

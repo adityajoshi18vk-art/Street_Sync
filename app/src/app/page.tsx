@@ -242,7 +242,7 @@ export default function HomePage() {
           <span>Backend index unavailable — {listError}</span>
           <button
             onClick={() => void loadBounties()}
-            className="btn-danger px-3 py-1.5 text-xs"
+            className="btn-danger btn-sm"
           >
             Retry
           </button>
@@ -363,7 +363,14 @@ export default function HomePage() {
               disabled={!draftPin || !isConnected || writing}
               className="btn-primary w-full py-3"
             >
-              {writing ? "Confirm in wallet…" : "Approve USDC & Create Bounty"}
+              {writing ? (
+                <>
+                  <span className="spinner spinner-sm border-white/40 border-t-white" />
+                  Confirm in wallet…
+                </>
+              ) : (
+                "Approve USDC & Create Bounty"
+              )}
             </button>
             {!isConnected && (
               <p className="text-center text-[11px] text-slate-500">
@@ -391,7 +398,7 @@ export default function HomePage() {
                 </div>
                 <Link
                   href={`/bounty/${selectedBounty.bountyId}`}
-                  className="btn-primary px-3 py-1.5 text-xs"
+                  className="btn-primary btn-sm"
                 >
                   Details
                 </Link>
@@ -408,7 +415,7 @@ export default function HomePage() {
                   <button
                     onClick={handlePledge}
                     disabled={!isConnected || writing || !pledgeAmount}
-                    className="btn-success shrink-0 px-4 py-2 text-xs"
+                    className="btn-success btn-sm shrink-0"
                   >
                     Pledge
                   </button>

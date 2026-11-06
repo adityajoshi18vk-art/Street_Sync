@@ -59,7 +59,7 @@ async function VerifyContent({ searchParams }: { searchParams: PageProps<"/verif
     <div className="space-y-4">
       <p className="text-sm text-slate-300">
         Project{" "}
-        <Link href={`/projects/${p.id}`} className="font-medium text-blue-300 underline underline-offset-2">
+        <Link href={`/projects/${p.id}`} className="font-medium text-brand-400 hover:underline">
           #{p.id.toString()} {catalogProject(p.sanctionDocumentHash)?.title ?? ""}
         </Link>{" "}
         · {options.length} document hash(es) recorded on-chain · <Link href="/verify" className="underline underline-offset-2">change project</Link>
@@ -73,7 +73,7 @@ export default function VerifyPage({ searchParams }: PageProps<"/verify">) {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="heading text-2xl">Verify a document</h1>
+        <h1 className="heading text-2xl sm:text-3xl">Verify a document</h1>
         <p className="mt-1 text-sm text-slate-300">
           Check whether a PDF is exactly the document an authorised role recorded on-chain. Your browser computes the
           file&apos;s SHA-256 and compares it with the hash stored in the JanLekha contract. No wallet or upload needed.

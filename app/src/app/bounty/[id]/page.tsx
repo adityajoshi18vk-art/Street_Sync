@@ -39,6 +39,7 @@ export default function BountyDetailPage() {
   const { writeContractAsync } = useWriteContract();
 
   const [pledgeAmount, setPledgeAmount] = useState("");
+  const [pledging, setPledging] = useState(false);
   const [pledgeStatus, setPledgeStatus] = useState<string | null>(null);
   const [pledgeError, setPledgeError] = useState<string | null>(null);
   const [videoEvidence, setVideoEvidence] = useState<VideoEvidence | null>(null);
@@ -150,6 +151,7 @@ export default function BountyDetailPage() {
     if (!address) return;
     setPledgeError(null);
     setPledgeStatus(null);
+    setPledging(true);
     try {
       const amountUsdc = String(Number(pledgeAmount));
       if (Number(pledgeAmount) <= 0) throw new Error("Enter a valid USDC amount.");
@@ -175,6 +177,8 @@ export default function BountyDetailPage() {
     } catch (e) {
       setPledgeStatus(null);
       setPledgeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPledging(false);
     }
   };
 
@@ -297,10 +301,11 @@ export default function BountyDetailPage() {
               />
               <button
                 onClick={handlePledge}
-                disabled={!isConnected || !pledgeAmount}
+                disabled={!isConnected || !pledgeAmount || pledging}
                 className="btn-success shrink-0 px-5"
               >
-                Pledge
+                {pledging && <span className="spinner spinner-sm border-white/30 border-t-white" aria-hidden />}
+                {pledging ? "Pledging…" : "Pledge"}
               </button>
             </div>
             {pledgeStatus && <p className="mt-2 text-xs font-medium text-brand-300">{pledgeStatus}</p>}
