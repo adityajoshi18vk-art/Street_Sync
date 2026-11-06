@@ -11,34 +11,3 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-
-/// Off-chain citizen feedback. Public fields only; never changes contract state.
-model CitizenFeedback {
-  id           String               @id @default(uuid())
-  chainId      Int                  @map("chain_id")
-  contract     String               /// lowercase JanLekha contract address
-  projectId    String               @map("project_id") /// decimal on-chain project id
-  body         String
-  credential   String               /// World ID credential identifier, e.g. "proof_of_human"
-  createdAt    DateTime             @default(now()) @map("created_at")
-  verification WorldIdVerification?
-
-  @@index([chainId, contract, projectId, createdAt])
-  @@map("citizen_feedback")
-}
-
-/// PRIVATE. World ID nullifiers are never exposed through contract events or public API responses.
-/// One verified human per action: uniqueness is enforced by the database, not only in code.
-model WorldIdVerification {
-  id              String          @id @default(uuid())
-  action          String
-  nullifier       String          /// canonical 0x-prefixed 32-byte lowercase hex
-  protocolVersion String          @map("protocol_version")
-  environment     String
-  verifiedAt      DateTime        @default(now()) @map("verified_at")
-  feedbackId      String          @unique @map("feedback_id")
-  feedback        CitizenFeedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
-
-  @@unique([action, nullifier])
-  @@map("world_id_verifications")
-}

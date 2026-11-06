@@ -86,27 +86,3 @@ npm run test:e2e   # Playwright: fresh Hardhat node on :8546, dedicated .next-e2
 The suite injects an EIP-1193 test wallet that forwards to the node's unlocked dev accounts (no private keys).
 It covers the full happy path (create → tender → sealed bids → reveal → award → milestone → evidence →
 inspection → mock PFMS attestation), wrong-network blocking, and a failed reveal using a tampered bid backup.
-
-## Citizen feedback (World ID)
-
-Citizens can post one feedback item per project, labelled **"Unique human verified"**. World ID is used for
-this and nothing else: never for department, vendor, inspector or PAO actions, and never needed to read public pages.
-Feedback is off-chain (PostgreSQL) and never changes milestone or payment state.
-
-How it works (World ID 4.0, IDKit 4.x, per docs.world.org):
-1. `POST /api/world-id/rp-context` signs the request server-side with `WORLD_ID_RP_SIGNING_KEY`.
-   Action = `<NEXT_PUBLIC_WORLD_ID_ACTION_PREFIX>-p<projectId>`.
-2. The browser opens `IDKitRequestWidget` (`proofOfHuman`, v4 proofs only). The signal binds the proof to the
-   SHA-256 of the exact feedback text.
-3. `POST /api/projects/[id]/feedback` checks action, environment and signal, then forwards the unmodified
-   result to `POST https://developer.world.org/api/v4/verify/{rp_id}`.
-4. The nullifier is stored in a private table with a unique `(action, nullifier)` index. Public responses never
-   include it. Nothing about World ID touches Hedera.
-
-Setup: create an app at developer.world.org, then set `NEXT_PUBLIC_WORLD_APP_ID`, `NEXT_PUBLIC_WORLD_RP_ID`,
-`WORLD_ID_RP_SIGNING_KEY` and `DATABASE_URL`, and run `npx prisma migrate deploy`. Use
-`NEXT_PUBLIC_WORLD_ID_ENVIRONMENT=staging` with the World ID simulator for testing.
-
-```bash
-TEST_DATABASE_URL=postgresql://postgres@localhost:5432/janlekha_test npm run test:feedback
-```
