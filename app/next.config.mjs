@@ -3,7 +3,13 @@ import { dirname, join } from "node:path";
 
 const require = createRequire(import.meta.url);
 // @aliimam/* declare "main": "dist/index.cjs", which they don't ship; point at their ESM build.
-const esmEntry = (pkg) => join(dirname(require.resolve(`${pkg}/package.json`)), "dist/index.mjs");
+const esmEntry = (pkg) => {
+  try {
+    return join(dirname(require.resolve(`${pkg}/package.json`)), "dist/index.mjs");
+  } catch {
+    return false;
+  }
+};
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

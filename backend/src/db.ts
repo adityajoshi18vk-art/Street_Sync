@@ -27,6 +27,9 @@ if (!fs.existsSync(dbDir)) {
 
 const db = new DatabaseSync(DB_PATH);
 
+// Give concurrent/restarting processes time to release locks
+db.exec("PRAGMA busy_timeout = 5000;");
+
 // Enable WAL mode for better concurrent read performance
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");

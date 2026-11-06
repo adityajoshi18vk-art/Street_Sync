@@ -52,7 +52,7 @@ const hardhatLocal = defineChain({
 // ─── Configuration ───────────────────────────────────────────────────────────
 
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? "5042002");
-const POLL_INTERVAL_MS = 3_000; // 3 seconds between polls
+const POLL_INTERVAL_MS = Number(process.env.INDEXER_POLL_INTERVAL_MS ?? (CHAIN_ID === 31337 ? 2_000 : 8_000));
 const CONFIRMATION_LAG = BigInt(process.env.INDEXER_CONFIRMATION_LAG ?? (CHAIN_ID === 31337 ? 0 : 5));
 
 // ─── Resolve contract address from deployment artifacts or env ────────────────
@@ -495,6 +495,8 @@ export async function startIndexer(): Promise<void> {
       }
     } catch (e) {
       console.error("[indexer] Poll error:", (e as Error).message);
+      pollTimer = setTimeout(poll, POLL_INTERVAL_MS * 2);
+      return;
     }
 
     pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
