@@ -181,3 +181,16 @@ npm run dev
    2. Run `npm run deploy:arc`
    3. The script automatically updates `contracts/deployments/arcTestnet.json`, instantly configuring the frontend and backend.
 
+---
+
+## JanLekha (separate project)
+
+`janlekha/` is a self-contained Next.js + Hardhat + Prisma app with its own lockfile; it is not part of the npm workspaces above. Setup:
+
+```bash
+cd janlekha && npm ci && cp .env.example .env
+npm run dev            # http://localhost:3000/health
+npm run contracts:test
+```
+
+See `janlekha/README.md` for all commands.

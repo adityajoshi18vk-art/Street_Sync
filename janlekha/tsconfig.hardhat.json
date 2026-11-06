@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "es2023",
+      "dom"
+    ],
+    "module": "node20",
+    "target": "es2023",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "hardhat.config.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "artifacts/artifacts.d.ts",
+    "artifacts/**/*.d.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
+  ]
+}
