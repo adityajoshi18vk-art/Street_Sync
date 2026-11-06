@@ -7,7 +7,8 @@ import { ACTIVE_CHAIN, HARDHAT_LOCAL, ARC_TESTNET, ARC_RPC_URL } from "./contrac
 export const SUPPORTED_CHAINS = [ARC_TESTNET, HARDHAT_LOCAL] as const;
 
 export const wagmiConfig = createConfig({
-  chains: SUPPORTED_CHAINS,
+  chains: ACTIVE_CHAIN.id === HARDHAT_LOCAL.id ? [HARDHAT_LOCAL, ARC_TESTNET] : SUPPORTED_CHAINS,
+  ssr: true,
   connectors: [injected({ shimDisconnect: true })],
   transports: {
     [ARC_TESTNET.id]: http(ARC_RPC_URL),
