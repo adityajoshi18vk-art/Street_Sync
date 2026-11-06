@@ -220,6 +220,16 @@ Press Ctrl+C once to stop all of them. Each JanLekha demo run starts from a fres
 
 Run one feature on its own with `npm run dev:streetsync` or `npm run dev:janlekha`.
 
+### Troubleshooting
+
+- **"JanLekha · Spending" shows "localhost refused to connect".** The JanLekha process did not start. Look for lines
+  starting with `[janlekha]` in the terminal running `npm run dev`. To see only its output, stop everything and run
+  `npm run dev:janlekha`. The first start takes about a minute: it boots the chain, deploys, seeds and compiles.
+- **"Node.js … is too old".** JanLekha needs Node.js 22+. Check with `node -v`, install Node 22 LTS, then run `npm install` again.
+- **"Port 8547 is already in use".** An earlier JanLekha chain is still running. Close it, or start with a different
+  port: `JANLEKHA_CHAIN_PORT=8548 npm run dev:janlekha` (PowerShell: `$env:JANLEKHA_CHAIN_PORT=8548; npm run dev:janlekha`).
+- **Windows:** supported. The JanLekha runner starts its tools with Node directly, so no extra shell setup is needed.
+
 ### Try the JanLekha demo
 
 1. Open http://localhost:3100/projects. Project #1 has the full lifecycle (tender, sealed bids, award, milestones, mock PFMS attestation).
