@@ -5,17 +5,22 @@
  * Tables:
  *   nullifiers      – World ID one-human-per-action enforcement
  *   nonces          – Issued EIP-712 attestation nonces (single-use)
- *   bounties        – Indexed on-chain bounty state cache
+ *   meta            – Schema version and deployment scope (chain + escrow)
+ *   bounties        – Canonical on-chain bounty state cache
  *   pledges         – Per-bounty pledger amounts
  *   panel_assignments – Reviewer panel selections per bounty×round
  *   vote_commits    – Commit hashes and revealed votes
  *   reviewer_slashes – Slash records
+ *   problem_votes   – Neighbour validation votes
+ *   reports         – Verified problem-report bundles
  *   events_cursor   – Indexer block cursor for resumable polling
+ * See schema.ts for DDL and the v1→v2 migration.
  */
 
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import fs from "node:fs";
+import { ensureDeploymentScope as ensureScope, initSchema } from "./schema.js";
 
 const DB_PATH = process.env.DB_PATH ?? "data/streetsync.db";
 
@@ -30,139 +35,14 @@ const db = new DatabaseSync(DB_PATH);
 // Enable WAL mode for better concurrent read performance
 db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
+// Test files and the server may open the same file concurrently.
+db.exec("PRAGMA busy_timeout = 5000;");
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Schema
 // ═══════════════════════════════════════════════════════════════════════════════
 
-db.exec(`
-  -- World ID nullifier tracking: one human per action
-  CREATE TABLE IF NOT EXISTS nullifiers (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    nullifier_hash   TEXT    NOT NULL,
-    action           TEXT    NOT NULL,
-    wallet           TEXT    NOT NULL,
-    created_at       INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(nullifier_hash, action)
-  );
-
-  -- Issued EIP-712 nonces (track which nonces we've issued so we don't reuse)
-  CREATE TABLE IF NOT EXISTS nonces (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    wallet           TEXT    NOT NULL,
-    nonce            TEXT    NOT NULL,
-    role             INTEGER NOT NULL,
-    bounty_id        TEXT    NOT NULL DEFAULT '0',
-    expiry           INTEGER NOT NULL,
-    issued_at        INTEGER NOT NULL DEFAULT (unixepoch()),
-    used             INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(wallet, nonce)
-  );
-
-  -- Bounty cache (indexed from on-chain events)
-  CREATE TABLE IF NOT EXISTS bounties (
-    bounty_id           TEXT    PRIMARY KEY,
-    creator             TEXT    NOT NULL,
-    description_hash    TEXT    NOT NULL,
-    lat_e5              INTEGER NOT NULL,
-    lng_e5              INTEGER NOT NULL,
-    region_cell         INTEGER NOT NULL,
-    total_pledged       TEXT    NOT NULL DEFAULT '0',
-    created_at          INTEGER NOT NULL,
-    claim_deadline      INTEGER NOT NULL,
-    worker              TEXT,
-    visual_challenge_code INTEGER,
-    arkiv_entity_key    TEXT,
-    evidence_hash       TEXT,
-    selection_block     TEXT,
-    review_round        INTEGER NOT NULL DEFAULT 0,
-    rework_count        INTEGER NOT NULL DEFAULT 0,
-    status              INTEGER NOT NULL DEFAULT 0,
-    updated_at          INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Pledge records
-  CREATE TABLE IF NOT EXISTS pledges (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id   TEXT    NOT NULL,
-    pledger     TEXT    NOT NULL,
-    amount      TEXT    NOT NULL,
-    new_total   TEXT    NOT NULL,
-    block_number TEXT,
-    tx_hash     TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, pledger, tx_hash)
-  );
-
-  -- Panel assignments per bounty×round
-  CREATE TABLE IF NOT EXISTS panel_assignments (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id     TEXT    NOT NULL,
-    review_round  INTEGER NOT NULL,
-    reviewer_0    TEXT    NOT NULL,
-    reviewer_1    TEXT    NOT NULL,
-    reviewer_2    TEXT    NOT NULL,
-    block_number  TEXT,
-    tx_hash       TEXT,
-    created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, review_round)
-  );
-
-  -- Vote commits and reveals
-  CREATE TABLE IF NOT EXISTS vote_commits (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id     TEXT    NOT NULL,
-    review_round  INTEGER NOT NULL DEFAULT 0,
-    reviewer      TEXT    NOT NULL,
-    commit_hash   TEXT,
-    revealed      INTEGER NOT NULL DEFAULT 0,
-    approve       INTEGER,
-    block_number  TEXT,
-    tx_hash       TEXT,
-    created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
-    UNIQUE(bounty_id, review_round, reviewer)
-  );
-
-  -- Reviewer slashes
-  CREATE TABLE IF NOT EXISTS reviewer_slashes (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id   TEXT    NOT NULL,
-    reviewer    TEXT    NOT NULL,
-    amount      TEXT    NOT NULL,
-    block_number TEXT,
-    tx_hash     TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Settle records
-  CREATE TABLE IF NOT EXISTS settlements (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    bounty_id       TEXT    NOT NULL UNIQUE,
-    approved        INTEGER NOT NULL,
-    worker_payout   TEXT    NOT NULL,
-    reviewer_cut    TEXT    NOT NULL,
-    block_number    TEXT,
-    tx_hash         TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Indexer cursor: tracks the last processed block for each chain
-  CREATE TABLE IF NOT EXISTS events_cursor (
-    chain_id    INTEGER PRIMARY KEY,
-    last_block  TEXT    NOT NULL DEFAULT '0',
-    updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  -- Indexes for common queries
-  CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status);
-  CREATE INDEX IF NOT EXISTS idx_bounties_region ON bounties(region_cell);
-  CREATE INDEX IF NOT EXISTS idx_bounties_creator ON bounties(creator);
-  CREATE INDEX IF NOT EXISTS idx_bounties_worker ON bounties(worker);
-  CREATE INDEX IF NOT EXISTS idx_pledges_bounty ON pledges(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_panel_bounty ON panel_assignments(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_votes_bounty ON vote_commits(bounty_id);
-  CREATE INDEX IF NOT EXISTS idx_nullifiers_hash ON nullifiers(nullifier_hash);
-`);
+initSchema(db);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Prepared Statements
