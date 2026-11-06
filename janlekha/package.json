@@ -1,0 +1,44 @@
+{
+  "name": "janlekha",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit && hardhat build --quiet && tsc -p tsconfig.hardhat.json",
+    "contracts:build": "hardhat build",
+    "contracts:test": "hardhat test",
+    "contracts:deploy:hedera": "hardhat ignition deploy ignition/modules/JanLekha.ts --network hederaTestnet",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.6.1",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "viem": "^2.57.16",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "hardhat": "^3.21.2",
+    "prisma": "^7.10.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "type": "module"
+}
