@@ -238,3 +238,21 @@ Arkiv access key and writer wallet. Workers do not need tGLM. The relay stores a
 bundle only when its EIP-191 signature recovers the on-chain worker of a `Claimed`
 bounty. Entities expire after 30 days. Fund the writer address
 (`ARKIV_PRIVATE_KEY`'s address) with tGLM at https://hub.arkiv.network/faucet.
+
+### World ID 4.0
+
+The app uses IDKit 4 with backend-signed requests:
+
+1. `POST /api/worldid/rp-context` returns the app ID, environment and an RP-signed
+   `rp_context` for `claim-bounty` / `register-reviewer`. The signature uses
+   `WORLD_RP_SIGNING_KEY`, which never leaves the backend.
+2. The browser asks World App for a proof whose signal is the connected wallet.
+3. `POST /api/worldid/verify` checks the action, environment and wallet-bound
+   `signal_hash`, then forwards the result to `https://developer.world.org/api/v4/verify/{rp_id}`.
+   It links the nullifier to that wallet and returns the EIP-712 attestation.
+4. `POST /api/worldid/attest` re-issues attestations for a wallet that already verified
+   for the role. Actions allow one verification per human, so a worker needs this to
+   claim later bounties. On-chain, an attestation is only valid from its own wallet.
+
+Backend variables: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`,
+`WORLD_ID_ENVIRONMENT` (`production` for World App, `staging` for the simulator).
