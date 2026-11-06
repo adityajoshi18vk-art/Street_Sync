@@ -1,3 +1,10 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+
+const require = createRequire(import.meta.url);
+// @aliimam/* declare "main": "dist/index.cjs", which they don't ship; point at their ESM build.
+const esmEntry = (pkg) => join(dirname(require.resolve(`${pkg}/package.json`)), "dist/index.mjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -18,6 +25,8 @@ const nextConfig = {
     // Our app never touches x402 payments, so stub every referenced subpath.
     config.resolve.alias = {
       ...config.resolve.alias,
+      "@aliimam/icons$": esmEntry("@aliimam/icons"),
+      "@aliimam/logos$": esmEntry("@aliimam/logos"),
       "@x402/core/client": false,
       "@x402/core/schemas": false,
       "@x402/core/server": false,

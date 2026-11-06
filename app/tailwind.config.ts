@@ -10,6 +10,18 @@ const config: Config = {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       colors: {
+        // shadcn/ui semantic tokens, mapped to the StreetSync palette in globals.css
+        background: "hsl(var(--background) / <alpha-value>)",
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        primary: {
+          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
+          foreground: "hsl(var(--primary-foreground) / <alpha-value>)"
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted) / <alpha-value>)",
+          foreground: "hsl(var(--muted-foreground) / <alpha-value>)"
+        },
+        border: "hsl(var(--border) / <alpha-value>)",
         ink: {
           950: "#050506",
           900: "#0b0b0e",
@@ -56,9 +68,7 @@ const config: Config = {
         rise: "rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both",
         shimmer: "shimmer 1.8s linear infinite",
         float: "float 7s ease-in-out infinite",
-        "glow-pulse": "glowPulse 3.5s ease-in-out infinite",
-        aurora: "aurora 18s ease-in-out infinite alternate",
-        marquee: "marquee 40s linear infinite"
+        "glow-pulse": "glowPulse 3.5s ease-in-out infinite"
       },
       keyframes: {
         rise: {
@@ -76,15 +86,6 @@ const config: Config = {
         glowPulse: {
           "0%, 100%": { opacity: "0.55" },
           "50%": { opacity: "1" }
-        },
-        aurora: {
-          "0%": { transform: "translate3d(-6%, -4%, 0) scale(1) rotate(0deg)" },
-          "50%": { transform: "translate3d(5%, 6%, 0) scale(1.15) rotate(12deg)" },
-          "100%": { transform: "translate3d(-3%, 8%, 0) scale(0.95) rotate(-8deg)" }
-        },
-        marquee: {
-          from: { transform: "translateX(0)" },
-          to: { transform: "translateX(-50%)" }
         }
       }
     }

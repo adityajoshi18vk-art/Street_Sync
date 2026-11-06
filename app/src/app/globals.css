@@ -4,6 +4,14 @@
 
 :root {
   color-scheme: dark;
+  /* shadcn/ui tokens (HSL channels) in the StreetSync palette */
+  --background: 240 9% 2%;
+  --foreground: 0 0% 98%;
+  --primary: 82 85% 67%;
+  --primary-foreground: 240 9% 2%;
+  --muted: 240 6% 10%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 5% 20%;
 }
 
 html {
@@ -18,20 +26,6 @@ body {
     radial-gradient(900px 480px at 12% -10%, rgb(163 230 53 / 0.06), transparent 62%),
     radial-gradient(760px 420px at 90% -6%, rgb(139 92 246 / 0.08), transparent 60%);
   background-attachment: fixed;
-}
-
-/* faint engineering grid over the ambient glows */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.022) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 25%, transparent 78%);
 }
 
 ::selection {
@@ -182,22 +176,6 @@ input[type="number"]::-webkit-inner-spin-button {
   .eyebrow {
     @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400;
   }
-}
-
-/* Hero aurora: blurred drifting color fields behind the headline */
-.aurora {
-  position: absolute;
-  inset: -20% -10% auto -10%;
-  height: 140%;
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(70px);
-  opacity: 0.55;
-}
-.aurora > span {
-  position: absolute;
-  border-radius: 9999px;
-  mix-blend-mode: screen;
 }
 
 /* Staggered entrance helper: apply .animate-rise plus a .stagger-N */

@@ -1,82 +1,218 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CircleCheck, Coins, Fingerprint, MapPin, ShieldCheck, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowDown, ArrowRight, ArrowUpRight, MapPin, ShieldCheck } from "lucide-react";
+
+import { HeroSection03 } from "@/components/ui/hero-03";
+import { StatusBadge } from "@/components/StatusBadge";
+import { ACTIVE_CHAIN, ESCROW_ADDRESS } from "@/config/contracts";
+import { getBackendHealth } from "@/lib/api";
 import { formatUsdcDisplaySafe, type BountyMapItem } from "@/lib/types";
 
+const REPO_URL = "https://github.com/akashpandey2388-arch/Street_Sync";
+// Unsplash, photo by ThisisEngineering — a technician at work.
+const HERO_PHOTO =
+  "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=900&q=75&auto=format&fit=crop";
+
+type IndexerState = "checking" | "live" | "offline";
+
+/** Glyphs rendered on the server (see app/page.tsx) so the icon libraries never ship to the browser. */
+export interface HeroGlyphs {
+  pin: ReactNode;
+  github: ReactNode;
+}
+
+/** Filled "verified" seal: lucide badge-check outline, filled with the accent. */
+function ProofSeal() {
+  return (
+    <svg viewBox="0 0 24 24" className="mx-[0.06em] h-[0.82em] w-[0.82em] shrink-0" aria-hidden>
+      <path
+        fill="#a78bfa"
+        d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
+      />
+      <path d="m8.6 12 2.4 2.4 4.6-4.8" fill="none" stroke="#050506" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function useIndexerState(): IndexerState {
+  const [state, setState] = useState<IndexerState>("checking");
+  useEffect(() => {
+    let cancelled = false;
+    getBackendHealth()
+      .then((h) => !cancelled && setState(h.status === "ok" && h.chainId === ACTIVE_CHAIN.id ? "live" : "offline"))
+      .catch(() => !cancelled && setState("offline"));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return state;
+}
+
 export function HomeHero({
-  chainName,
   bounties,
-  loading
+  loading,
+  glyphs
 }: {
-  chainName: string;
   bounties: BountyMapItem[];
   loading: boolean;
+  glyphs: HeroGlyphs;
 }) {
+  const indexer = useIndexerState();
   const escrowed = bounties.reduce((sum, b) => sum + (Number.isFinite(b.totalPledged) ? b.totalPledged : 0), 0);
-  const stats = [
-    { icon: MapPin, label: "Bounties on the map", value: String(bounties.length) },
-    { icon: Coins, label: "USDC in escrow", value: formatUsdcDisplaySafe(escrowed) },
-    { icon: Sparkles, label: "Open to claim", value: String(bounties.filter((b) => b.status === 0).length) },
-    { icon: CircleCheck, label: "Repairs approved", value: String(bounties.filter((b) => b.status === 4).length) }
-  ];
+  const open = bounties.filter((b) => b.status === 0).length;
+  const approved = bounties.filter((b) => b.status === 4).length;
+  const latest = bounties.reduce<BountyMapItem | null>(
+    (top, b) => (!top || Number(b.bountyId) > Number(top.bountyId) ? b : top),
+    null
+  );
+  const explorer = ACTIVE_CHAIN.blockExplorers?.default.url;
 
   return (
-    <section className="relative isolate overflow-hidden rounded-[2rem] border border-white/[0.08] px-5 pb-6 pt-12 text-center sm:px-10 sm:pt-16">
-      <div className="aurora" aria-hidden>
-        <span className="left-[8%] top-[10%] h-72 w-72 animate-aurora bg-brand-400/50" />
-        <span className="right-[6%] top-[0%] h-80 w-80 animate-aurora bg-accent-500/60 [animation-delay:-6s]" />
-        <span className="left-[40%] top-[35%] h-64 w-64 animate-aurora bg-emerald-400/30 [animation-delay:-11s]" />
-      </div>
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,transparent_20%,rgb(5_5_6/0.85)_75%)]" aria-hidden />
-
-      <p className="eyebrow animate-rise">
-        <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-glow-pulse" />
-        Live on {chainName}
-        <span className="hidden sm:inline">· USDC escrow · World ID</span>
-      </p>
-
-      <h1 className="heading animate-rise stagger-1 mx-auto mt-5 max-w-3xl text-[2.15rem] leading-[1.04] min-[400px]:text-[2.5rem] sm:text-6xl lg:text-7xl">
-        Fix your street.
-        <br />
-        <span className="text-gradient whitespace-nowrap">Proven on-chain.</span>
-      </h1>
-
-      <p className="animate-rise stagger-2 mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-zinc-400 sm:text-base">
-        Neighbors fund it, a verified human fixes it, other verified humans confirm it — USDC
-        releases only when the community agrees.
-      </p>
-
-      <div className="animate-rise stagger-3 mt-7 flex flex-wrap items-center justify-center gap-3">
-        <a href="#create" className="btn-primary px-6 py-2.5">
-          <MapPin className="h-4 w-4" strokeWidth={2.5} aria-hidden />
-          Drop a bounty
-        </a>
-        <Link href="/review" className="btn-ghost px-6 py-2.5">
-          <ShieldCheck className="h-4 w-4" aria-hidden />
-          Review repairs
-          <ArrowRight className="h-4 w-4 opacity-60" aria-hidden />
-        </Link>
-      </div>
-
-      <dl className="animate-rise stagger-4 mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.06] text-left lg:grid-cols-4">
-        {stats.map(({ icon: Icon, label, value }) => (
-          <div key={label} className="flex items-center gap-3 bg-ink-950/80 px-3.5 py-4 backdrop-blur sm:px-4">
-            <span className="icon-tile h-9 w-9 rounded-xl">
-              <Icon className="h-[18px] w-[18px]" aria-hidden />
+    <HeroSection03
+      title="StreetSync: fix the block, proof pays."
+      meta={{
+        start: (
+          <>
+            StreetSync<span className="hidden sm:inline"> — civic repairs, settled on-chain</span>
+          </>
+        ),
+        end: (
+          <span className="inline-flex items-center gap-2">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                indexer === "live" ? "bg-primary animate-glow-pulse" : indexer === "offline" ? "bg-red-400" : "bg-zinc-500"
+              }`}
+            />
+            {indexer === "live" ? `Indexer live · ${ACTIVE_CHAIN.name}` : indexer === "offline" ? "Indexer offline" : "Checking indexer…"}
+          </span>
+        )
+      }}
+      rows={[
+        {
+          content: "Fix the",
+          caption: "Neighbors pool USDC for a repair on their own street.",
+          captionSide: "start"
+        },
+        {
+          content: (
+            <>
+              <span>Bl</span>
+              {glyphs.pin}
+              <span>ck</span>
+            </>
+          ),
+          caption: "A World ID–verified human does the work. Three verified reviewers decide whether it's done."
+        },
+        {
+          content: (
+            <>
+              <span>Proof</span>
+              <ProofSeal />
+              <span>Pays</span>
+            </>
+          )
+        }
+      ]}
+      signature={{
+        detail: `${ACTIVE_CHAIN.name} · USDC escrow`,
+        label: "In escrow",
+        value: loading ? (
+          <span className="skeleton inline-block h-10 w-28 align-middle" />
+        ) : (
+          <>
+            {formatUsdcDisplaySafe(escrowed)}
+            <span className="ml-2 align-baseline font-mono text-xs font-normal not-italic tracking-[0.18em] text-muted-foreground md:text-sm">
+              USDC
             </span>
-            <div className="flex min-w-0 flex-col-reverse">
-              <dt className="text-[11px] font-medium leading-tight text-zinc-500">{label}</dt>
-              <dd className="font-display text-xl font-extrabold tabular-nums text-white">
-                {loading ? <span className="skeleton inline-block h-6 w-12 align-middle" /> : value}
-              </dd>
-            </div>
+          </>
+        )
+      }}
+      media={
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={HERO_PHOTO} alt="Technician repairing street-side equipment" className="h-full w-full object-cover" />
+          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-ink-950/80 px-3 py-1 text-[11px] font-semibold text-zinc-100 backdrop-blur">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
+            Verified human at work
+          </span>
+        </>
+      }
+      aside={
+        <div className="space-y-5">
+          <div>
+            <p className="label-micro">Latest on the map</p>
+            {loading ? (
+              <div className="skeleton mt-2 h-14 max-w-md" />
+            ) : latest ? (
+              <Link
+                href={`/bounty/${latest.bountyId}`}
+                className="group mt-2 flex max-w-md items-center justify-between gap-4 rounded-2xl border border-border bg-white/[0.03] px-4 py-3 transition hover:border-primary/40"
+              >
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    Bounty #{latest.bountyId}
+                    <StatusBadge status={latest.status} />
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {latest.description ?? `Pinned at ${latest.lat.toFixed(4)}, ${latest.lng.toFixed(4)}`}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2 font-display text-sm font-bold text-foreground">
+                  {formatUsdcDisplaySafe(latest.totalPledged)} USDC
+                  <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
+                </span>
+              </Link>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No bounties yet — drop the first pin.</p>
+            )}
+            {!loading && (
+              <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                {bounties.length} bounties · {open} open · {approved} approved
+              </p>
+            )}
           </div>
-        ))}
-      </dl>
-
-      <p className="mt-4 flex items-start justify-center gap-1.5 text-[11px] text-zinc-500 sm:items-center">
-        <Fingerprint className="mt-px h-3.5 w-3.5 shrink-0 sm:mt-0" aria-hidden />
-        One human, one claim — every worker and reviewer is World ID verified.
-      </p>
-    </section>
+          <div className="flex flex-wrap gap-3">
+            <a href="#create" className="btn-primary">
+              <MapPin className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+              Drop a bounty
+            </a>
+            <Link href="/review" className="btn-ghost">
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              Review repairs
+            </Link>
+          </div>
+        </div>
+      }
+      links={
+        <>
+          {explorer && ESCROW_ADDRESS && (
+            <a
+              href={`${explorer}/address/${ESCROW_ADDRESS}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-semibold transition hover:text-foreground"
+            >
+              Escrow on explorer
+              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          )}
+          <a href={REPO_URL} target="_blank" rel="noreferrer" aria-label="Source on GitHub" className="transition hover:text-foreground">
+            {glyphs.github}
+          </a>
+        </>
+      }
+      sideTab={
+        <a
+          href="#create"
+          className="flex items-center gap-2 rounded-l-xl bg-primary px-3 py-5 text-sm font-bold text-primary-foreground shadow-glow-sm transition hover:pr-4"
+        >
+          <span className="rotate-180 [writing-mode:vertical-rl]">Drop a bounty</span>
+          <ArrowDown className="h-4 w-4" aria-hidden />
+        </a>
+      }
+    />
   );
 }
