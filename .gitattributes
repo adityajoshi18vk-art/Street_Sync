@@ -1,0 +1,2 @@
+# Demo PDFs are plain ASCII; their SHA-256 is recorded on-chain, so line endings must never be converted.
+*.pdf binary
