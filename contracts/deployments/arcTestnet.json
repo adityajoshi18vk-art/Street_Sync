@@ -1045,10 +1045,10 @@
         }
       ]
     },
-    "MockUSDC": {
-      "address": "0x0000000000000000000000000000000000000000",
+    "USDC": {
+      "address": "0x3600000000000000000000000000000000000000",
       "transactionHash": null,
-      "note": "Demo 6-decimal USDC. On Arc Testnet main USDC, set the real address before deploy and override with NEXT_PUBLIC_USDC_ADDRESS in the app.",
+      "note": "Arc Testnet system USDC ERC-20 interface (6 decimals).",
       "abi": [
         {
           "type": "function",
