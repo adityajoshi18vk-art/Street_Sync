@@ -10,12 +10,20 @@ import {
   type WorldIdRequestContext,
   type WorldIdRole
 } from "@/lib/api";
-import { WORLD_ACTION_REVIEWER, WORLD_ACTION_WORKER } from "@/config/contracts";
+import { WORLD_ACTION_NEIGHBOUR, WORLD_ACTION_REVIEWER, WORLD_ACTION_WORKER } from "@/config/contracts";
+
+const ACTIONS: Record<WorldIdRole, string> = {
+  worker: WORLD_ACTION_WORKER,
+  reviewer: WORLD_ACTION_REVIEWER,
+  neighbour: WORLD_ACTION_NEIGHBOUR
+};
 
 interface WorldIdButtonProps {
   role: WorldIdRole;
   bountyId: string;
   wallet: string | undefined;
+  /** Browser GPS; required by the backend for role "neighbour". */
+  location?: { lat: number; lng: number };
   disabled?: boolean;
   label: string;
   busyLabel?: string;
@@ -29,19 +37,20 @@ interface WorldIdButtonProps {
  * bound to the wallet (signal) and the backend verifies it.
  */
 export default function WorldIdButton({
-  role, bountyId, wallet, disabled, label, busyLabel, onAttestation, onError
+  role, bountyId, wallet, location, disabled, label, busyLabel, onAttestation, onError
 }: WorldIdButtonProps) {
   const [busy, setBusy] = useState(false);
   const [request, setRequest] = useState<WorldIdRequestContext | null>(null);
   const [open, setOpen] = useState(false);
   const attestationRef = useRef<Attestation | null>(null);
-  const action = role === "worker" ? WORLD_ACTION_WORKER : WORLD_ACTION_REVIEWER;
+  const action = ACTIONS[role];
 
   const start = async () => {
     if (!wallet) return onError("Connect a wallet first.");
+    if (role === "neighbour" && !location) return onError("Share your location first so we can confirm you are nearby.");
     setBusy(true);
     try {
-      const existing = await reuseWorldIdAttestation({ wallet, role, bountyId });
+      const existing = await reuseWorldIdAttestation({ wallet, role, bountyId, location });
       if (existing) {
         await onAttestation(existing);
         return;
@@ -77,7 +86,7 @@ export default function WorldIdButton({
           allow_legacy_proofs={true}
           preset={proofOfHuman({ signal: wallet.toLowerCase() })}
           handleVerify={async (result: IDKitResult) => {
-            attestationRef.current = await verifyWorldIdProof({ wallet, role, bountyId, idkitResponse: result });
+            attestationRef.current = await verifyWorldIdProof({ wallet, role, bountyId, idkitResponse: result, location });
           }}
           onSuccess={async () => {
             if (attestationRef.current) await onAttestation(attestationRef.current);
