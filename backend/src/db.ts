@@ -1087,7 +1087,7 @@ export const dbAccess = {
     // Dynamic filter query: only the filters the caller passes are applied.
     // q matches a transaction hash, a record id, or text inside the raw event JSON.
     const conds: string[] = [];
-    const params: unknown[] = [];
+    const params: (string | number)[] = [];
     if (opts.projectId) { conds.push("project_id = ?"); params.push(opts.projectId); }
     if (opts.recordId) { conds.push("record_id = ?"); params.push(opts.recordId); }
     if (opts.eventName) { conds.push("event_name = ?"); params.push(opts.eventName); }

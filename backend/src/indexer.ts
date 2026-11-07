@@ -59,14 +59,14 @@ export const JANLEKHA_ABI = [
 
 /** Registry key, env var, and deployment artifact key for each JanLekha contract. */
 export const JANLEKHA_REGISTRIES = [
-  { key: "role",        envVar: "JANLEKHA_ROLE_REGISTRY_ADDRESS",        artifactKey: "RoleRegistry" },
-  { key: "budget",      envVar: "JANLEKHA_BUDGET_REGISTRY_ADDRESS",      artifactKey: "BudgetRegistry" },
-  { key: "project",     envVar: "JANLEKHA_PROJECT_REGISTRY_ADDRESS",     artifactKey: "ProjectRegistry" },
-  { key: "procurement", envVar: "JANLEKHA_PROCUREMENT_REGISTRY_ADDRESS", artifactKey: "ProcurementRegistry" },
-  { key: "milestone",   envVar: "JANLEKHA_MILESTONE_REGISTRY_ADDRESS",   artifactKey: "MilestoneRegistry" },
-  { key: "payment",     envVar: "JANLEKHA_PAYMENT_REGISTRY_ADDRESS",     artifactKey: "PaymentRegistry" },
-  { key: "document",    envVar: "JANLEKHA_DOCUMENT_REGISTRY_ADDRESS",    artifactKey: "DocumentRegistry" },
-  { key: "audit",       envVar: "JANLEKHA_AUDIT_REGISTRY_ADDRESS",       artifactKey: "AuditRegistry" },
+  { key: "role",        envVar: "JANLEKHA_ROLE_REGISTRY_ADDRESS",        artifactKey: "JanLekhaRoleRegistry" },
+  { key: "budget",      envVar: "JANLEKHA_BUDGET_REGISTRY_ADDRESS",      artifactKey: "JanLekhaBudgetRegistry" },
+  { key: "project",     envVar: "JANLEKHA_PROJECT_REGISTRY_ADDRESS",     artifactKey: "JanLekhaProjectRegistry" },
+  { key: "procurement", envVar: "JANLEKHA_PROCUREMENT_REGISTRY_ADDRESS", artifactKey: "JanLekhaProcurementRegistry" },
+  { key: "milestone",   envVar: "JANLEKHA_MILESTONE_REGISTRY_ADDRESS",   artifactKey: "JanLekhaMilestoneRegistry" },
+  { key: "payment",     envVar: "JANLEKHA_PAYMENT_REGISTRY_ADDRESS",     artifactKey: "JanLekhaPaymentRegistry" },
+  { key: "document",    envVar: "JANLEKHA_DOCUMENT_REGISTRY_ADDRESS",    artifactKey: "JanLekhaDocumentRegistry" },
+  { key: "audit",       envVar: "JANLEKHA_AUDIT_REGISTRY_ADDRESS",       artifactKey: "JanLekhaAuditRegistry" },
 ] as const;
 
 export type JanlekhaRegistryKey = (typeof JANLEKHA_REGISTRIES)[number]["key"];
@@ -76,7 +76,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 /** JanLekha deployment artifact, written by the contract port deploy script. */
 function janlekhaDeploymentArtifactPath(): string {
   return path.resolve(
-    process.env.JANLEKHA_DEPLOYMENTS_PATH ?? "../contracts/deployments/janlekhaArcTestnet.json",
+    process.env.JANLEKHA_DEPLOYMENTS_PATH ?? "../contracts/deployments/arcTestnet-janlekha.json",
   );
 }
 
@@ -542,7 +542,7 @@ function recordJanlekhaEvent(registry: string, log: JanlekhaLog, eventName: stri
 function handleProjectRegistered(registry: string, log: JanlekhaLog) {
   const a = log.args as { id: string; departmentId: string; contractor: Address; name: string; budgetInr: bigint };
   recordJanlekhaEvent(registry, log, "ProjectRegistered", a.id, a.id);
-  dbAccess.upsertJanlekhaProject(a.id, a.name, a.departmentId, a.contractor.toLowerCase(), a.amountInr.toString(), 0, jlNow(), jlBlock(log), jlTx(log));
+  dbAccess.upsertJanlekhaProject(a.id, a.name, a.departmentId, a.contractor.toLowerCase(), a.budgetInr.toString(), 0, jlNow(), jlBlock(log), jlTx(log));
   console.log(`[indexer:janlekha] ProjectRegistered ${a.id} (${a.name})`);
 }
 
@@ -736,7 +736,7 @@ async function startJanlekhaIndexer(client: ReturnType<typeof createClient>): Pr
   const addresses = resolveJanlekhaAddresses();
   if (addresses.size === 0) {
     console.warn("[indexer:janlekha] No JanLekha registry addresses configured. JanLekha indexing disabled.");
-    console.warn("[indexer:janlekha] Set JANLEKHA_*_REGISTRY_ADDRESS in .env or provide contracts/deployments/janlekhaArcTestnet.json.");
+    console.warn("[indexer:janlekha] Set JANLEKHA_*_REGISTRY_ADDRESS in .env or provide contracts/deployments/arcTestnet-janlekha.json.");
     return;
   }
 
