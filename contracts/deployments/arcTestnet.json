@@ -2022,5 +2022,51 @@
         }
       ]
     }
+  },
+  "janlekha": {
+    "status": "NOT_DEPLOYED",
+    "note": "JanLekha registries have NOT been deployed to Arc Testnet yet. All addresses below are placeholders (zero address), not real deployments. Deploy with: npx hardhat run scripts/deploy-janlekha.ts --network arcTestnet (PRIVATE_KEY from env only, testnet only). Demo data only.",
+    "contracts": {
+      "JanLekhaRoleRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaBudgetRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaProjectRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaProcurementRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaMilestoneRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaPaymentRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaDocumentRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      },
+      "JanLekhaAuditRegistry": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "NOT_DEPLOYED",
+        "abi": []
+      }
+    }
   }
 }

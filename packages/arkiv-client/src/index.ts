@@ -10,6 +10,8 @@ import { createHash } from "node:crypto";
 import { unpackBundle, sha256Bytes32, HEADER_SIZE, SIGNATURE_SIZE, MAGIC_BYTES } from "@streetsync/evidence";
 import type { EvidenceMetadata, UnpackedBundle, CompressionStats } from "@streetsync/evidence";
 
+export * from "./janlekha.js";
+
 // Re-export compression stats for UI stats panel as requested
 export type { CompressionStats };
 

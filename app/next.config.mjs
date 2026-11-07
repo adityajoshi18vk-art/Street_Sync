@@ -14,50 +14,19 @@ const esmEntry = (pkg) => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Same-origin proxy to the backend and JanLekha single-port integration
+  // Same-origin proxy to the backend. JanLekha is now a module inside this
+  // app under /janlekha, so the old rewrites to the separate Hedera JanLekha
+  // sub-app on port 3100 are removed. Old top-level links redirect instead.
   async rewrites() {
     const target = process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
-    const janlekhaPort = process.env.JANLEKHA_PORT || "3100";
-    const janlekhaHost = process.env.JANLEKHA_HOST || "127.0.0.1";
-    const janlekhaOrigin = `http://${janlekhaHost}:${janlekhaPort}`;
+    return [{ source: "/backend/:path*", destination: `${target}/:path*` }];
+  },
+  async redirects() {
     return [
-      { source: "/backend/:path*", destination: `${target}/:path*` },
-      {
-        source: "/janlekha",
-        destination: `${janlekhaOrigin}/janlekha`
-      },
-      {
-        source: "/janlekha/:path*",
-        destination: `${janlekhaOrigin}/janlekha/:path*`
-      },
-      {
-        source: "/projects",
-        destination: `${janlekhaOrigin}/janlekha/projects`
-      },
-      {
-        source: "/projects/:path*",
-        destination: `${janlekhaOrigin}/janlekha/projects/:path*`
-      },
-      {
-        source: "/verify",
-        destination: `${janlekhaOrigin}/janlekha/verify`
-      },
-      {
-        source: "/verify/:path*",
-        destination: `${janlekhaOrigin}/janlekha/verify/:path*`
-      },
-      {
-        source: "/demo-documents/:path*",
-        destination: `${janlekhaOrigin}/janlekha/demo-documents/:path*`
-      },
-      {
-        source: "/api/documents/:path*",
-        destination: `${janlekhaOrigin}/janlekha/api/documents/:path*`
-      },
-      {
-        source: "/api/documents",
-        destination: `${janlekhaOrigin}/janlekha/api/documents`
-      }
+      { source: "/projects", destination: "/janlekha/projects", permanent: false },
+      { source: "/projects/:path*", destination: "/janlekha/projects/:path*", permanent: false },
+      { source: "/verify", destination: "/janlekha/verify", permanent: false },
+      { source: "/verify/:path*", destination: "/janlekha/verify/:path*", permanent: false },
     ];
   },
   webpack: (config, { isServer }) => {

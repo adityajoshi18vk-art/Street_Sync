@@ -20,6 +20,7 @@ export * from "./dictionary.js";
 export * from "./compress.js";
 export * from "./resizer.js";
 export * from "./bundle.js";
+export * from "./janlekha.js";
 
 // Convenience aliases matching various caller conventions
 export {
