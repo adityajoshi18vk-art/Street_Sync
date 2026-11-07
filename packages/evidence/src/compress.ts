@@ -146,3 +146,56 @@ export async function decompressMetadata(
 
 export { DICT_ID, ZSTD_DICTIONARY };
 
+/**
+ * Compress arbitrary raw bytes with Zstd.
+ * Returns method "zstd" when the WASM engine compresses the data, and
+ * method "none" when WASM is unavailable, in which case the input is
+ * returned unchanged and the caller must record method "none" so the
+ * reader does not try to decompress it. The method is never guessed:
+ * it travels with the payload in the JanLekha envelope and manifest.
+ */
+export async function compressBytes(
+  data: Uint8Array,
+  level: number = 10
+): Promise<{ compressed: Uint8Array; method: "zstd" | "none" }> {
+  await initZstd();
+  if (zstdWasmModule && zstdInitialized) {
+    try {
+      const compressed = zstdWasmModule.compress(data, level);
+      return { compressed: new Uint8Array(compressed), method: "zstd" };
+    } catch {
+      return { compressed: new Uint8Array(data), method: "none" };
+    }
+  }
+  return { compressed: new Uint8Array(data), method: "none" };
+}
+
+/**
+ * Decompress bytes produced by compressBytes. Method "none" returns a
+ * copy of the input. Method "zstd" tries the WASM engine first, then
+ * the pure JS fzstd decompressor, and throws instead of returning
+ * corrupt or partial data when both fail. Fail closed, never guess.
+ */
+export async function decompressBytes(
+  data: Uint8Array,
+  method: "zstd" | "none"
+): Promise<Uint8Array> {
+  if (method === "none") {
+    return new Uint8Array(data);
+  }
+  await initZstd();
+  if (zstdWasmModule && zstdInitialized) {
+    try {
+      const out = zstdWasmModule.decompress(data);
+      return new Uint8Array(out);
+    } catch {
+      // Fall through to the fzstd fallback below.
+    }
+  }
+  try {
+    return new Uint8Array(fzstdDecompress(data));
+  } catch (err) {
+    throw new Error(`Zstd decompression failed: ${String(err)}`);
+  }
+}
+

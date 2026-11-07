@@ -183,6 +183,15 @@ const DERIVED_DDL = `
     updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
   );
 
+  -- Gamification stickers earned per wallet (awarded lazily from indexed activity)
+  CREATE TABLE IF NOT EXISTS stickers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    wallet      TEXT    NOT NULL,
+    sticker_id  TEXT    NOT NULL,
+    awarded_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    UNIQUE(wallet, sticker_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_bounties_status ON bounties(status);
   CREATE INDEX IF NOT EXISTS idx_bounties_region ON bounties(region_cell);
   CREATE INDEX IF NOT EXISTS idx_bounties_creator ON bounties(creator);
@@ -191,6 +200,7 @@ const DERIVED_DDL = `
   CREATE INDEX IF NOT EXISTS idx_panel_bounty ON panel_assignments(bounty_id);
   CREATE INDEX IF NOT EXISTS idx_votes_bounty ON vote_commits(bounty_id);
   CREATE INDEX IF NOT EXISTS idx_problem_votes_bounty ON problem_votes(bounty_id);
+  CREATE INDEX IF NOT EXISTS idx_stickers_wallet ON stickers(wallet);
 `;
 
 function getMeta(db: DatabaseSync, key: string): string | null {
