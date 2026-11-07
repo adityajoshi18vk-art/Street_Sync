@@ -14,11 +14,35 @@ const esmEntry = (pkg) => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Same-origin proxy to the backend, so the app works behind a tunnel or preview URL
-  // where the browser can't reach localhost:3001. Use with NEXT_PUBLIC_API_URL=/backend.
+  // Same-origin proxy to the backend and JanLekha single-port integration
   async rewrites() {
     const target = process.env.BACKEND_PROXY_TARGET ?? "http://127.0.0.1:3001";
-    return [{ source: "/backend/:path*", destination: `${target}/:path*` }];
+    const janlekhaPort = process.env.JANLEKHA_PORT || "3100";
+    const janlekhaHost = process.env.JANLEKHA_HOST || "127.0.0.1";
+    const janlekhaOrigin = `http://${janlekhaHost}:${janlekhaPort}`;
+    return [
+      { source: "/backend/:path*", destination: `${target}/:path*` },
+      {
+        source: "/janlekha",
+        destination: `${janlekhaOrigin}/janlekha`
+      },
+      {
+        source: "/janlekha/:path*",
+        destination: `${janlekhaOrigin}/janlekha/:path*`
+      },
+      {
+        source: "/demo-documents/:path*",
+        destination: `${janlekhaOrigin}/janlekha/demo-documents/:path*`
+      },
+      {
+        source: "/api/documents/:path*",
+        destination: `${janlekhaOrigin}/janlekha/api/documents/:path*`
+      },
+      {
+        source: "/api/documents",
+        destination: `${janlekhaOrigin}/janlekha/api/documents`
+      }
+    ];
   },
   webpack: (config, { isServer }) => {
     config.experiments = {

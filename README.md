@@ -192,14 +192,12 @@ npm run dev
 
 This repository is one project with two features:
 
-| Feature | What it does | URL (local) |
+| Feature | What it does | URL (local - unified on Port 3000) |
 | :--- | :--- | :--- |
 | **StreetSync** | Neighbours fund civic repairs; verified humans fix and review them; USDC escrow on Arc | http://localhost:3000 |
-| **JanLekha** | Public, verifiable audit trail for government budgets, tenders, milestones and payment attestations on Hedera | http://localhost:3100 |
+| **JanLekha** | Public, verifiable audit trail for government budgets, tenders, milestones and payment attestations on Hedera | http://localhost:3000/janlekha |
 
-Each app links to the other in its header. They run as two apps because they depend on incompatible
-framework versions (StreetSync: Next 14 + Hardhat 2; JanLekha: Next 16 + Hardhat 3), and `janlekha/` keeps its
-own lockfile. You still install and start everything from the root.
+Both features are unified under **Port 3000** via Next.js multi-zone rewrites. They run as two cooperating services because they depend on different framework generations (StreetSync: Next 14 + Hardhat 2; JanLekha: Next 16 + Hardhat 3), but you interact with both seamlessly on `http://localhost:3000`. You still install and start everything with a single command from the root.
 
 ### Install (once)
 
@@ -219,7 +217,7 @@ npm run dev
 | :--- | :--- | :--- |
 | StreetSync backend API | 3001 | `BACKEND_PORT`; uses Arc Testnet when `backend/.env.arc` exists, otherwise the local Hardhat chain (`backend/.env`) |
 | StreetSync app | 3000 | |
-| JanLekha app | 3100 | Starts its own local demo chain on 8547, deploys `JanLekha.sol` and seeds three synthetic projects. Nothing to configure. |
+| JanLekha app | 3100 (internal) | Internal micro-frontend service, seamlessly proxied to http://localhost:3000/janlekha. Starts its local demo chain on 8547. |
 
 Press Ctrl+C once to stop all of them. Each JanLekha demo run starts from a fresh chain.
 
@@ -237,7 +235,7 @@ Run one feature on its own with `npm run dev:streetsync` or `npm run dev:janlekh
 
 ### Try the JanLekha demo
 
-1. Open http://localhost:3100/projects. Project #1 has the full lifecycle (tender, sealed bids, award, milestones, mock PFMS attestation).
+1. Open http://localhost:3000/janlekha/projects. Project #1 has the full lifecycle (tender, sealed bids, award, milestones, mock PFMS attestation).
 2. Open **Verify a document**, pick *Tender document*, then select `janlekha/public/demo-documents/drain-tender-notice.pdf` to get **MATCH**.
    Edit one character of a copy and it shows **MISMATCH**.
 3. No wallet is needed for any of this. Department, vendor, inspector and PAO actions need a browser wallet on the demo chain
